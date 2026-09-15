@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,18 +9,71 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; }
-        .tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 500; }
-        .tab-btn.active { border-bottom-color: #38bdf8; color: #38bdf8; font-weight: 600; }
-        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .modal { display: none; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
-        .modal.active { display: flex; }
-        .terminal { font-family: monospace; background: #000; color: #0f0; padding: 1rem; border-radius: 0.5rem; height: 220px; overflow-y: auto; white-space: pre-wrap; font-size: 13px; }
-        .market-btn { transition: all 0.2s; border: 1px solid rgba(255, 255, 255, 0.05); }
-        .market-btn:hover { background: rgba(255, 255, 255, 0.05); }
-        .market-btn.active { background: #38bdf8; color: #0f172a; font-weight: 700; border-color: #38bdf8; box-shadow: 0 1px 4px rgba(56, 189, 248, 0.3); }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .tab-btn {
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .tab-btn.active {
+            border-bottom-color: #38bdf8;
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal {
+            display: none;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .terminal {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            height: 220px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+
+        .market-btn {
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .market-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .market-btn.active {
+            background: #38bdf8;
+            color: #0f172a;
+            font-weight: 700;
+            border-color: #38bdf8;
+            box-shadow: 0 1px 4px rgba(56, 189, 248, 0.3);
+        }
     </style>
 </head>
+
 <body class="min-h-screen">
     <!-- Navbar -->
     <nav class="border-b border-slate-800 bg-slate-900/50 sticky top-0 z-10 backdrop-blur-md">
@@ -28,23 +82,43 @@
                 <div class="flex items-center gap-6">
                     <div class="flex items-center gap-2">
                         <span class="text-xl">⚡️</span>
-                        <h1 class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent">Job Hunter CRM</h1>
+                        <h1
+                            class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent">
+                            Job Hunter CRM</h1>
                     </div>
                     <div class="flex gap-1 border-l border-slate-800 pl-4 h-full items-center">
-                        <button onclick="setTab('inbox')" id="tab-inbox" class="tab-btn active px-3 py-1.5 text-slate-400">Inbox (<span id="count-inbox">0</span>)</button>
-                        <button onclick="setTab('sent')" id="tab-sent" class="tab-btn px-3 py-1.5 text-slate-400">Отправлено (<span id="count-sent">0</span>)</button>
-                        <button onclick="setTab('replied')" id="tab-replied" class="tab-btn px-3 py-1.5 text-slate-400">Ответили (<span id="count-replied">0</span>)</button>
-                        <button onclick="setTab('profiles')" id="tab-profiles" class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300">👤 Профили</button>
+                        <button onclick="setTab('inbox')" id="tab-inbox"
+                            class="tab-btn active px-3 py-1.5 text-slate-400">Inbox (<span
+                                id="count-inbox">0</span>)</button>
+                        <button onclick="setTab('sent')" id="tab-sent"
+                            class="tab-btn px-3 py-1.5 text-slate-400">Отправлено (<span
+                                id="count-sent">0</span>)</button>
+                        <button onclick="setTab('replied')" id="tab-replied"
+                            class="tab-btn px-3 py-1.5 text-slate-400">Ответили (<span
+                                id="count-replied">0</span>)</button>
+                        <button onclick="setTab('profiles')" id="tab-profiles"
+                            class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300">👤 Профили</button>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a id="bookmarklet-btn" href="#" onclick="event.preventDefault(); alert('Перетащите кнопку «🔖 Auto-Apply» на панель закладок браузера!\n\nЗатем на странице вакансии (HH.ru / LinkedIn) нажмите эту закладку для автозаполнения.');" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-grab flex items-center gap-1.5 select-none" title="Перетащите на панель закладок вашего браузера">
+                    <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+                        <span class="text-purple-400 font-semibold">🎯 Резюме:</span>
+                        <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1">
+                            <option value="">Загрузка...</option>
+                        </select>
+                    </div>
+                    <a id="bookmarklet-btn" href="#"
+                        onclick="event.preventDefault(); alert('Перетащите кнопку «🔖 Auto-Apply» на панель закладок браузера!\n\nЗатем на странице вакансии (HH.ru / LinkedIn) нажмите эту закладку для автозаполнения.');"
+                        class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-grab flex items-center gap-1.5 select-none"
+                        title="Перетащите на панель закладок вашего браузера">
                         <span>🔖</span> Auto-Apply
                     </a>
-                    <button onclick="startHarvest()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                    <button onclick="startHarvest()"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
                         <span>🔄</span> Собрать вакансии
                     </button>
-                    <button onclick="toggleModal('settings-modal')" class="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700">
+                    <button onclick="toggleModal('settings-modal')"
+                        class="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700">
                         ⚙️ Настройки ИИ
                     </button>
                 </div>
@@ -88,16 +162,75 @@
             <!-- Sidebar: Market Filter + Vacancy List -->
             <div class="w-1/3 flex flex-col gap-3">
                 <!-- Market Filter Segmented Control -->
-                <div class="glass-panel p-1 rounded-xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
-                    <button onclick="setMarket('all')" id="market-btn-all" class="market-btn active flex-1 py-1.5 px-2 rounded-lg font-medium text-center transition-all flex items-center justify-center gap-1">
+                <div
+                    class="glass-panel p-1 rounded-xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
+                    <button onclick="setMarket('all')" id="market-btn-all"
+                        class="market-btn active flex-1 py-1.5 px-2 rounded-lg font-medium text-center transition-all flex items-center justify-center gap-1">
                         <span>🌐</span> Все (<span id="market-count-all">0</span>)
                     </button>
-                    <button onclick="setMarket('ru')" id="market-btn-ru" class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                    <button onclick="setMarket('ru')" id="market-btn-ru"
+                        class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
                         <span>🇷🇺</span> RU (<span id="market-count-ru">0</span>)
                     </button>
-                    <button onclick="setMarket('en')" id="market-btn-en" class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                    <button onclick="setMarket('en')" id="market-btn-en"
+                        class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
                         <span>🌍</span> Remote (<span id="market-count-en">0</span>)
                     </button>
+                </div>
+
+                <!-- Search & Filter Controls -->
+                <div class="glass-panel p-2.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <div class="relative">
+                        <input type="text" id="filter-search" oninput="onFilterChange()" placeholder="🔍 Поиск (React, Сбер, Remote...)"
+                            class="w-full bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Грейд:</label>
+                            <select id="filter-grade" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Все грейды</option>
+                                <option value="Lead">Lead / Arch</option>
+                                <option value="Senior">Senior</option>
+                                <option value="Middle">Middle</option>
+                                <option value="Junior">Junior</option>
+                                <option value="Intern">Intern / Стажер</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Мэтч %:</label>
+                            <select id="filter-match" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Любой скор</option>
+                                <option value="80">🔥 80%+ (Топ мэтч)</option>
+                                <option value="60">⚡ 60%+ (Хороший)</option>
+                                <option value="mixed">⚠️ Смешанный (&lt;60%)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Источник:</label>
+                            <select id="filter-source" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Все источники</option>
+                                <option value="tg">Telegram</option>
+                                <option value="hh">HeadHunter</option>
+                                <option value="habr">Хабр Карьера</option>
+                                <option value="superjob">SuperJob</option>
+                                <option value="rabota">Rabota.ru</option>
+                                <option value="crypto">Crypto / Web3</option>
+                                <option value="remote">WWR & Remote</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Сортировка:</label>
+                            <select id="filter-sort" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="newest">⚡ Свежие (по времени публикации)</option>
+                                <option value="score_desc">🔥 Топ мэтч (% совпадения)</option>
+                                <option value="salary">💰 По зарплате</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Vacancy List -->
@@ -108,7 +241,8 @@
 
             <!-- Main Content: Vacancy Details -->
             <div class="w-2/3 h-[calc(100vh-12rem)] overflow-y-auto pr-1" id="vacancy-details">
-                <div class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
+                <div
+                    class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
                     <span class="text-3xl mb-3">👈</span>
                     <p class="text-sm font-medium">Выберите вакансию из списка слева</p>
                 </div>
@@ -121,15 +255,19 @@
         <div class="glass-panel rounded-xl p-6">
             <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-700/60">
                 <div>
-                    <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>👤</span> Персоны и Резюме</h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Управляйте профилями для откликов на русском и английском языках</p>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>👤</span> Персоны и Резюме
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Управляйте профилями для откликов на русском и английском
+                        языках</p>
                 </div>
-                <button onclick="addProfile()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1">
+                <button onclick="addProfile()"
+                    class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1">
                     ➕ Добавить профиль
                 </button>
             </div>
             <div class="flex gap-6">
-                <div class="w-1/3 flex flex-col gap-2 h-[calc(100vh-14rem)] overflow-y-auto pr-1" id="profiles-list"></div>
+                <div class="w-1/3 flex flex-col gap-2 h-[calc(100vh-14rem)] overflow-y-auto pr-1" id="profiles-list">
+                </div>
                 <div class="w-2/3" id="profile-editor">
                     <div class="text-slate-400 text-center py-16 text-sm">Выберите профиль слева</div>
                 </div>
@@ -141,26 +279,90 @@
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal fixed inset-0 z-50 items-center justify-center">
         <div class="glass-panel p-5 rounded-xl w-[420px] border border-slate-700 shadow-2xl">
-            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ (Gemini)</h2>
+            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ
+                (Gemini)</h2>
             <div class="mb-3">
                 <label class="block text-xs font-medium text-slate-400 mb-1">Gemini API Key</label>
-                <input type="password" id="gemini-key" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
-                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с <code>AIzaSy...</code></p>
+                <input type="password" id="gemini-key" placeholder="AIzaSy..."
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с
+                    <code>AIzaSy...</code></p>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="toggleModal('settings-modal')" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
-                <button onclick="saveConfig()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Сохранить</button>
+                <button onclick="toggleModal('settings-modal')"
+                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
+                <button onclick="saveConfig()"
+                    class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Сохранить</button>
             </div>
         </div>
     </div>
 
     <!-- Harvest Modal -->
     <div id="harvest-modal" class="modal fixed inset-0 z-50 items-center justify-center">
-        <div class="glass-panel p-5 rounded-xl w-[600px] border border-slate-700 shadow-2xl">
-            <h2 class="text-base font-bold mb-3 text-sky-400 flex items-center gap-2"><span>🔄</span> Сбор вакансий (TG, Habr, CryptoJobs, Remotive, RemoteOK, WWR)</h2>
-            <div class="terminal" id="harvest-logs">Ожидание запуска...</div>
-            <div class="flex justify-end mt-3">
-                <button onclick="closeHarvest()" id="harvest-close-btn" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg hidden">Готово</button>
+        <div class="glass-panel p-6 rounded-2xl w-[620px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div id="harvest-radar" class="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-lg animate-pulse">
+                        🔄
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Сбор вакансий по источникам
+                        </h2>
+                        <p class="text-[11px] text-slate-400">HeadHunter, SuperJob, Rabota.ru, Хабр, Telegram, WWR, CryptoJobs</p>
+                    </div>
+                </div>
+                <div id="harvest-badge" class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                    <span>Сканирование...</span>
+                </div>
+            </div>
+
+            <!-- Active animated progress card -->
+            <div id="harvest-status-card" class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2 text-xs">
+                    <span id="harvest-current-step" class="font-semibold text-slate-200">Инициализация модулей поиска...</span>
+                    <span id="harvest-percent" class="text-indigo-400 font-mono font-bold">В процессе</span>
+                </div>
+                <!-- Progress bar -->
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div id="harvest-progress-bar" class="bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full w-1/3 transition-all duration-500 animate-pulse"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mt-3 text-[11px] text-slate-400 text-center">
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-500 text-[10px]">Источники</div>
+                        <div class="font-bold text-slate-300 mt-0.5">9 площадок</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-500 text-[10px]">Анти-BS & Резюме</div>
+                        <div class="font-bold text-emerald-400 mt-0.5">Фильтр активен</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-500 text-[10px]">Целевое резюме</div>
+                        <div id="harvest-active-profile-label" class="font-bold text-purple-400 mt-0.5 truncate">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible Terminal Details -->
+            <div class="mb-4">
+                <button onclick="toggleTerminalLogs()" type="button" class="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 py-1 px-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                    <span class="flex items-center gap-1.5">
+                        <span>📟</span>
+                        <span id="toggle-logs-text">Показать подробный лог терминала</span>
+                    </span>
+                    <span id="toggle-logs-arrow">▼</span>
+                </button>
+                <div id="terminal-container" class="hidden mt-2">
+                    <div class="terminal text-[11px] h-44 overflow-y-auto font-mono leading-relaxed" id="harvest-logs">Ожидание запуска...</div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeHarvest()" id="harvest-close-btn"
+                    class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-2 ring-2 ring-emerald-500/40 hidden">
+                    <span>🎉</span> Посмотреть найденные вакансии
+                </button>
             </div>
         </div>
     </div>
@@ -173,8 +375,11 @@
                 <img id="cropper-image" class="max-w-full hidden">
             </div>
             <div class="flex justify-end gap-2">
-                <button onclick="toggleModal('cropper-modal')" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
-                <button onclick="saveCrop()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Применить аватар</button>
+                <button onclick="toggleModal('cropper-modal')"
+                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
+                <button onclick="saveCrop()"
+                    class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Применить
+                    аватар</button>
             </div>
         </div>
     </div>
@@ -187,12 +392,100 @@
         let currentVac = null;
         let currentProfile = null;
         let cropper = null;
+        let activeProfileId = null;
 
-        window.onload = () => {
+        // --- Filter & Search State ---
+        let filterSearch = '';
+        let filterGrade = 'all';
+        let filterMatch = 'all';
+        let filterSource = 'all';
+        let filterSort = 'newest';
+
+        window.onload = async () => {
             initBookmarklet();
-            loadConfig();
+            await loadProfilesList();
+            await loadConfig();
             loadPitches();
         };
+
+        function onFilterChange() {
+            filterSearch = (document.getElementById('filter-search')?.value || '').toLowerCase().trim();
+            filterGrade = document.getElementById('filter-grade')?.value || 'all';
+            filterMatch = document.getElementById('filter-match')?.value || 'all';
+            filterSource = document.getElementById('filter-source')?.value || 'all';
+            filterSort = document.getElementById('filter-sort')?.value || 'newest';
+
+            renderList();
+        }
+
+        function parseSalaryValue(s) {
+            if (!s || s === 'Не указана') return 0;
+            const nums = s.replace(/\s+/g, '').match(/\d+/g);
+            return nums ? parseInt(nums[0], 10) : 0;
+        }
+
+        function formatRelativeTime(dateStr) {
+            if (!dateStr) return '';
+            const cleanStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+            const date = new Date(cleanStr);
+            if (isNaN(date.getTime())) return dateStr;
+            const now = new Date();
+            const diffMs = now - date;
+            if (diffMs < 0) return 'только что';
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffMins < 1) return 'только что';
+            if (diffMins < 60) return `${diffMins} мин назад`;
+            if (diffHours < 24) return `${diffHours} ч назад`;
+            if (diffDays === 1) return 'вчера';
+            if (diffDays < 7) return `${diffDays} дн назад`;
+            return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+        }
+
+        function renderActiveProfileDropdown() {
+            const select = document.getElementById('active-profile-select');
+            const modalLabel = document.getElementById('harvest-active-profile-label');
+            if (!select) return;
+
+            if (!profiles || profiles.length === 0) {
+                select.innerHTML = '<option value="">(Нет профилей)</option>';
+                if (modalLabel) modalLabel.innerText = 'По умолчанию';
+                return;
+            }
+
+            if (!activeProfileId || !profiles.some(p => p.id === activeProfileId)) {
+                activeProfileId = profiles[0].id;
+            }
+
+            select.innerHTML = profiles.map(p => `
+                <option value="${p.id}" ${p.id === activeProfileId ? 'selected' : ''}>
+                    ${p.role || p.name || p.id} (${(p.lang || 'ru').toUpperCase()})
+                </option>
+            `).join('');
+
+            const cur = profiles.find(p => p.id === activeProfileId) || profiles[0];
+            if (modalLabel && cur) {
+                modalLabel.innerText = `${cur.role || cur.name} (${(cur.lang || 'ru').toUpperCase()})`;
+            }
+        }
+
+        async function changeActiveProfile(profileId) {
+            activeProfileId = profileId;
+            renderActiveProfileDropdown();
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active_profile_id: profileId })
+                });
+                showToast('🎯 Активное резюме переключено!');
+                renderDetails();
+            } catch (e) {
+                console.error("Error saving active profile", e);
+            }
+        }
 
         function initBookmarklet() {
             const origin = window.location.origin;
@@ -274,11 +567,11 @@
             const countInbox = vacancies.filter(v => statusFilter(v, 'inbox')).length;
             const countSent = vacancies.filter(v => statusFilter(v, 'sent')).length;
             const countReplied = vacancies.filter(v => statusFilter(v, 'replied')).length;
-            
+
             document.getElementById('count-inbox').innerText = countInbox;
             document.getElementById('count-sent').innerText = countSent;
             document.getElementById('count-replied').innerText = countReplied;
-            
+
             // Market counts for currently active tab
             const tabVacs = vacancies.filter(v => statusFilter(v, currentTab));
             const marketAll = tabVacs.length;
@@ -306,7 +599,7 @@
             if (statSent) statSent.innerText = countSent;
             const statReplied = document.getElementById('stat-replied');
             if (statReplied) statReplied.innerText = countReplied;
-            
+
             const winRate = countSent > 0 ? Math.round((countReplied / countSent) * 100) : 0;
             const statWinrate = document.getElementById('stat-winrate');
             if (statWinrate) statWinrate.innerText = winRate + '%';
@@ -322,33 +615,92 @@
             const listEl = document.getElementById('vacancy-list');
             const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
             let filtered = vacancies.filter(v => targetStatus.includes(v.status));
-            
+
+            // 1. Market filter (ru / en)
             if (currentMarket === 'ru') {
                 filtered = filtered.filter(v => (v.language || 'ru') === 'ru');
             } else if (currentMarket === 'en') {
                 filtered = filtered.filter(v => v.language === 'en');
             }
 
+            // 2. Search query filter (title, company, description, skills, location)
+            if (filterSearch) {
+                filtered = filtered.filter(v => {
+                    const text = `${v.title || ''} ${v.company || ''} ${v.description || ''} ${v.skills || ''} ${v.location || ''}`.toLowerCase();
+                    return text.includes(filterSearch);
+                });
+            }
+
+            // 3. Grade filter (Junior, Middle, Senior, Lead, Intern)
+            if (filterGrade !== 'all') {
+                filtered = filtered.filter(v => (v.grade || 'Middle').toLowerCase() === filterGrade.toLowerCase());
+            }
+
+            // 4. Match score filter
+            if (filterMatch === '80') {
+                filtered = filtered.filter(v => (v.score || 0) >= 80);
+            } else if (filterMatch === '60') {
+                filtered = filtered.filter(v => (v.score || 0) >= 60);
+            } else if (filterMatch === 'mixed') {
+                filtered = filtered.filter(v => (v.score || 0) < 60);
+            }
+
+            // 5. Source filter
+            if (filterSource !== 'all') {
+                filtered = filtered.filter(v => (v.source || '').toLowerCase().includes(filterSource));
+            }
+
+            // 6. Sorting
+            if (filterSort === 'score_desc') {
+                filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
+            } else if (filterSort === 'newest') {
+                filtered.sort((a, b) => {
+                    const timeA = new Date((a.published_at || a.created_at || '').replace(' ', 'T')).getTime() || 0;
+                    const timeB = new Date((b.published_at || b.created_at || '').replace(' ', 'T')).getTime() || 0;
+                    return timeB - timeA;
+                });
+            } else if (filterSort === 'salary') {
+                filtered.sort((a, b) => parseSalaryValue(b.salary) - parseSalaryValue(a.salary));
+            }
+
             if (filtered.length === 0) {
-                listEl.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-900/50 rounded-lg border border-slate-800 text-xs">Нет вакансий в выбранной категории</div>`;
+                listEl.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-900/50 rounded-lg border border-slate-800 text-xs">Нет вакансий по выбранным фильтрам</div>`;
                 return;
             }
 
             listEl.innerHTML = filtered.map(v => {
                 const isEn = v.language === 'en';
-                const langBadge = isEn 
-                    ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-950/80 text-sky-400 border border-sky-800/70 flex items-center gap-1">🌍 EN · Remote</span>`
+                const langBadge = isEn
+                    ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-950/80 text-sky-400 border border-sky-800/70 flex items-center gap-1">🌍 EN</span>`
                     : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/70 flex items-center gap-1">🇷🇺 RU</span>`;
+
+                const grade = v.grade || 'Middle';
+                let gradeClass = 'bg-sky-950/80 text-sky-400 border-sky-800/70';
+                if (grade === 'Junior' || grade === 'Intern') {
+                    gradeClass = 'bg-emerald-950/80 text-emerald-400 border-emerald-800/70';
+                } else if (grade === 'Senior') {
+                    gradeClass = 'bg-purple-950/80 text-purple-300 border-purple-800/70';
+                } else if (grade === 'Lead') {
+                    gradeClass = 'bg-amber-950/80 text-amber-300 border-amber-800/70';
+                }
+                const gradeBadge = `<span class="text-[10px] font-semibold px-2 py-0.5 rounded border ${gradeClass}">${grade}</span>`;
+
+                const timeStr = formatRelativeTime(v.published_at || v.created_at);
+                const timeBadge = timeStr ? `<span class="text-[10px] text-slate-400 font-mono" title="${v.published_at || v.created_at || ''}">⏱ ${timeStr}</span>` : '';
 
                 return `
                 <div onclick="selectVac('${v.id}')" 
-                     class="cursor-pointer p-3.5 rounded-xl border transition-all ${currentVac?.id === v.id ? 'bg-slate-800/90 border-sky-500 shadow-sm' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'}">
-                    <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                        <div class="flex items-center gap-1.5">
+                     class="cursor-pointer p-3 rounded-xl border transition-all ${currentVac?.id === v.id ? 'bg-slate-800/90 border-sky-500 shadow-sm' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'}">
+                    <div class="flex items-center justify-between gap-1.5 mb-1.5 flex-wrap">
+                        <div class="flex items-center gap-1">
                             <span class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">${v.source || 'WEB'}</span>
+                            ${gradeBadge}
                             ${langBadge}
                         </div>
-                        ${v.score > 0 ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/80' : v.score >= 50 ? 'bg-amber-900/50 text-amber-400 border border-amber-800/80' : 'bg-rose-900/50 text-rose-400 border border-rose-800/80'}">🔥 ${v.score}% Match</span>` : ''}
+                        <div class="flex items-center gap-1.5">
+                            ${timeBadge}
+                            ${v.score > 0 ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/80' : v.score >= 50 ? 'bg-amber-900/50 text-amber-400 border border-amber-800/80' : 'bg-rose-900/50 text-rose-400 border border-rose-800/80'}">🔥 ${v.score}% Match</span>` : ''}
+                        </div>
                     </div>
                     <h3 class="font-semibold text-slate-200 text-sm truncate" title="${v.title}">${v.title}</h3>
                     <div class="text-sky-400 text-xs mt-1 flex items-center justify-between">
@@ -391,9 +743,24 @@
                 ? `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-950 text-sky-300 border border-sky-700 flex items-center gap-1">🌍 International · Remote (EN)</span>`
                 : `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700 flex items-center gap-1">🇷🇺 Локальная / РФ и СНГ (RU)</span>`;
 
-            const personaHint = isEn
-                ? `🇬🇧 Международный профиль (English · Frontend / Full-stack Engineer)`
-                : `🇷🇺 Локальный профиль (Русский · Frontend разработчик)`;
+            const grade = v.grade || 'Middle';
+            let gradeBadgeClass = 'bg-sky-950/90 text-sky-300 border-sky-700';
+            if (grade === 'Junior' || grade === 'Intern') {
+                gradeBadgeClass = 'bg-emerald-950/90 text-emerald-300 border-emerald-700';
+            } else if (grade === 'Senior') {
+                gradeBadgeClass = 'bg-purple-950/90 text-purple-300 border-purple-700';
+            } else if (grade === 'Lead') {
+                gradeBadgeClass = 'bg-amber-950/90 text-amber-300 border-amber-700';
+            }
+            const gradeBadge = `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${gradeBadgeClass}">Грейд: ${grade}</span>`;
+
+            const activeP = profiles.find(p => p.id === activeProfileId);
+            const personaHint = activeP
+                ? `${activeP.role || activeP.name} (${(activeP.lang || 'ru').toUpperCase()})`
+                : (isEn ? `🇬🇧 Международный профиль (English · Frontend / Full-stack Engineer)` : `🇷🇺 Локальный профиль (Русский · Frontend разработчик)`);
+
+            const pubDateStr = v.published_at || v.created_at || '';
+            const pubRelative = formatRelativeTime(pubDateStr);
 
             detailsEl.innerHTML = `
                 <div class="glass-panel rounded-xl p-5 border-l-4 ${isEn ? 'border-l-sky-500' : 'border-l-amber-500'} mb-4 shadow-sm">
@@ -402,6 +769,7 @@
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
                                 <h2 class="text-xl font-bold text-white">${v.title}</h2>
                                 ${marketBadge}
+                                ${gradeBadge}
                                 ${v.score > 0 ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'bg-amber-900/50 text-amber-400 border border-amber-800'}">🔥 ${v.score}% Match</span>` : ''}
                             </div>
                             <div class="flex gap-3 items-center text-xs text-slate-400 flex-wrap">
@@ -409,6 +777,7 @@
                                 <span>•</span>
                                 <span>📍 ${v.location || (isEn ? 'Worldwide Remote' : 'Удаленно')}</span>
                                 ${v.salary && v.salary !== 'Не указана' ? `<span>•</span><span class="text-emerald-400 font-medium">💰 ${v.salary}</span>` : ''}
+                                ${pubDateStr ? `<span>•</span><span class="text-slate-300 font-mono" title="${pubDateStr}">⏱ ${pubRelative} (${pubDateStr.split('.')[0]})</span>` : ''}
                                 <span>•</span>
                                 <a href="${v.url}" target="_blank" class="text-slate-400 hover:text-white underline">Оригинал вакансии ↗</a>
                             </div>
@@ -427,8 +796,8 @@
                 <!-- Persona Active Indicator -->
                 <div class="bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-between mb-4">
                     <div class="flex items-center gap-2">
-                        <span>👤 Активная персона:</span>
-                        <span class="font-medium text-slate-200">${personaHint}</span>
+                        <span>🎯 Активное резюме под вакансию:</span>
+                        <span class="font-medium text-purple-300">${personaHint}</span>
                     </div>
                     <button onclick="setTab('profiles')" class="text-purple-400 hover:underline text-[11px]">Редактировать персоны ↗</button>
                 </div>
@@ -490,20 +859,20 @@
             const btn = document.getElementById(`btn-rewrite-${vac_id}`);
             const prog = document.getElementById(`ai-progress-${vac_id}`);
             const ptext = document.getElementById(`ai-text-${vac_id}`);
-            
+
             btn.disabled = true;
             btn.classList.add('opacity-50');
             prog.classList.remove('hidden');
             ptext.innerText = 'Запрос в Gemini... (подбираем персону и генерируем pitch)';
-            
+
             try {
                 const res = await fetch(`/api/vacancies/${vac_id}/rewrite`, { method: 'POST' });
                 const data = await res.json();
-                
+
                 if (data.success) {
                     ptext.innerHTML = '<span class="text-emerald-400 font-medium">✅ Готово! Текст обновлен.</span>';
                     setTimeout(() => prog.classList.add('hidden'), 2000);
-                    
+
                     const v = vacancies.find(v => v.id === vac_id);
                     if (v) {
                         v.short_dm = data.short_dm;
@@ -515,10 +884,10 @@
                 } else {
                     ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ ${data.error || 'Ошибка генерации'}</span>`;
                 }
-            } catch(e) {
+            } catch (e) {
                 ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ Ошибка сети. Проверьте VPN и консоль сервера.</span>`;
             }
-            
+
             btn.disabled = false;
             btn.classList.remove('opacity-50');
         }
@@ -557,15 +926,15 @@
                 profiles = await res.json();
                 renderProfilesList();
                 renderProfileEditor();
-            } catch(e) { console.error("Error loading profiles", e); }
+                renderActiveProfileDropdown();
+            } catch (e) { console.error("Error loading profiles", e); }
         }
 
         function renderProfilesList() {
             const list = document.getElementById('profiles-list');
             list.innerHTML = profiles.map((p, idx) => `
-                <div onclick="selectProfile(${idx})" class="p-3.5 rounded-xl cursor-pointer border transition-all ${
-                    currentProfile === idx 
-                    ? 'bg-slate-800/90 border-purple-500/80 shadow-md ring-1 ring-purple-500/30' 
+                <div onclick="selectProfile(${idx})" class="p-3.5 rounded-xl cursor-pointer border transition-all ${currentProfile === idx
+                    ? 'bg-slate-800/90 border-purple-500/80 shadow-md ring-1 ring-purple-500/30'
                     : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                 }">
                     <div class="flex items-center gap-3">
@@ -632,9 +1001,8 @@
 
         function showToast(msg, isError = false) {
             const toast = document.createElement('div');
-            toast.className = `fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 border transition-all transform duration-200 ${
-                isError ? 'bg-rose-950 border-rose-700 text-rose-200' : 'bg-emerald-950 border-emerald-600 text-emerald-200'
-            }`;
+            toast.className = `fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 border transition-all transform duration-200 ${isError ? 'bg-rose-950 border-rose-700 text-rose-200' : 'bg-emerald-950 border-emerald-600 text-emerald-200'
+                }`;
             toast.innerHTML = msg;
             document.body.appendChild(toast);
             setTimeout(() => {
@@ -919,7 +1287,7 @@
         async function saveProfiles() {
             if (currentProfile === null || !profiles[currentProfile]) return;
             const p = profiles[currentProfile];
-            
+
             p.id = document.getElementById('p-id').value.trim() || ('profile_' + Date.now());
             p.lang = document.getElementById('p-lang').value;
             p.role = document.getElementById('p-role').value;
@@ -939,7 +1307,7 @@
             p.contacts_structured.github = document.getElementById('p-gh').value;
             p.contacts_structured.linkedin = document.getElementById('p-li').value;
             p.contacts_structured.portfolio = document.getElementById('p-portfolio').value;
-            
+
             p.contacts = [
                 p.contacts_structured.telegram,
                 p.contacts_structured.email,
@@ -973,10 +1341,10 @@
             });
 
             try {
-                const res = await fetch('/api/profiles', { 
-                    method: 'POST', 
+                const res = await fetch('/api/profiles', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(profiles) 
+                    body: JSON.stringify(profiles)
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -986,7 +1354,7 @@
                 } else {
                     showToast(`❌ Ошибка сохранения: ${data.error}`, true);
                 }
-            } catch(e) {
+            } catch (e) {
                 showToast(`❌ Ошибка сети при сохранении`, true);
             }
         }
@@ -995,20 +1363,20 @@
             if (currentProfile === null || !profiles[currentProfile]) return;
             const p = profiles[currentProfile];
             if (!confirm(`Удалить профиль «${p.name || p.role}»?`)) return;
-            
+
             profiles.splice(currentProfile, 1);
             currentProfile = profiles.length > 0 ? 0 : null;
-            
+
             try {
-                await fetch('/api/profiles', { 
-                    method: 'POST', 
+                await fetch('/api/profiles', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(profiles) 
+                    body: JSON.stringify(profiles)
                 });
                 showToast('🗑️ Профиль удален');
                 renderProfilesList();
                 renderProfileEditor();
-            } catch(e) {
+            } catch (e) {
                 showToast('❌ Ошибка сети при удалении', true);
             }
         }
@@ -1017,7 +1385,7 @@
             const file = input.files[0];
             const status = document.getElementById('resume-status');
             status.innerHTML = `<span class="text-sky-400 animate-pulse">Парсинг через Gemini...</span>`;
-            
+
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
@@ -1082,34 +1450,107 @@
                 const res = await fetch('/api/config');
                 const data = await res.json();
                 document.getElementById('gemini-key').value = data.gemini_api_key || '';
-            } catch (e) {}
+                activeProfileId = data.active_profile_id || null;
+                renderActiveProfileDropdown();
+            } catch (e) { }
         }
 
         async function saveConfig() {
             const key = document.getElementById('gemini-key').value.trim();
-            await fetch('/api/config', { 
-                method: 'POST', 
+            await fetch('/api/config', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gemini_api_key: key }) 
+                body: JSON.stringify({ gemini_api_key: key, active_profile_id: activeProfileId })
             });
             toggleModal('settings-modal');
+        }
+
+        let terminalVisible = false;
+        function toggleTerminalLogs() {
+            terminalVisible = !terminalVisible;
+            const container = document.getElementById('terminal-container');
+            const text = document.getElementById('toggle-logs-text');
+            const arrow = document.getElementById('toggle-logs-arrow');
+            if (container) {
+                if (terminalVisible) {
+                    container.classList.remove('hidden');
+                    if (text) text.innerText = 'Скрыть лог терминала';
+                    if (arrow) arrow.innerText = '▲';
+                    const logs = document.getElementById('harvest-logs');
+                    if (logs) logs.scrollTop = logs.scrollHeight;
+                } else {
+                    container.classList.add('hidden');
+                    if (text) text.innerText = 'Показать подробный лог терминала';
+                    if (arrow) arrow.innerText = '▼';
+                }
+            }
         }
 
         async function startHarvest() {
             const logs = document.getElementById('harvest-logs');
             const btn = document.getElementById('harvest-close-btn');
-            logs.innerText = 'Запуск модулей сбора вакансий...\n';
-            btn.classList.add('hidden');
+            const pBar = document.getElementById('harvest-progress-bar');
+            const pText = document.getElementById('harvest-percent');
+            const pStep = document.getElementById('harvest-current-step');
+
+            // Reset modal UI
+            if (logs) logs.innerText = '🚀 Запуск сборщика вакансий...\n';
+            if (btn) btn.classList.add('hidden');
+            if (pBar) {
+                pBar.style.width = '15%';
+                pBar.className = 'bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full transition-all duration-700 animate-pulse';
+            }
+            if (pText) pText.innerText = '15%';
+            if (pStep) pStep.innerText = 'Подключение к источникам (HH, SuperJob, Rabota, TG, RemoteOK)...';
+
             toggleModal('harvest-modal');
-            
+
+            // Simulated progress while background harvest runs
+            let currentProg = 15;
+            const progressInterval = setInterval(() => {
+                if (currentProg < 88) {
+                    currentProg += Math.floor(Math.random() * 10) + 4;
+                    if (currentProg > 88) currentProg = 88;
+                    if (pBar) pBar.style.width = currentProg + '%';
+                    if (pText) pText.innerText = currentProg + '%';
+                    if (currentProg > 35 && currentProg <= 65) {
+                        if (pStep) pStep.innerText = 'Анти-BS фильтрация, отсеивание рекламы и кандидатов...';
+                    } else if (currentProg > 65) {
+                        if (pStep) pStep.innerText = 'Расчет грейдов (Junior-Lead) и сопоставление со стеком...';
+                    }
+                }
+            }, 1200);
+
             try {
                 const res = await fetch('/api/harvest', { method: 'POST' });
                 const data = await res.json();
-                logs.innerText += data.logs || data.error || 'Готово.';
-            } catch (e) { 
-                logs.innerText += '\\nОшибка соединения с сервером.'; 
+                clearInterval(progressInterval);
+
+                if (pBar) {
+                    pBar.style.width = '100%';
+                    pBar.classList.remove('animate-pulse');
+                }
+                if (pText) pText.innerText = '100%';
+                if (pStep) pStep.innerHTML = '<span class="text-emerald-400 font-bold">✨ Сбор завершен успешно!</span>';
+
+                if (logs) {
+                    logs.innerText += (data.logs || data.error || 'Готово.') + '\n\n🏁 Процесс завершен.';
+                    logs.scrollTop = logs.scrollHeight;
+                }
+            } catch (e) {
+                clearInterval(progressInterval);
+                if (pStep) pStep.innerHTML = '<span class="text-rose-400 font-bold">❌ Ошибка сбора</span>';
+                if (logs) {
+                    logs.innerText += '\n❌ Ошибка соединения с сервером: ' + e;
+                    logs.scrollTop = logs.scrollHeight;
+                }
             }
-            btn.classList.remove('hidden');
+
+            if (btn) {
+                btn.classList.remove('hidden');
+                btn.classList.add('animate-bounce');
+                setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
+            }
         }
 
         function closeHarvest() {
@@ -1118,4 +1559,5 @@
         }
     </script>
 </body>
+
 </html>

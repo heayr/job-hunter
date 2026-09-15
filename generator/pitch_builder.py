@@ -32,26 +32,30 @@ def load_profiles() -> List[Dict]:
     return []
 
 
-def select_profile(lang: str) -> Dict:
-    """Pick the best profile for the given language from profiles.json."""
+def select_profile(lang: str = "ru", profile_id: Optional[str] = None) -> Dict:
+    """Pick the active profile by ID or by matching language from profiles.json."""
     profiles = load_profiles()
-    # Prefer exact language match
+    if not profiles:
+        return {
+            "name": "Candidate Name",
+            "lang": "en",
+            "role": "Frontend / Fullstack Engineer",
+            "contacts": "Telegram: @username | Email: candidate@example.com | GitHub: https://github.com/username | LinkedIn: https://linkedin.com/in/username",
+            "keywords": "React, Next.js, TypeScript, JavaScript, Redux Toolkit, Tailwind CSS, Node.js, FastAPI, Docker",
+            "summary": "Fullstack Engineer with experience building production web applications with React, Next.js and TypeScript.",
+            "experience": "• Engineered high-performance web applications\n• Delivered production-ready microservices and REST APIs\n• Integrated modern auth, state management, and containerized deployments",
+        }
+    # 1. If explicit profile_id provided, find it
+    if profile_id:
+        for p in profiles:
+            if p.get('id') == profile_id:
+                return p
+    # 2. Prefer exact language match
     for p in profiles:
         if p.get('lang', 'ru') == lang:
             return p
-    # Fallback: first profile regardless of language
-    if profiles:
-        return profiles[0]
-    # Hard fallback if profiles.json is empty
-    return {
-        "name": "Candidate Name",
-        "lang": "en",
-        "role": "Frontend / Fullstack Engineer",
-        "contacts": "Telegram: @username | Email: candidate@example.com | GitHub: https://github.com/username | LinkedIn: https://linkedin.com/in/username",
-        "keywords": "React, Next.js, TypeScript, JavaScript, Redux Toolkit, Tailwind CSS, Node.js, FastAPI, Docker",
-        "summary": "Fullstack Engineer with experience building production web applications with React, Next.js and TypeScript.",
-        "experience": "• Engineered high-performance web applications\n• Delivered production-ready microservices and REST APIs\n• Integrated modern auth, state management, and containerized deployments",
-    }
+    # Fallback to first profile
+    return profiles[0]
 
 
 # ─────────────────────────────────────────────
@@ -95,8 +99,9 @@ def determine_language(vacancy: Dict[str, Any]) -> str:
 #  CV builder — uses real profile data
 # ─────────────────────────────────────────────
 
-def build_tailored_cv(vacancy: Dict[str, Any], target_keywords: List[str], lang: str = "ru") -> str:
-    profile = select_profile(lang)
+def build_tailored_cv(vacancy: Dict[str, Any], target_keywords: List[str], lang: str = "ru", profile: Optional[Dict] = None) -> str:
+    if profile is None:
+        profile = select_profile(lang)
     kw_str = ", ".join(target_keywords)
     title = vacancy.get("title", profile.get("role", "Frontend Engineer"))
     name = profile.get("name", "Имя Фамилия" if lang == "ru" else "Candidate Name")
@@ -156,11 +161,13 @@ EDUCATION & LANGUAGES:
 #  Main pitch generator
 # ─────────────────────────────────────────────
 
-def calculate_match_score(vacancy: Dict[str, Any], profile: Dict[str, Any]) -> int:
+def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, Any]] = None) -> int:
     """
     Calculates deterministic match percentage (0-100%) based on tech stack overlap,
     role seniority, and keywords between vacancy and candidate profile.
     """
+    if profile is None:
+        profile = select_profile("ru")
     title = (vacancy.get("title") or "").lower()
     desc = (vacancy.get("description") or "").lower()
     skills = (vacancy.get("skills") or "").lower()
@@ -191,7 +198,19 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Dict[str, Any]) -> i
     elif any(k in title for k in ["middle", "мидл", "fullstack", "фуллстек"]):
         score += 5
 
-    return max(30, min(98, score))
+    # 5. Mixed / foreign stack penalty (-15 to -20 points)
+    # If the vacancy requires tech outside the candidate's core stack (e.g. PHP, C#, .NET, Java, 1C, Bitrix)
+    foreign_tech = [
+        r'\bphp\b', r'\blaravel\b', r'\bc#\b', r'\.net\b', r'\bjava(?!script)\b',
+        r'\bruby\b', r'\bror\b', r'\b1с\b', r'\b1c\b', r'\bbitrix\b', r'\bбитрикс\b',
+        r'\bwordpress\b', r'\bangular\b'
+    ]
+    for ft in foreign_tech:
+        if re.search(ft, full_text):
+            score -= 15
+            break
+
+    return max(20, min(98, score))
 
 
 # ─────────────────────────────────────────────
@@ -237,7 +256,7 @@ def select_dynamic_achievements(full_text: str, lang: str = "ru") -> List[str]:
     return bullets[:3]
 
 
-def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False) -> Dict[str, Any]:
+def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Optional[str] = None) -> Dict[str, Any]:
     title = vacancy.get("title", "Frontend Developer")
     company = vacancy.get("company", "вашей компании")
     recipient = vacancy.get("contact_name", "")
@@ -245,7 +264,17 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False) -> Dict[str, A
     desc = vacancy.get("description", "")
     lang = determine_language(vacancy)
 
-    profile = select_profile(lang)
+    if profile_id is None:
+        try:
+            cfg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
+            if os.path.exists(cfg_path):
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    profile_id = cfg.get("active_profile_id")
+        except Exception:
+            pass
+
+    profile = select_profile(lang, profile_id=profile_id)
     name = profile.get("name", "Имя Фамилия" if lang == "ru" else "Candidate Name")
 
     # Clean structured contact formatting
@@ -263,7 +292,7 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False) -> Dict[str, A
     target_kws = extract_target_keywords(title, skills, desc)
     highlight_kw = ", ".join(target_kws[:4])
 
-    tailored_cv = build_tailored_cv(vacancy, target_kws, lang=lang)
+    tailored_cv = build_tailored_cv(vacancy, target_kws, lang=lang, profile=profile)
 
     # Anti-BS trap analysis
     warnings = analyze_vacancy_traps(desc)

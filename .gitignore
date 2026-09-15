@@ -35,7 +35,6 @@ review_queue.html
 .system_generated/
 scratch/
 archive/
-.agents/
 
 # ─────────────────────────────────────────────
 #  Python & Environment

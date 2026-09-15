@@ -71,7 +71,8 @@ class HHScraper(BaseScraper):
                     "contact_handle": item.get("alternate_url", ""),
                     "contact_type": "portal",
                     "skills": skills_str,
-                    "description": desc_clean or item.get("name", "")
+                    "description": desc_clean or item.get("name", ""),
+                    "published_at": item.get("published_at")
                 })
         except urllib.error.HTTPError as e:
             if e.code == 403:

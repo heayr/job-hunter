@@ -58,6 +58,9 @@ def parse_telegram_html(html_content: str, channel_name: str = "telegram") -> Li
         contacts = extract_contacts(text)
         post_url = f"https://t.me/{post_id}"
 
+        time_match = re.search(r'<time[^>]*datetime=[\"\x27]([^\"]+)[\"\x27]', block_html)
+        published_at = time_match.group(1) if time_match else None
+
         vacancies.append({
             "id": f"tg:{post_id.replace('/', '_')}",
             "source": f"tg_{channel_name}",
@@ -71,7 +74,8 @@ def parse_telegram_html(html_content: str, channel_name: str = "telegram") -> Li
             "skills": "React, TypeScript, JavaScript",
             "contact_name": contacts.get("contact_name") or "",
             "contact_handle": contacts.get("primary_handle") or f"https://t.me/{post_id}",
-            "contact_type": contacts.get("primary_type") or "telegram"
+            "contact_type": contacts.get("primary_type") or "telegram",
+            "published_at": published_at
         })
 
     return vacancies

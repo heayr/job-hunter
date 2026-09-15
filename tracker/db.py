@@ -47,6 +47,11 @@ def init_db():
         cursor.execute("ALTER TABLE vacancies ADD COLUMN score INTEGER DEFAULT 0")
     if 'language' not in columns:
         cursor.execute("ALTER TABLE vacancies ADD COLUMN language TEXT DEFAULT 'ru'")
+    if 'grade' not in columns:
+        cursor.execute("ALTER TABLE vacancies ADD COLUMN grade TEXT DEFAULT 'Middle'")
+    if 'published_at' not in columns:
+        cursor.execute("ALTER TABLE vacancies ADD COLUMN published_at TEXT")
+        cursor.execute("UPDATE vacancies SET published_at = created_at WHERE published_at IS NULL")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pitches (
@@ -58,7 +63,8 @@ def init_db():
         status TEXT DEFAULT 'DRAFT', -- 'DRAFT' | 'APPROVED' | 'SENT' | 'REJECTED'
         sent_at TIMESTAMP,
         notes TEXT,
-        FOREIGN KEY(vacancy_id) REFERENCES vacancies(id)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (vacancy_id) REFERENCES vacancies (id) ON DELETE CASCADE
     );
     """)
     conn.commit()
@@ -69,10 +75,13 @@ def save_vacancy(vacancy: Dict[str, Any]) -> bool:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        pub_at = vacancy.get("published_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-        INSERT OR IGNORE INTO vacancies 
-        (id, source, title, company, url, salary, location, is_remote, description, skills, contact_name, contact_handle, contact_type, language)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO vacancies (
+            id, source, title, company, url, salary, location,
+            is_remote, description, skills, contact_name, contact_handle, contact_type, language, grade, published_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             vacancy["id"],
             vacancy.get("source", "unknown"),
@@ -87,7 +96,9 @@ def save_vacancy(vacancy: Dict[str, Any]) -> bool:
             vacancy.get("contact_name", ""),
             vacancy.get("contact_handle", ""),
             vacancy.get("contact_type", ""),
-            vacancy.get("language", "ru")
+            vacancy.get("language", "ru"),
+            vacancy.get("grade", "Middle"),
+            pub_at
         ))
         inserted = cursor.rowcount > 0
         conn.commit()

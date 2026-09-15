@@ -64,8 +64,10 @@ class CRMHandler(BaseHTTPRequestHandler):
             SELECT
                 v.id, v.title, v.company, v.url, v.salary, v.location,
                 v.source, v.description, v.contact_handle, v.contact_type,
-                v.status, v.score,
+                v.status, v.score, COALESCE(v.grade, 'Middle') AS grade,
                 COALESCE(v.language, p.language, 'ru') AS language,
+                COALESCE(v.published_at, v.created_at) AS published_at,
+                v.created_at,
                 MAX(CASE WHEN p.pitch_type = 'short_dm'     THEN p.content END) AS short_dm,
                 MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.content END) AS cover_letter,
                 MAX(CASE WHEN p.pitch_type = 'tailored_cv'  THEN p.content END) AS tailored_cv
@@ -73,7 +75,7 @@ class CRMHandler(BaseHTTPRequestHandler):
             LEFT JOIN pitches p ON p.vacancy_id = v.id
             WHERE v.status != 'archive'
             GROUP BY v.id
-            ORDER BY v.created_at DESC
+            ORDER BY COALESCE(v.published_at, v.created_at) DESC
         ''')
         rows = cur.fetchall()
         conn.close()

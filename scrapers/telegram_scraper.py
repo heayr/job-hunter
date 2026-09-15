@@ -57,11 +57,20 @@ class TelegramScraper(BaseScraper):
                     if len(text) < 50:
                         continue
 
-                    # Skip candidate resumes / self-promotions / news posts
-                    if re.search(r'(?:#резюме|\bрезюме\b|\bcv\b|ищу работу|open to work|looking for a job|готов к предложениям|\bкандидат\b|обо мне:\s|о себе:\s)', text.lower()):
+                    # Skip candidate resumes / self-promotions
+                    resume_patterns = r'(?:#резюме\b|#cv\b|\bищу работу\b|\bв поиске работы\b|\bв поисках работы\b|\bв поиске проекта\b|\bищу проект\b|\bищу команду\b|\bopen to work\b|\blooking for (?:a )?job\b|\blooking for (?:new )?opportunities\b|\bготов к предложениям\b|\bрассматриваю предложения\b|\bготов рассмотреть предложения\b|\bоткрыт к предложениям\b|\bобо мне:\b|\bо себе:\b|\bмой стек:\b|\bмои навыки:\b|\bобо мне\n|\bо себе\n|резюме\s*[:\-]|cv\s*[:\-])'
+                    if re.search(resume_patterns, text, re.I):
+                        continue
+
+                    # Skip promotional / ads / webinars / events / meetups
+                    ad_patterns = r'(?:\bвебинар\b|\bинтенсив\b|\bтестовый собес\b|\bпробное собеседование\b|\bонлайн-практикум\b|\bбесплатный практикум\b|\bпрямой эфир\b|\bподкаст\b|\bмитап\b|\bконференция\b|\bреклама\.\s*о рекламодателе\b|подарок для всех,\s*кто зарегается)'
+                    if re.search(ad_patterns, text, re.I):
                         continue
 
                     lines = [line.strip() for line in text.split('\n') if line.strip()]
+                    # Skip if first line indicates candidate resume or self-promotion
+                    if lines and re.search(r'^(?:[^\w\s]*\s*)?(?:резюме|cv)\b', lines[0], re.I):
+                        continue
                     # Filter out purely hashtag lines and salary/noise lines for title extraction
                     content_lines = [
                         l for l in lines 
