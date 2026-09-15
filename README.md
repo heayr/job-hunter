@@ -10,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green.svg)](https://www.python.org/)
 [![Vanilla JS](https://img.shields.io/badge/Frontend-Vanilla--JS-yellow.svg)](crm_v2_template.html)
-[![Architecture: Local--First](https://img.shields.io/badge/Architecture-Local--First-purple.svg)](#-tech-stack--architecture)
+[![Architecture: Local--First](https://img.shields.io/badge/Architecture-Local--First-purple.svg)](docs/ARCHITECTURE.md)
 [![Zero Dependency](https://img.shields.io/badge/Backend-Zero--Dependency-brightgreen.svg)](crm.py)
 
 <br/>
@@ -124,6 +124,14 @@ All 20 unit tests verify scraper endpoints, database migrations, contact isolati
 
 ---
 
+## 📁 Documentation
+
+- 🏗 **[Architecture Overview](docs/ARCHITECTURE.md)** — Deep dive into data flows, SQLite schema, and the Smart Bookmarklet DOM engine.
+- 🔌 **[Scrapers & Harvester Guide](docs/SCRAPERS_GUIDE.md)** — How to write and register a custom job scraper in under 5 minutes.
+- ⚙️ **[Configuration Guide](docs/CONFIGURATION.md)** — Profiles setup, Gemini API, and Anti-BS filter customization.
+
+---
+
 # 🇷🇺 Русский
 
 <div align="center">
@@ -226,6 +234,14 @@ cp generator/profiles.example.json generator/profiles.json
 python3 -m unittest discover tests
 ```
 20 тестов проверяют работу парсеров, миграции БД, изоляцию контактов, расчет скоринга и фильтрацию по рынкам.
+
+---
+
+## 📁 Документация
+
+- 🏗 **[Архитектура системы](docs/ARCHITECTURE.md)** — Потоки данных, схема SQLite и принцип работы Bookmarklet.
+- 🔌 **[Создание своих парсеров](docs/SCRAPERS_GUIDE.md)** — Инструкция по добавлению сборщика вакансий за 5 минут.
+- ⚙️ **[Руководство по настройке](docs/CONFIGURATION.md)** — Настройка профилей, Gemini API и Anti-BS фильтра.
 
 ---
 
