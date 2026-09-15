@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────
+#  Sensitive Data & Secrets (DO NOT COMMIT!)
+# ─────────────────────────────────────────────
+config.json
+*.key
+*.pem
+.env
+.env.*
+*.session
+*.session-journal
+
+# ─────────────────────────────────────────────
+#  Personal Data & Resumes
+# ─────────────────────────────────────────────
+generator/profiles.json
+*.pdf
+*.docx
+*.doc
+
+# ─────────────────────────────────────────────
+#  Databases & Scraped Cache
+# ─────────────────────────────────────────────
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+jobs.db
+review_queue.html
+
+# ─────────────────────────────────────────────
+#  Local Runtime & Logs
+# ─────────────────────────────────────────────
+.current_port
+*.log
+.system_generated/
+scratch/
+archive/
+docs/*.md
+
+# ─────────────────────────────────────────────
+#  Python & Environment
+# ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# ─────────────────────────────────────────────
+#  Operating System & IDE
+# ─────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

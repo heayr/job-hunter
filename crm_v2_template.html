@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Hunter CRM V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; }
+        .tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 500; }
+        .tab-btn.active { border-bottom-color: #38bdf8; color: #38bdf8; font-weight: 600; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .modal { display: none; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+        .modal.active { display: flex; }
+        .terminal { font-family: monospace; background: #000; color: #0f0; padding: 1rem; border-radius: 0.5rem; height: 220px; overflow-y: auto; white-space: pre-wrap; font-size: 13px; }
+        .market-btn { transition: all 0.2s; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .market-btn:hover { background: rgba(255, 255, 255, 0.05); }
+        .market-btn.active { background: #38bdf8; color: #0f172a; font-weight: 700; border-color: #38bdf8; box-shadow: 0 1px 4px rgba(56, 189, 248, 0.3); }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Navbar -->
+    <nav class="border-b border-slate-800 bg-slate-900/50 sticky top-0 z-10 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14 items-center">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⚡️</span>
+                        <h1 class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent">Job Hunter CRM</h1>
+                    </div>
+                    <div class="flex gap-1 border-l border-slate-800 pl-4 h-full items-center">
+                        <button onclick="setTab('inbox')" id="tab-inbox" class="tab-btn active px-3 py-1.5 text-slate-400">Inbox (<span id="count-inbox">0</span>)</button>
+                        <button onclick="setTab('sent')" id="tab-sent" class="tab-btn px-3 py-1.5 text-slate-400">Отправлено (<span id="count-sent">0</span>)</button>
+                        <button onclick="setTab('replied')" id="tab-replied" class="tab-btn px-3 py-1.5 text-slate-400">Ответили (<span id="count-replied">0</span>)</button>
+                        <button onclick="setTab('profiles')" id="tab-profiles" class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300">👤 Профили</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a id="bookmarklet-btn" href="#" onclick="event.preventDefault(); alert('Перетащите кнопку «🔖 Auto-Apply» на панель закладок браузера!\n\nЗатем на странице вакансии (HH.ru / LinkedIn) нажмите эту закладку для автозаполнения.');" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-grab flex items-center gap-1.5 select-none" title="Перетащите на панель закладок вашего браузера">
+                        <span>🔖</span> Auto-Apply
+                    </a>
+                    <button onclick="startHarvest()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                        <span>🔄</span> Собрать вакансии
+                    </button>
+                    <button onclick="toggleModal('settings-modal')" class="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700">
+                        ⚙️ Настройки ИИ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main View: Vacancies -->
+    <div id="main-view">
+        <!-- Analytics Dashboard -->
+        <div class="max-w-7xl mx-auto px-4 pt-5">
+            <div class="glass-panel rounded-xl p-3 flex justify-around items-center mb-1 shadow-sm flex-wrap gap-2">
+                <div class="text-center px-3">
+                    <div class="text-slate-400 text-xs font-medium">Всего вакансий</div>
+                    <div class="text-xl font-bold text-white mt-0.5" id="stat-total">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">🇷🇺 РФ и СНГ (RU)</div>
+                    <div class="text-xl font-bold text-amber-400 mt-0.5" id="stat-ru">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">🌍 Remote (EN)</div>
+                    <div class="text-xl font-bold text-sky-400 mt-0.5" id="stat-en">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">Отправлено (Sent)</div>
+                    <div class="text-xl font-bold text-indigo-400 mt-0.5" id="stat-sent">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">Ответили (Replied)</div>
+                    <div class="text-xl font-bold text-emerald-400 mt-0.5" id="stat-replied">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">Win Rate</div>
+                    <div class="text-xl font-bold text-purple-400 mt-0.5" id="stat-winrate">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 py-5 flex gap-6">
+            <!-- Sidebar: Market Filter + Vacancy List -->
+            <div class="w-1/3 flex flex-col gap-3">
+                <!-- Market Filter Segmented Control -->
+                <div class="glass-panel p-1 rounded-xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
+                    <button onclick="setMarket('all')" id="market-btn-all" class="market-btn active flex-1 py-1.5 px-2 rounded-lg font-medium text-center transition-all flex items-center justify-center gap-1">
+                        <span>🌐</span> Все (<span id="market-count-all">0</span>)
+                    </button>
+                    <button onclick="setMarket('ru')" id="market-btn-ru" class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                        <span>🇷🇺</span> RU (<span id="market-count-ru">0</span>)
+                    </button>
+                    <button onclick="setMarket('en')" id="market-btn-en" class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                        <span>🌍</span> Remote (<span id="market-count-en">0</span>)
+                    </button>
+                </div>
+
+                <!-- Vacancy List -->
+                <div class="flex flex-col gap-2.5 h-[calc(100vh-16rem)] overflow-y-auto pr-1" id="vacancy-list">
+                    <div class="p-4 text-center text-slate-500">Загрузка вакансий...</div>
+                </div>
+            </div>
+
+            <!-- Main Content: Vacancy Details -->
+            <div class="w-2/3 h-[calc(100vh-12rem)] overflow-y-auto pr-1" id="vacancy-details">
+                <div class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
+                    <span class="text-3xl mb-3">👈</span>
+                    <p class="text-sm font-medium">Выберите вакансию из списка слева</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profiles View -->
+    <div id="profiles-view" class="max-w-7xl mx-auto px-4 py-6 hidden">
+        <div class="glass-panel rounded-xl p-6">
+            <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-700/60">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>👤</span> Персоны и Резюме</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Управляйте профилями для откликов на русском и английском языках</p>
+                </div>
+                <button onclick="addProfile()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1">
+                    ➕ Добавить профиль
+                </button>
+            </div>
+            <div class="flex gap-6">
+                <div class="w-1/3 flex flex-col gap-2 h-[calc(100vh-14rem)] overflow-y-auto pr-1" id="profiles-list"></div>
+                <div class="w-2/3" id="profile-editor">
+                    <div class="text-slate-400 text-center py-16 text-sm">Выберите профиль слева</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="glass-panel p-5 rounded-xl w-[420px] border border-slate-700 shadow-2xl">
+            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ (Gemini)</h2>
+            <div class="mb-3">
+                <label class="block text-xs font-medium text-slate-400 mb-1">Gemini API Key</label>
+                <input type="password" id="gemini-key" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с <code>AIzaSy...</code></p>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="toggleModal('settings-modal')" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
+                <button onclick="saveConfig()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Harvest Modal -->
+    <div id="harvest-modal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="glass-panel p-5 rounded-xl w-[600px] border border-slate-700 shadow-2xl">
+            <h2 class="text-base font-bold mb-3 text-sky-400 flex items-center gap-2"><span>🔄</span> Сбор вакансий (TG, Habr, CryptoJobs, Remotive, RemoteOK, WWR)</h2>
+            <div class="terminal" id="harvest-logs">Ожидание запуска...</div>
+            <div class="flex justify-end mt-3">
+                <button onclick="closeHarvest()" id="harvest-close-btn" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg hidden">Готово</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper Modal -->
+    <div id="cropper-modal" class="modal fixed inset-0 z-[60] items-center justify-center">
+        <div class="glass-panel p-5 rounded-xl w-[500px] border border-slate-700 shadow-2xl">
+            <h2 class="text-base font-bold mb-3 text-white">Центрирование фото (1:1)</h2>
+            <div class="w-full h-[320px] bg-slate-900 mb-3 overflow-hidden flex justify-center rounded-lg">
+                <img id="cropper-image" class="max-w-full hidden">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="toggleModal('cropper-modal')" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
+                <button onclick="saveCrop()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Применить аватар</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let vacancies = [];
+        let profiles = [];
+        let currentTab = 'inbox';
+        let currentMarket = 'all';
+        let currentVac = null;
+        let currentProfile = null;
+        let cropper = null;
+
+        window.onload = () => {
+            initBookmarklet();
+            loadConfig();
+            loadPitches();
+        };
+
+        function initBookmarklet() {
+            const origin = window.location.origin;
+            const code = `javascript:(async function(){try{const u="${origin}";const r=await fetch(u+"/api/pitches");if(!r.ok)throw new Error("HTTP "+r.status);const p=await r.json();const l=window.location.href.split("?")[0].replace(/\\/+$/,"");const m=p.find(v=>v.url&&(l.includes(v.url.split("?")[0].replace(/\\/+$/,""))||v.url.includes(l)))||p[0];if(!m||!m.cover_letter)return alert("❌ Job Hunter: Нет сгенерированного Cover Letter для этой вакансии.");const t=m.cover_letter;let f=0;const sel=['textarea[name*="message"]','textarea[name*="cover"]','textarea[placeholder*="письмо"]','textarea[placeholder*="сопроводит"]','textarea[data-qa*="letter"]','textarea[data-qa*="message"]','textarea','[contenteditable="true"]'];for(const s of sel){const els=document.querySelectorAll(s);for(const el of els){if(el.offsetParent!==null){if(el.tagName==='TEXTAREA'||el.tagName==='INPUT'){el.value=t;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));f++;break;}else if(el.getAttribute('contenteditable')==='true'){el.innerText=t;el.dispatchEvent(new Event('input',{bubbles:true}));f++;break;}}}if(f>0)break;}if(f>0){const b=document.createElement('div');b.style="position:fixed;bottom:24px;right:24px;background:#059669;color:#fff;padding:14px 22px;border-radius:10px;z-index:999999;font-family:sans-serif;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,0.25);";b.innerText="⚡️ Job Hunter: Сопроводительное письмо успешно вставлено!";document.body.appendChild(b);setTimeout(()=>b.remove(),3500);}else{await navigator.clipboard.writeText(t);alert("📋 Job Hunter: Текст скопирован в буфер обмена!\\nНажмите Вставить (Cmd+V) в нужное поле.");}}catch(e){alert("❌ Job Hunter: Ошибка связи с локальной CRM ("+e.message+"). Убедитесь, что сервер запущен!");}})();`;
+            const btn = document.getElementById('bookmarklet-btn');
+            if (btn) btn.href = code;
+        }
+
+        // --- VACANCIES & MARKETS ---
+        async function loadPitches() {
+            try {
+                const res = await fetch('/api/pitches');
+                vacancies = await res.json();
+                updateCounts();
+                renderList();
+                renderDetails();
+            } catch (e) {
+                console.error("Failed to load vacancies", e);
+            }
+        }
+
+        function setMarket(market) {
+            currentMarket = market;
+            document.querySelectorAll('.market-btn').forEach(b => {
+                b.classList.remove('active');
+                b.classList.add('text-slate-400');
+            });
+            const btn = document.getElementById(`market-btn-${market}`);
+            if (btn) {
+                btn.classList.add('active');
+                btn.classList.remove('text-slate-400');
+            }
+
+            // If current vacancy is filtered out, re-select
+            const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
+            let filtered = vacancies.filter(v => targetStatus.includes(v.status));
+            if (currentMarket === 'ru') {
+                filtered = filtered.filter(v => (v.language || 'ru') === 'ru');
+            } else if (currentMarket === 'en') {
+                filtered = filtered.filter(v => v.language === 'en');
+            }
+
+            if (currentVac && !filtered.some(v => v.id === currentVac.id)) {
+                currentVac = filtered.length > 0 ? filtered[0] : null;
+            }
+
+            renderList();
+            renderDetails();
+        }
+
+        function setTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('active', 'text-slate-400');
+                if (b.id === `tab-${tab}`) {
+                    b.classList.add('active');
+                } else if (b.id !== 'tab-profiles') {
+                    b.classList.add('text-slate-400');
+                }
+            });
+
+            if (tab === 'profiles') {
+                document.getElementById('main-view').classList.add('hidden');
+                document.getElementById('profiles-view').classList.remove('hidden');
+                loadProfilesList();
+            } else {
+                document.getElementById('main-view').classList.remove('hidden');
+                document.getElementById('profiles-view').classList.add('hidden');
+                currentVac = null;
+                updateCounts();
+                renderList();
+                renderDetails();
+            }
+        }
+
+        function updateCounts() {
+            const statusFilter = (v, s) => (s === 'inbox') ? (v.status === 'inbox' || v.status === 'new') : (v.status === s);
+
+            const countInbox = vacancies.filter(v => statusFilter(v, 'inbox')).length;
+            const countSent = vacancies.filter(v => statusFilter(v, 'sent')).length;
+            const countReplied = vacancies.filter(v => statusFilter(v, 'replied')).length;
+            
+            document.getElementById('count-inbox').innerText = countInbox;
+            document.getElementById('count-sent').innerText = countSent;
+            document.getElementById('count-replied').innerText = countReplied;
+            
+            // Market counts for currently active tab
+            const tabVacs = vacancies.filter(v => statusFilter(v, currentTab));
+            const marketAll = tabVacs.length;
+            const marketRu = tabVacs.filter(v => (v.language || 'ru') === 'ru').length;
+            const marketEn = tabVacs.filter(v => v.language === 'en').length;
+
+            const cAll = document.getElementById('market-count-all');
+            if (cAll) cAll.innerText = marketAll;
+            const cRu = document.getElementById('market-count-ru');
+            if (cRu) cRu.innerText = marketRu;
+            const cEn = document.getElementById('market-count-en');
+            if (cEn) cEn.innerText = marketEn;
+
+            // Analytics Totals
+            const totalRu = vacancies.filter(v => (v.language || 'ru') === 'ru').length;
+            const totalEn = vacancies.filter(v => v.language === 'en').length;
+
+            const statTotal = document.getElementById('stat-total');
+            if (statTotal) statTotal.innerText = vacancies.length;
+            const statRu = document.getElementById('stat-ru');
+            if (statRu) statRu.innerText = totalRu;
+            const statEn = document.getElementById('stat-en');
+            if (statEn) statEn.innerText = totalEn;
+            const statSent = document.getElementById('stat-sent');
+            if (statSent) statSent.innerText = countSent;
+            const statReplied = document.getElementById('stat-replied');
+            if (statReplied) statReplied.innerText = countReplied;
+            
+            const winRate = countSent > 0 ? Math.round((countReplied / countSent) * 100) : 0;
+            const statWinrate = document.getElementById('stat-winrate');
+            if (statWinrate) statWinrate.innerText = winRate + '%';
+        }
+
+        function selectVac(id) {
+            currentVac = vacancies.find(v => v.id === id);
+            renderList();
+            renderDetails();
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('vacancy-list');
+            const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
+            let filtered = vacancies.filter(v => targetStatus.includes(v.status));
+            
+            if (currentMarket === 'ru') {
+                filtered = filtered.filter(v => (v.language || 'ru') === 'ru');
+            } else if (currentMarket === 'en') {
+                filtered = filtered.filter(v => v.language === 'en');
+            }
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-900/50 rounded-lg border border-slate-800 text-xs">Нет вакансий в выбранной категории</div>`;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(v => {
+                const isEn = v.language === 'en';
+                const langBadge = isEn 
+                    ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-950/80 text-sky-400 border border-sky-800/70 flex items-center gap-1">🌍 EN · Remote</span>`
+                    : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/70 flex items-center gap-1">🇷🇺 RU</span>`;
+
+                return `
+                <div onclick="selectVac('${v.id}')" 
+                     class="cursor-pointer p-3.5 rounded-xl border transition-all ${currentVac?.id === v.id ? 'bg-slate-800/90 border-sky-500 shadow-sm' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'}">
+                    <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">${v.source || 'WEB'}</span>
+                            ${langBadge}
+                        </div>
+                        ${v.score > 0 ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/80' : v.score >= 50 ? 'bg-amber-900/50 text-amber-400 border border-amber-800/80' : 'bg-rose-900/50 text-rose-400 border border-rose-800/80'}">🔥 ${v.score}% Match</span>` : ''}
+                    </div>
+                    <h3 class="font-semibold text-slate-200 text-sm truncate" title="${v.title}">${v.title}</h3>
+                    <div class="text-sky-400 text-xs mt-1 flex items-center justify-between">
+                        <span class="truncate pr-2">🏢 ${v.company}</span>
+                        ${v.salary && v.salary !== 'Не указана' ? `<span class="text-emerald-400 font-medium whitespace-nowrap">${v.salary}</span>` : ''}
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function renderDetails() {
+            const detailsEl = document.getElementById('vacancy-details');
+            if (!currentVac) {
+                detailsEl.innerHTML = `
+                    <div class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
+                        <span class="text-3xl mb-3">👈</span>
+                        <p class="text-sm font-medium">Выберите вакансию из списка слева</p>
+                    </div>`;
+                return;
+            }
+
+            const v = currentVac;
+            const isEn = v.language === 'en';
+            let contactInfo = '';
+            let actionBtnHtml = '';
+
+            if (v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me'))) {
+                const tgHandle = v.contact_handle.replace('https://t.me/', '').replace('@', '');
+                contactInfo = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || '')}" class="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium bg-sky-900/30 px-3 py-1 rounded-lg text-xs border border-sky-800/50"><span>✈️</span> Telegram HR</a>`;
+                actionBtnHtml = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || '')}" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5">✈️ Написать в TG</a>`;
+            } else {
+                contactInfo = `<span class="text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg text-xs">Контакты скрыты</span>`;
+                actionBtnHtml = `<a href="${v.url}" target="_blank" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5">🔗 Откликнуться на сайте</a>`;
+            }
+
+            const linkedinHR = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent('HR OR Recruiter OR "Talent Acquisition" ' + v.company)}`;
+            const linkedinCTO = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent('CTO OR "Engineering Manager" OR "Tech Lead" ' + v.company)}`;
+
+            const marketBadge = isEn
+                ? `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-950 text-sky-300 border border-sky-700 flex items-center gap-1">🌍 International · Remote (EN)</span>`
+                : `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700 flex items-center gap-1">🇷🇺 Локальная / РФ и СНГ (RU)</span>`;
+
+            const personaHint = isEn
+                ? `🇬🇧 Международный профиль (English · Frontend / Full-stack Engineer)`
+                : `🇷🇺 Локальный профиль (Русский · Frontend разработчик)`;
+
+            detailsEl.innerHTML = `
+                <div class="glass-panel rounded-xl p-5 border-l-4 ${isEn ? 'border-l-sky-500' : 'border-l-amber-500'} mb-4 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <h2 class="text-xl font-bold text-white">${v.title}</h2>
+                                ${marketBadge}
+                                ${v.score > 0 ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'bg-amber-900/50 text-amber-400 border border-amber-800'}">🔥 ${v.score}% Match</span>` : ''}
+                            </div>
+                            <div class="flex gap-3 items-center text-xs text-slate-400 flex-wrap">
+                                <span class="text-sky-400 font-medium">🏢 ${v.company}</span>
+                                <span>•</span>
+                                <span>📍 ${v.location || (isEn ? 'Worldwide Remote' : 'Удаленно')}</span>
+                                ${v.salary && v.salary !== 'Не указана' ? `<span>•</span><span class="text-emerald-400 font-medium">💰 ${v.salary}</span>` : ''}
+                                <span>•</span>
+                                <a href="${v.url}" target="_blank" class="text-slate-400 hover:text-white underline">Оригинал вакансии ↗</a>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2 items-end">
+                            ${contactInfo}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 flex gap-2 border-t border-slate-700/60 pt-3 flex-wrap">
+                        <a href="${linkedinHR}" target="_blank" class="text-slate-300 hover:text-white flex items-center gap-1 font-medium bg-slate-800/80 hover:bg-slate-700/80 px-2.5 py-1 rounded-lg text-xs border border-slate-700 transition-colors"><span>🔍</span> Найти HR в LinkedIn</a>
+                        <a href="${linkedinCTO}" target="_blank" class="text-amber-300 hover:text-amber-200 flex items-center gap-1 font-medium bg-amber-900/20 hover:bg-amber-900/40 px-2.5 py-1 rounded-lg text-xs border border-amber-700/40 transition-colors"><span>⚡️</span> Найти CTO / Tech Lead</a>
+                    </div>
+                </div>
+
+                <!-- Persona Active Indicator -->
+                <div class="bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span>👤 Активная персона:</span>
+                        <span class="font-medium text-slate-200">${personaHint}</span>
+                    </div>
+                    <button onclick="setTab('profiles')" class="text-purple-400 hover:underline text-[11px]">Редактировать персоны ↗</button>
+                </div>
+
+                <div class="mb-4 flex gap-2 flex-wrap items-center">
+                    <button onclick="rewriteAI('${v.id}')" id="btn-rewrite-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-2 px-3.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5">
+                        <span>✨</span> Переписать через Gemini (${isEn ? 'EN' : 'RU'})
+                    </button>
+                    <a href="/cv/${v.id}" target="_blank" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                        <span>📄</span> Открыть PDF-резюме
+                    </a>
+                </div>
+
+                <div id="ai-progress-${v.id}" class="hidden mb-4 bg-slate-900/90 rounded-lg p-3 border border-slate-700 text-xs">
+                    <div class="text-slate-400 flex items-center gap-2">
+                        <span class="animate-spin">⏳</span>
+                        <span id="ai-text-${v.id}">Генерация текста и оценка матчинга...</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-4 mb-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">💬 Short DM (${isEn ? 'English' : 'Русский'})</h3>
+                            <button onclick="copyText('dm-box')" class="text-[11px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Копировать</button>
+                        </div>
+                        <textarea id="dm-box" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-300 h-28 focus:outline-none focus:border-sky-500 font-sans leading-relaxed">${v.short_dm || ''}</textarea>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">📧 Cover Letter (${isEn ? 'English' : 'Русский'})</h3>
+                            <button onclick="copyText('cl-box')" class="text-[11px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Копировать</button>
+                        </div>
+                        <textarea id="cl-box" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-300 h-44 focus:outline-none focus:border-sky-500 font-sans leading-relaxed">${v.cover_letter || ''}</textarea>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-700/60 flex flex-wrap gap-2 items-center">
+                    ${actionBtnHtml}
+                    <div class="w-px h-6 bg-slate-800 mx-1"></div>
+                    
+                    ${(v.status === 'inbox' || v.status === 'new') ? `<button onclick="updateStatus('${v.id}', 'sent')" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5">✅ Отметить как Отправлено</button>` : ''}
+                    ${v.status === 'sent' ? `<button onclick="updateStatus('${v.id}', 'replied')" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5">💬 HR ответил</button>` : ''}
+                    
+                    <button onclick="updateStatus('${v.id}', 'archive')" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800/60 text-xs font-medium py-2 px-3 rounded-lg transition-colors ml-auto">
+                        В архив
+                    </button>
+                </div>
+
+                <div class="mt-4 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">📋 Описание вакансии</h3>
+                    <div class="text-xs text-slate-400 whitespace-pre-wrap leading-relaxed">${v.description || 'Нет описания.'}</div>
+                </div>
+            `;
+        }
+
+        async function rewriteAI(vac_id) {
+            const btn = document.getElementById(`btn-rewrite-${vac_id}`);
+            const prog = document.getElementById(`ai-progress-${vac_id}`);
+            const ptext = document.getElementById(`ai-text-${vac_id}`);
+            
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            prog.classList.remove('hidden');
+            ptext.innerText = 'Запрос в Gemini... (подбираем персону и генерируем pitch)';
+            
+            try {
+                const res = await fetch(`/api/vacancies/${vac_id}/rewrite`, { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.success) {
+                    ptext.innerHTML = '<span class="text-emerald-400 font-medium">✅ Готово! Текст обновлен.</span>';
+                    setTimeout(() => prog.classList.add('hidden'), 2000);
+                    
+                    const v = vacancies.find(v => v.id === vac_id);
+                    if (v) {
+                        v.short_dm = data.short_dm;
+                        v.cover_letter = data.cover_letter;
+                        if (data.score) v.score = data.score;
+                    }
+                    renderDetails();
+                    renderList();
+                } else {
+                    ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ ${data.error || 'Ошибка генерации'}</span>`;
+                }
+            } catch(e) {
+                ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ Ошибка сети. Проверьте VPN и консоль сервера.</span>`;
+            }
+            
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+        }
+
+        async function updateStatus(vac_id, status) {
+            try {
+                await fetch(`/api/vacancies/${vac_id}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                const v = vacancies.find(v => v.id === vac_id);
+                if (v) v.status = status;
+                updateCounts();
+                currentVac = null;
+                renderList();
+                renderDetails();
+            } catch (e) {
+                alert("Ошибка: " + e);
+            }
+        }
+
+        function copyText(elementId) {
+            const el = document.getElementById(elementId);
+            el.select();
+            document.execCommand('copy');
+            const originalBorder = el.style.borderColor;
+            el.style.borderColor = '#10b981';
+            setTimeout(() => { el.style.borderColor = originalBorder; }, 600);
+        }
+
+        // --- PROFILES ---
+        async function loadProfilesList() {
+            try {
+                const res = await fetch('/api/profiles');
+                profiles = await res.json();
+                renderProfilesList();
+                renderProfileEditor();
+            } catch(e) { console.error("Error loading profiles", e); }
+        }
+
+        function renderProfilesList() {
+            const list = document.getElementById('profiles-list');
+            list.innerHTML = profiles.map((p, idx) => `
+                <div onclick="selectProfile(${idx})" class="p-3.5 rounded-xl cursor-pointer border transition-all ${
+                    currentProfile === idx 
+                    ? 'bg-slate-800/90 border-purple-500/80 shadow-md ring-1 ring-purple-500/30' 
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            ${p.photo_url ? `<img src="${p.photo_url}" class="w-full h-full object-cover">` : `<span class="text-xs font-bold text-slate-400">${(p.name || 'P')[0]}</span>`}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs font-bold text-white truncate">${p.role || 'Без роли'}</span>
+                                <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">${p.lang || 'ru'}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 truncate mt-0.5">${p.name || 'Имя не указано'}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectProfile(i) {
+            currentProfile = i;
+            renderProfilesList();
+            renderProfileEditor();
+        }
+
+        async function addProfile() {
+            const newId = 'profile_' + Date.now();
+            const newP = {
+                id: newId,
+                lang: 'ru',
+                role: 'Frontend / Fullstack-разработчик',
+                name: 'Имя Фамилия',
+                photo_url: '',
+                contacts: 'Telegram: @username | Email: candidate@example.com | Телефон: +79990000000 | GitHub: https://github.com/username | LinkedIn: https://linkedin.com/in/username',
+                contacts_structured: {
+                    telegram: '@username',
+                    email: 'candidate@example.com',
+                    phone: '+79990000000',
+                    github: 'https://github.com/username',
+                    linkedin: 'https://linkedin.com/in/username',
+                    portfolio: 'https://example.com'
+                },
+                location: { city: 'Москва', country: 'Россия', remote: true, hybrid: true, office: true },
+                summary: 'Разрабатываю продукты и довожу их до production — от архитектурных решений до деплоя с реальными пользователями.',
+                keywords: 'Next.js 16, React 19, TypeScript, JavaScript, Tailwind CSS v4, FastAPI, Node.js, Docker, Traefik, Git, CI/CD',
+                experience: '',
+                experience_structured: [],
+                education: [
+                    { grade: 'Высшее образование', field: 'Информационные технологии', institution: 'Университет', years: '2016–2020' }
+                ],
+                languages: [
+                    { language: 'Русский', level: 'родной' },
+                    { language: 'Английский', level: 'B2' }
+                ]
+            };
+            profiles.push(newP);
+            await fetch('/api/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(profiles)
+            });
+            showToast('✅ Создан и сохранен новый профиль!');
+            selectProfile(profiles.length - 1);
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 border transition-all transform duration-200 ${
+                isError ? 'bg-rose-950 border-rose-700 text-rose-200' : 'bg-emerald-950 border-emerald-600 text-emerald-200'
+            }`;
+            toast.innerHTML = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function renderProfileEditor() {
+            const ed = document.getElementById('profile-editor');
+            if (currentProfile === null || !profiles[currentProfile]) {
+                ed.innerHTML = '<div class="text-center py-16 text-slate-500 text-xs">Выберите профиль слева</div>';
+                return;
+            }
+            const p = profiles[currentProfile];
+            const c = p.contacts_structured || {};
+            const loc = p.location || {};
+            const expList = p.experience_structured || [];
+            const eduList = p.education || [];
+            const langList = p.languages || [];
+
+            ed.innerHTML = `
+                <div class="flex flex-col gap-4 bg-slate-900/50 p-5 rounded-xl border border-slate-800 h-[calc(100vh-14rem)] overflow-y-auto pr-2">
+                    <!-- Top Upload Bar -->
+                    <div class="flex justify-between items-center bg-slate-900/90 p-3 rounded-lg border border-slate-700/80 shadow-sm">
+                        <div>
+                            <div class="text-xs font-semibold text-white flex items-center gap-2">
+                                <span>📄</span> Автопарсинг резюме под стандарты площадок
+                            </div>
+                            <div class="text-[11px] text-slate-400">Парсит PDF/DOCX: поля разбиваются на опыт, компании, контакты, стек и грейды образования</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="bg-indigo-600 hover:bg-indigo-500 cursor-pointer text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                                <span>📤</span> Загрузить файл
+                                <input type="file" class="hidden" accept=".pdf,.docx,.txt" onchange="uploadResume(this)">
+                            </label>
+                            <span id="resume-status" class="text-xs"></span>
+                        </div>
+                    </div>
+
+                    <!-- 1. Basic Info (HH.ru / LinkedIn / Habr) -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <span>👤</span> Основная информация (HH.ru / LinkedIn)
+                        </h3>
+                        <div class="grid grid-cols-3 gap-3 mb-3">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">ID профиля</label>
+                                <input id="p-id" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono" value="${p.id || ''}">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Язык откликов</label>
+                                <select id="p-lang" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                                    <option value="ru" ${p.lang !== 'en' ? 'selected' : ''}>🇷🇺 Русский</option>
+                                    <option value="en" ${p.lang === 'en' ? 'selected' : ''}>🇺🇸 English</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Желаемая должность / Headline</label>
+                                <input id="p-role" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-medium" value="${p.role || ''}">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Имя и Фамилия</label>
+                                <input id="p-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${p.name || ''}">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Город / Локация</label>
+                                <input id="p-city" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${loc.city || 'Москва'}">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Аватар</label>
+                                <div class="flex gap-2">
+                                    <input id="p-photo" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white truncate" value="${p.photo_url || ''}">
+                                    <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 cursor-pointer px-2.5 py-1.5 rounded-lg text-xs flex items-center" title="Загрузить фото и центрировать">
+                                        📷 <input type="file" class="hidden" accept="image/*" onchange="initCrop(this)">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Structured Contact Channels -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <span>📞</span> Контакты для откликов
+                        </h3>
+                        <div class="grid grid-cols-3 gap-3 mb-2">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Telegram</label>
+                                <input id="p-tg" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${c.telegram || ''}" placeholder="@username">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Email</label>
+                                <input id="p-email" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${c.email || ''}" placeholder="email@gmail.com">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Телефон</label>
+                                <input id="p-phone" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${c.phone || ''}" placeholder="+7 (999) 000-00-00">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">GitHub</label>
+                                <input id="p-gh" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${c.github || ''}" placeholder="https://github.com/...">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">LinkedIn</label>
+                                <input id="p-li" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${c.linkedin || ''}" placeholder="https://linkedin.com/in/...">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Портфолио / Сайт</label>
+                                <input id="p-portfolio" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${c.portfolio || ''}" placeholder="https://...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Skills & ATS Keywords -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <span>⚡</span> Ключевые навыки (ATS & Matching)
+                        </h3>
+                        <p class="text-[11px] text-slate-500 mb-2">Список тегов через запятую — используется для расчета % совпадения с вакансией</p>
+                        <input id="p-keys" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono" value="${p.keywords || ''}">
+                    </div>
+
+                    <!-- 4. Summary -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <span>📝</span> О себе (Professional Summary)
+                        </h3>
+                        <textarea id="p-summary" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 h-24 focus:outline-none focus:border-sky-500 leading-relaxed font-sans">${p.summary || ''}</textarea>
+                    </div>
+
+                    <!-- 5. Structured Work Experience -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>💼</span> Места работы (Структурированный опыт)
+                            </h3>
+                            <span class="text-[11px] text-slate-500">${expList.length} мест распарсено</span>
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            ${expList.map((job, idx) => `
+                                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700/80">
+                                    <div class="flex justify-between items-start mb-1.5">
+                                        <div>
+                                            <div class="text-xs font-bold text-white flex items-center gap-2">
+                                                <span>${job.role || 'Должность'}</span>
+                                                <span class="text-slate-500">•</span>
+                                                <span class="text-sky-400">${job.company || 'Компания'}</span>
+                                            </div>
+                                            <div class="text-[11px] text-slate-400">${job.description || ''}</div>
+                                        </div>
+                                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">${job.period || ''}</span>
+                                    </div>
+                                    <ul class="text-[11px] text-slate-300 list-disc pl-4 space-y-0.5 mt-2">
+                                        ${(job.bullets || []).map(b => `<li>${b}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-slate-800">
+                            <label class="text-[11px] font-medium text-slate-400 mb-1 block">Полный текст опыта (для генератора питчей и резюме)</label>
+                            <textarea id="p-exp" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 h-36 focus:outline-none focus:border-sky-500 leading-relaxed font-sans">${p.experience || ''}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- 6. Education with Editable Grades -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🎓</span> Образование (Грейды, Специальности, ВУЗы)
+                            </h3>
+                            <button onclick="addEducationRow()" class="text-[11px] bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                                <span>+</span> Добавить образование
+                            </button>
+                        </div>
+                        <div id="edu-rows-container" class="flex flex-col gap-2.5">
+                            ${eduList.map((e, idx) => `
+                                <div class="edu-row grid grid-cols-12 gap-2 bg-slate-900/90 p-2.5 rounded-lg border border-slate-700/80 items-center">
+                                    <div class="col-span-3">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Грейд / Уровень</label>
+                                        <input class="edu-grade w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${e.grade || ''}" placeholder="Магистратура, Бакалавр...">
+                                    </div>
+                                    <div class="col-span-4">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Специальность / Программа</label>
+                                        <input class="edu-field w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${e.field || ''}" placeholder="PR и маркетинг...">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">ВУЗ / Организация</label>
+                                        <input class="edu-inst w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${e.institution || ''}" placeholder="РУТ (МИИТ)...">
+                                    </div>
+                                    <div class="col-span-1">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Годы</label>
+                                        <input class="edu-years w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white font-mono text-center" value="${e.years || ''}" placeholder="2015-2017">
+                                    </div>
+                                    <div class="col-span-1 text-right pt-3">
+                                        <button onclick="this.closest('.edu-row').remove()" class="text-rose-400 hover:text-rose-300 p-1 text-xs" title="Удалить">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- 7. Languages -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🌐</span> Знание языков
+                            </h3>
+                            <button onclick="addLanguageRow()" class="text-[11px] bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                                <span>+</span> Добавить язык
+                            </button>
+                        </div>
+                        <div id="lang-rows-container" class="flex flex-col gap-2">
+                            ${langList.map((l, idx) => `
+                                <div class="lang-row flex gap-2 items-center bg-slate-900/90 p-2 rounded-lg border border-slate-700/80">
+                                    <input class="lang-name flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${l.language || ''}" placeholder="Язык (например: Английский)">
+                                    <input class="lang-level flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${l.level || ''}" placeholder="Уровень (например: B2, родной)">
+                                    <button onclick="this.closest('.lang-row').remove()" class="text-rose-400 hover:text-rose-300 px-2 py-1 text-xs" title="Удалить">🗑️</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Save Actions -->
+                    <div class="flex gap-2 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900/95 py-2.5">
+                        <button onclick="saveProfiles()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-lg transition-colors">
+                            <span>💾</span> Сохранить профиль
+                        </button>
+                        <button onclick="deleteProfile()" class="bg-rose-900/30 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 text-xs font-medium px-3.5 py-2.5 rounded-lg ml-auto transition-colors">
+                            🗑️ Удалить профиль
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addEducationRow() {
+            const container = document.getElementById('edu-rows-container');
+            const div = document.createElement('div');
+            div.className = "edu-row grid grid-cols-12 gap-2 bg-slate-900/90 p-2.5 rounded-lg border border-slate-700/80 items-center";
+            div.innerHTML = `
+                <div class="col-span-3">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">Грейд / Уровень</label>
+                    <input class="edu-grade w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Магистратура, Бакалавр...">
+                </div>
+                <div class="col-span-4">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">Специальность / Программа</label>
+                    <input class="edu-field w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Специальность...">
+                </div>
+                <div class="col-span-3">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">ВУЗ / Организация</label>
+                    <input class="edu-inst w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="ВУЗ...">
+                </div>
+                <div class="col-span-1">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">Годы</label>
+                    <input class="edu-years w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white font-mono text-center" placeholder="2015-2017">
+                </div>
+                <div class="col-span-1 text-right pt-3">
+                    <button onclick="this.closest('.edu-row').remove()" class="text-rose-400 hover:text-rose-300 p-1 text-xs" title="Удалить">🗑️</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function addLanguageRow() {
+            const container = document.getElementById('lang-rows-container');
+            const div = document.createElement('div');
+            div.className = "lang-row flex gap-2 items-center bg-slate-900/90 p-2 rounded-lg border border-slate-700/80";
+            div.innerHTML = `
+                <input class="lang-name flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Язык">
+                <input class="lang-level flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Уровень">
+                <button onclick="this.closest('.lang-row').remove()" class="text-rose-400 hover:text-rose-300 px-2 py-1 text-xs" title="Удалить">🗑️</button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function saveProfiles() {
+            if (currentProfile === null || !profiles[currentProfile]) return;
+            const p = profiles[currentProfile];
+            
+            p.id = document.getElementById('p-id').value.trim() || ('profile_' + Date.now());
+            p.lang = document.getElementById('p-lang').value;
+            p.role = document.getElementById('p-role').value;
+            p.name = document.getElementById('p-name').value;
+            p.photo_url = document.getElementById('p-photo').value;
+            p.summary = document.getElementById('p-summary').value;
+            p.keywords = document.getElementById('p-keys').value;
+            p.experience = document.getElementById('p-exp').value;
+
+            p.location = p.location || {};
+            p.location.city = document.getElementById('p-city').value;
+
+            p.contacts_structured = p.contacts_structured || {};
+            p.contacts_structured.telegram = document.getElementById('p-tg').value;
+            p.contacts_structured.email = document.getElementById('p-email').value;
+            p.contacts_structured.phone = document.getElementById('p-phone').value;
+            p.contacts_structured.github = document.getElementById('p-gh').value;
+            p.contacts_structured.linkedin = document.getElementById('p-li').value;
+            p.contacts_structured.portfolio = document.getElementById('p-portfolio').value;
+            
+            p.contacts = [
+                p.contacts_structured.telegram,
+                p.contacts_structured.email,
+                p.contacts_structured.phone,
+                p.contacts_structured.github,
+                p.contacts_structured.linkedin
+            ].filter(Boolean).join(' | ');
+
+            // Collect education rows
+            const eduRows = document.querySelectorAll('#edu-rows-container .edu-row');
+            p.education = [];
+            eduRows.forEach(row => {
+                const grade = row.querySelector('.edu-grade')?.value.trim();
+                const field = row.querySelector('.edu-field')?.value.trim();
+                const institution = row.querySelector('.edu-inst')?.value.trim();
+                const years = row.querySelector('.edu-years')?.value.trim();
+                if (grade || field || institution) {
+                    p.education.push({ grade, field, institution, years });
+                }
+            });
+
+            // Collect language rows
+            const langRows = document.querySelectorAll('#lang-rows-container .lang-row');
+            p.languages = [];
+            langRows.forEach(row => {
+                const language = row.querySelector('.lang-name')?.value.trim();
+                const level = row.querySelector('.lang-level')?.value.trim();
+                if (language) {
+                    p.languages.push({ language, level });
+                }
+            });
+
+            try {
+                const res = await fetch('/api/profiles', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profiles) 
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Профиль «${p.name || p.role}» успешно сохранен!`);
+                    renderProfilesList();
+                    renderProfileEditor();
+                } else {
+                    showToast(`❌ Ошибка сохранения: ${data.error}`, true);
+                }
+            } catch(e) {
+                showToast(`❌ Ошибка сети при сохранении`, true);
+            }
+        }
+
+        async function deleteProfile() {
+            if (currentProfile === null || !profiles[currentProfile]) return;
+            const p = profiles[currentProfile];
+            if (!confirm(`Удалить профиль «${p.name || p.role}»?`)) return;
+            
+            profiles.splice(currentProfile, 1);
+            currentProfile = profiles.length > 0 ? 0 : null;
+            
+            try {
+                await fetch('/api/profiles', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profiles) 
+                });
+                showToast('🗑️ Профиль удален');
+                renderProfilesList();
+                renderProfileEditor();
+            } catch(e) {
+                showToast('❌ Ошибка сети при удалении', true);
+            }
+        }
+        async function uploadResume(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const status = document.getElementById('resume-status');
+            status.innerHTML = `<span class="text-sky-400 animate-pulse">Парсинг через Gemini...</span>`;
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const res = await fetch('/api/upload_resume', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename: file.name, base64: e.target.result })
+                    });
+                    const data = await res.json();
+                    if (data.success && data.profile) {
+                        profiles[currentProfile] = Object.assign(profiles[currentProfile] || {}, data.profile);
+                        await fetch('/api/profiles', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(profiles)
+                        });
+                        showToast('✅ Резюме распарсено и сохранено!');
+                        renderProfilesList();
+                        renderProfileEditor();
+                        status.innerHTML = `<span class="text-emerald-400 font-medium">✅ Распарсено и сохранено!</span>`;
+                    } else {
+                        status.innerHTML = `<span class="text-rose-400">❌ ${data.error || 'Ошибка'}</span>`;
+                    }
+                } catch (err) {
+                    status.innerHTML = `<span class="text-rose-400">❌ Ошибка сети</span>`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- CROPPER ---
+        function initCrop(input) {
+            if (input.files && input.files[0]) {
+                const r = new FileReader();
+                r.onload = (e) => {
+                    const img = document.getElementById('cropper-image');
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                    toggleModal('cropper-modal');
+                    if (cropper) cropper.destroy();
+                    cropper = new Cropper(img, { aspectRatio: 1, viewMode: 2 });
+                };
+                r.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function saveCrop() {
+            if (!cropper) return;
+            const canvas = cropper.getCroppedCanvas({ width: 400, height: 400 });
+            document.getElementById('p-photo').value = canvas.toDataURL('image/jpeg', 0.85);
+            toggleModal('cropper-modal');
+            saveProfiles();
+        }
+
+        // --- SYSTEM / MODALS ---
+        function toggleModal(id) {
+            document.getElementById(id).classList.toggle('active');
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                document.getElementById('gemini-key').value = data.gemini_api_key || '';
+            } catch (e) {}
+        }
+
+        async function saveConfig() {
+            const key = document.getElementById('gemini-key').value.trim();
+            await fetch('/api/config', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gemini_api_key: key }) 
+            });
+            toggleModal('settings-modal');
+        }
+
+        async function startHarvest() {
+            const logs = document.getElementById('harvest-logs');
+            const btn = document.getElementById('harvest-close-btn');
+            logs.innerText = 'Запуск модулей сбора вакансий...\n';
+            btn.classList.add('hidden');
+            toggleModal('harvest-modal');
+            
+            try {
+                const res = await fetch('/api/harvest', { method: 'POST' });
+                const data = await res.json();
+                logs.innerText += data.logs || data.error || 'Готово.';
+            } catch (e) { 
+                logs.innerText += '\\nОшибка соединения с сервером.'; 
+            }
+            btn.classList.remove('hidden');
+        }
+
+        function closeHarvest() {
+            toggleModal('harvest-modal');
+            loadPitches();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+[
+  {
+    "id": "demo_frontend_ru",
+    "lang": "ru",
+    "name": "Иван Иванов",
+    "full_name": "Иван Иванов",
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "role": "Frontend / Fullstack-разработчик",
+    "contacts": "Telegram: @username | Email: candidate@example.com | Телефон: +79990000000 | GitHub: https://github.com/username | LinkedIn: https://linkedin.com/in/username",
+    "contacts_structured": {
+      "telegram": "@username",
+      "telegram_url": "https://t.me/username",
+      "email": "candidate@example.com",
+      "phone": "+79990000000",
+      "github": "https://github.com/username",
+      "linkedin": "https://linkedin.com/in/username",
+      "portfolio": "https://example.com"
+    },
+    "location": {
+      "city": "Москва",
+      "country": "Россия",
+      "raw": "Москва | Удаленно",
+      "remote": true,
+      "hybrid": true,
+      "office": false
+    },
+    "summary": "Разрабатываю современные веб-приложения и сервисы на React, Next.js и TypeScript. Опыт полного цикла: от архитектуры и адаптивной верстки до бэкенда на Python/Node.js и деплоя в Docker.",
+    "keywords": "Next.js, React, TypeScript, JavaScript, Tailwind CSS, HTML5, CSS3, FastAPI, Node.js, PostgreSQL, Docker, Git, CI/CD",
+    "skills_categorized": {
+      "Core": ["React", "Next.js", "TypeScript", "JavaScript ES6+"],
+      "UI": ["Tailwind CSS", "HTML5", "CSS3"],
+      "Backend": ["FastAPI", "Node.js", "PostgreSQL", "REST API"],
+      "DevOps": ["Docker", "Docker Compose", "CI/CD", "Git"]
+    },
+    "experience": "### Lead / Senior Frontend Engineer | Tech Company (2023 — настоящее время)\n• Разработка архитектуры SPA/SSR на Next.js и React с высокими требованиями к производительности.\n• Проектирование REST API и микросервисов.\n• Управление процессом релиза и развертывания в Docker.",
+    "experience_structured": [
+      {
+        "role": "Senior Frontend Engineer",
+        "company": "Tech Company",
+        "period": "2023 — настоящее время",
+        "bullets": [
+          "Разработка архитектуры масштабируемых веб-приложений на Next.js и React 19.",
+          "Оптимизация производительности и показателей Google PageSpeed Insights.",
+          "Интеграция сторонних сервисов, платежных шлюзов и REST API."
+        ],
+        "description": "Разработка ключевых модулей платформы.",
+        "site": "example.com"
+      }
+    ],
+    "education": [],
+    "languages": [
+      { "language": "Русский", "level": "родной" },
+      { "language": "Английский", "level": "B2" }
+    ]
+  },
+  {
+    "id": "demo_frontend_en",
+    "lang": "en",
+    "name": "Alex Developer",
+    "full_name": "Alex Developer",
+    "first_name": "Alex",
+    "last_name": "Developer",
+    "role": "Frontend / Full-stack Engineer",
+    "contacts": "Telegram: @username | Email: candidate@example.com | GitHub: https://github.com/username | LinkedIn: https://linkedin.com/in/username",
+    "contacts_structured": {
+      "telegram": "@username",
+      "telegram_url": "https://t.me/username",
+      "email": "candidate@example.com",
+      "phone": "+10000000000",
+      "github": "https://github.com/username",
+      "linkedin": "https://linkedin.com/in/username",
+      "portfolio": "https://example.com"
+    },
+    "location": {
+      "city": "Remote",
+      "country": "Worldwide",
+      "raw": "Worldwide Remote",
+      "remote": true,
+      "hybrid": false,
+      "office": false
+    },
+    "summary": "Full-stack engineer specializing in React, Next.js, and TypeScript. Experienced in shipping production SaaS platforms, crafting responsive user interfaces, and designing scalable backend APIs.",
+    "keywords": "React, Next.js, TypeScript, JavaScript, Tailwind CSS, Node.js, FastAPI, Docker, PostgreSQL, REST API, Git",
+    "skills_categorized": {
+      "Core": ["React", "Next.js", "TypeScript", "JavaScript"],
+      "UI": ["Tailwind CSS", "CSS3", "HTML5"],
+      "Backend": ["FastAPI", "Node.js", "PostgreSQL", "REST API"],
+      "Infrastructure": ["Docker", "Docker Compose", "CI/CD", "Git"]
+    },
+    "experience": "### Senior Software Engineer | Global Remote SaaS (2023 — Present)\n• Built high-performance web applications using React and Next.js.\n• Implemented robust authentication, state management, and real-time features.\n• Deployed containerized microservices with Docker.",
+    "experience_structured": [
+      {
+        "role": "Senior Software Engineer",
+        "company": "Global Remote SaaS",
+        "period": "2023 — Present",
+        "bullets": [
+          "Engineered performant frontend interfaces with Next.js and TypeScript.",
+          "Integrated RESTful endpoints and third-party APIs.",
+          "Maintained high code quality through automated testing and code reviews."
+        ],
+        "description": "Full-stack product development.",
+        "site": "example.com"
+      }
+    ],
+    "education": [],
+    "languages": [
+      { "language": "English", "level": "Fluent" }
+    ]
+  }
+]
