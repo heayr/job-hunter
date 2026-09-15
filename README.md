@@ -239,9 +239,9 @@ python3 -m unittest discover tests
 
 ## 📁 Документация
 
-- 🏗 **[Архитектура системы](docs/ARCHITECTURE.md)** — Потоки данных, схема SQLite и принцип работы Bookmarklet.
-- 🔌 **[Создание своих парсеров](docs/SCRAPERS_GUIDE.md)** — Инструкция по добавлению сборщика вакансий за 5 минут.
-- ⚙️ **[Руководство по настройке](docs/CONFIGURATION.md)** — Настройка профилей, Gemini API и Anti-BS фильтра.
+- 🏗 **[Архитектура системы](docs/ru/ARCHITECTURE.md)** — Потоки данных, схема SQLite и принцип работы Bookmarklet.
+- 🔌 **[Создание своих парсеров](docs/ru/SCRAPERS_GUIDE.md)** — Инструкция по добавлению сборщика вакансий за 5 минут.
+- ⚙️ **[Руководство по настройке](docs/ru/CONFIGURATION.md)** — Настройка профилей, Gemini API и Anti-BS фильтра.
 
 ---
 

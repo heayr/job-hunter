@@ -1,5 +1,7 @@
 # 🔌 Scrapers & Harvester Guide
 
+**[English](SCRAPERS_GUIDE.md)** &nbsp;•&nbsp; **[Русский](ru/SCRAPERS_GUIDE.md)**
+
 This guide explains how Job Hunter CRM ingests job postings and how you can add a custom scraper in under 5 minutes.
 
 ---

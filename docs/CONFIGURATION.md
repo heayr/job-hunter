@@ -1,5 +1,7 @@
 # ⚙️ Configuration & Customization Guide
 
+**[English](CONFIGURATION.md)** &nbsp;•&nbsp; **[Русский](ru/CONFIGURATION.md)**
+
 This document covers configuring AI models, managing candidate profiles, and customizing the Anti-BS filter.
 
 ---

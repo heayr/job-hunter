@@ -1,5 +1,7 @@
 # 🏗 System Architecture
 
+**[English](ARCHITECTURE.md)** &nbsp;•&nbsp; **[Русский](ru/ARCHITECTURE.md)**
+
 Job Hunter CRM is engineered with an uncompromising **local-first, zero-dependency** design philosophy. It is built to run autonomously on the user's machine without external database servers, cloud backends, or heavy compilation steps.
 
 ---
