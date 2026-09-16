@@ -84,6 +84,12 @@ window.api = {
         return res;
     },
 
+    async getHarvestStatus() {
+        const res = await fetch('/api/harvest/status');
+        if (!res.ok) throw new Error(`Failed to get harvest status: ${res.status}`);
+        return await res.json();
+    },
+
     async parseVacancyAi(payload) {
         const res = await fetch('/api/vacancies/ai-parse', {
             method: 'POST',

@@ -4,8 +4,28 @@
 
 function toggleModal(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.toggle('active');
+    if (!el) return;
+    
+    // Auto-bind backdrop click to close if not already bound
+    if (!el.dataset.backdropBound) {
+        el.dataset.backdropBound = 'true';
+        el.addEventListener('click', (e) => {
+            if (e.target === el) {
+                toggleModal(id);
+            }
+        });
+    }
+
+    el.classList.toggle('active');
 }
+
+// Global ESC key handler to close active modals
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const activeModals = document.querySelectorAll('.modal.active');
+        activeModals.forEach(m => m.classList.remove('active'));
+    }
+});
 
 async function loadConfig() {
     try {
@@ -55,62 +75,69 @@ async function startHarvest() {
     const pStep = document.getElementById('harvest-current-step');
 
     // Reset modal UI
-    if (logs) logs.innerText = '🚀 Запуск сборщика вакансий...\n';
+    if (logs) {
+        logs.innerText = '🚀 Запуск сборщика вакансий...\n';
+        logs.scrollTop = logs.scrollHeight;
+    }
     if (btn) btn.classList.add('hidden');
     if (pBar) {
-        pBar.style.width = '15%';
+        pBar.style.width = '5%';
         pBar.className = 'bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full transition-all duration-700 animate-pulse';
     }
-    if (pText) pText.innerText = '15%';
-    if (pStep) pStep.innerText = 'Подключение к источникам (HH, SuperJob, Rabota, TG, RemoteOK)...';
+    if (pText) pText.innerText = '0%';
+    if (pStep) pStep.innerText = 'Подключение к источникам...';
 
     toggleModal('harvest-modal');
 
-    // Progress animation while background harvest runs
-    let currentProg = 15;
-    const progressInterval = setInterval(() => {
-        if (currentProg < 88) {
-            currentProg += Math.floor(Math.random() * 10) + 4;
-            if (currentProg > 88) currentProg = 88;
-            if (pBar) pBar.style.width = currentProg + '%';
-            if (pText) pText.innerText = currentProg + '%';
-            if (currentProg > 35 && currentProg <= 65) {
-                if (pStep) pStep.innerText = 'Анти-BS фильтрация, отсеивание рекламы и кандидатов...';
-            } else if (currentProg > 65) {
-                if (pStep) pStep.innerText = 'Расчет грейдов (Junior-Lead) и сопоставление со стеком...';
-            }
-        }
-    }, 1200);
-
     try {
-        const res = await api.startHarvest();
-        const data = await res.json();
-        clearInterval(progressInterval);
+        await api.startHarvest();
+        
+        // Start polling
+        const progressInterval = setInterval(async () => {
+            try {
+                const statusData = await api.getHarvestStatus();
+                if (logs) {
+                    logs.innerText = statusData.logs || 'Ожидание логов...';
+                    logs.scrollTop = logs.scrollHeight;
+                }
+                
+                // Parse logs to guess progress
+                const logText = statusData.logs || '';
+                let currentProg = 5;
+                if (logText.includes('Anti-BS filter')) currentProg = 30;
+                if (logText.includes('Writing pitch')) currentProg = 60;
+                if (logText.includes('Gemini API')) currentProg = 75;
+                if (logText.includes('Finished')) currentProg = 95;
+                
+                if (pBar) pBar.style.width = currentProg + '%';
+                if (pText) pText.innerText = currentProg + '%';
+                
+                if (!statusData.is_running && logText) {
+                    clearInterval(progressInterval);
+                    if (pBar) {
+                        pBar.style.width = '100%';
+                        pBar.classList.remove('animate-pulse');
+                    }
+                    if (pText) pText.innerText = '100%';
+                    if (pStep) pStep.innerHTML = '<span class="text-emerald-400 font-bold">✨ Сбор завершен!</span>';
+                    
+                    if (btn) {
+                        btn.classList.remove('hidden');
+                        btn.classList.add('animate-bounce');
+                        setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
+                    }
+                }
+            } catch (pollErr) {
+                console.error("Poll error:", pollErr);
+            }
+        }, 1500);
 
-        if (pBar) {
-            pBar.style.width = '100%';
-            pBar.classList.remove('animate-pulse');
-        }
-        if (pText) pText.innerText = '100%';
-        if (pStep) pStep.innerHTML = '<span class="text-emerald-400 font-bold">✨ Сбор завершен успешно!</span>';
-
-        if (logs) {
-            logs.innerText += (data.logs || data.error || 'Готово.') + '\n\n🏁 Процесс завершен.';
-            logs.scrollTop = logs.scrollHeight;
-        }
     } catch (e) {
-        clearInterval(progressInterval);
-        if (pStep) pStep.innerHTML = '<span class="text-rose-400 font-bold">❌ Ошибка сбора</span>';
+        if (pStep) pStep.innerHTML = '<span class="text-rose-400 font-bold">❌ Ошибка запуска</span>';
         if (logs) {
             logs.innerText += '\n❌ Ошибка соединения с сервером: ' + e;
             logs.scrollTop = logs.scrollHeight;
         }
-    }
-
-    if (btn) {
-        btn.classList.remove('hidden');
-        btn.classList.add('animate-bounce');
-        setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
     }
 }
 

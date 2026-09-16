@@ -35,8 +35,15 @@
 
         .modal {
             display: none;
-            background: rgba(0, 0, 0, 0.7);
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: rgba(0, 0, 0, 0.75);
             backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            overflow-y: auto;
         }
 
         .modal.active {
@@ -76,68 +83,77 @@
 
 <body class="min-h-screen">
     <!-- Navbar -->
-    <nav class="border-b border-slate-800 bg-slate-900/50 sticky top-0 z-10 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-14 items-center">
-                <div class="flex items-center gap-6">
-                    <div class="flex items-center gap-2">
+    <nav class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-40 backdrop-blur-md shadow-lg w-full">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 w-full">
+            <div class="flex justify-between py-3 gap-4 items-center w-full min-w-0">
+                
+                <!-- Left: Logo & Tabs -->
+                <div class="flex items-center gap-4 sm:gap-6 min-w-0 flex-1">
+                    <div class="flex items-center gap-2 shrink-0">
                         <span class="text-xl">⚡️</span>
-                        <h1
-                            class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent">
-                            Job Hunter CRM</h1>
+                        <h1 class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent whitespace-nowrap">
+                            Job Hunter
+                        </h1>
                     </div>
-                    <div class="flex gap-1 border-l border-slate-800 pl-4 h-full items-center">
-                        <button onclick="setTab('inbox')" id="tab-inbox"
-                            class="tab-btn active px-3 py-1.5 text-slate-400">Inbox (<span
-                                id="count-inbox">0</span>)</button>
-                        <button onclick="setTab('sent')" id="tab-sent"
-                            class="tab-btn px-3 py-1.5 text-slate-400">Отправлено (<span
-                                id="count-sent">0</span>)</button>
-                        <button onclick="setTab('replied')" id="tab-replied"
-                            class="tab-btn px-3 py-1.5 text-slate-400">Ответили (<span
-                                id="count-replied">0</span>)</button>
-                        <button onclick="setTab('archive')" id="tab-archive"
-                            class="tab-btn px-3 py-1.5 text-slate-400">Архив (<span
-                                id="count-archive">0</span>)</button>
-                        <button onclick="setTab('blacklist')" id="tab-blacklist"
-                            class="tab-btn px-3 py-1.5 text-rose-400 hover:text-rose-300">💩 Черный список (<span
-                                id="count-blacklist">0</span>)</button>
-                        <button onclick="setTab('profiles')" id="tab-profiles"
-                            class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300">👤 Профили</button>
+                    
+                    <!-- Desktop Tabs -->
+                    <div class="hidden lg:flex gap-1 border-l border-slate-700 pl-4 items-center">
+                        <button onclick="setTab('inbox')" id="tab-inbox" class="tab-btn active px-3 py-1.5 text-slate-400 whitespace-nowrap">Inbox (<span id="count-inbox">0</span>)</button>
+                        <button onclick="setTab('sent')" id="tab-sent" class="tab-btn px-3 py-1.5 text-slate-400 whitespace-nowrap">Отправлено (<span id="count-sent">0</span>)</button>
+                        <button onclick="setTab('replied')" id="tab-replied" class="tab-btn px-3 py-1.5 text-slate-400 whitespace-nowrap">Ответили (<span id="count-replied">0</span>)</button>
+                        <button onclick="setTab('archive')" id="tab-archive" class="tab-btn px-3 py-1.5 text-slate-400 whitespace-nowrap">Архив (<span id="count-archive">0</span>)</button>
+                        <button onclick="setTab('blacklist')" id="tab-blacklist" class="tab-btn px-3 py-1.5 text-rose-400 hover:text-rose-300 whitespace-nowrap">💩 Черный список (<span id="count-blacklist">0</span>)</button>
+                        <button onclick="setTab('profiles')" id="tab-profiles" class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300 whitespace-nowrap">👤 Профили</button>
+                    </div>
+
+                    <!-- Mobile Burger Button -->
+                    <div class="lg:hidden">
+                        <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="text-slate-300 hover:text-white p-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        </button>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+
+                <!-- Mobile Menu Dropdown -->
+                <div id="mobile-menu" class="hidden lg:hidden w-full bg-slate-800 rounded-lg mt-2 p-2 flex flex-col gap-1 border border-slate-700 shadow-xl absolute top-full left-0 z-50">
+                    <button onclick="setTab('inbox'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-inbox-mob" class="tab-btn active px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Inbox (<span id="count-inbox-mob">0</span>)</button>
+                    <button onclick="setTab('sent'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-sent-mob" class="tab-btn px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Отправлено (<span id="count-sent-mob">0</span>)</button>
+                    <button onclick="setTab('replied'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-replied-mob" class="tab-btn px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Ответили (<span id="count-replied-mob">0</span>)</button>
+                    <button onclick="setTab('archive'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-archive-mob" class="tab-btn px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Архив (<span id="count-archive-mob">0</span>)</button>
+                    <button onclick="setTab('blacklist'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-blacklist-mob" class="tab-btn px-4 py-2 text-rose-400 hover:text-rose-300 text-left rounded hover:bg-slate-700 w-full">💩 Черный список (<span id="count-blacklist-mob">0</span>)</button>
+                    <button onclick="setTab('profiles'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-profiles-mob" class="tab-btn px-4 py-2 text-purple-400 hover:text-purple-300 text-left rounded hover:bg-slate-700 w-full">👤 Профили</button>
+                </div>
+
+                <!-- Right: Profile & Actions Dropdown -->
+                <div class="flex items-center gap-3 shrink-0 min-w-0">
+                    <div class="hidden sm:flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs shadow-sm">
                         <span class="text-purple-400 font-semibold">🎯 Резюме:</span>
-                        <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1">
+                        <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1 w-24">
                             <option value="">Загрузка...</option>
                         </select>
                     </div>
-                    <a id="bookmarklet-btn" href="#"
-                        onclick="event.preventDefault(); toggleModal('bookmarklet-modal');"
-                        class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-grab flex items-center gap-1.5 select-none"
-                        title="Перетащите на панель закладок или нажмите для инструкции">
-                        <span>🔖</span> Auto-Apply
-                    </a>
-                    <button onclick="toggleModal('ai-parser-modal')"
-                        class="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md flex items-center gap-1.5"
-                        title="Универсальный парсинг вакансии по ссылке или тексту через ИИ">
-                        <span>🪄</span> Добавить через ИИ
-                    </button>
-                    <button onclick="startHarvest()"
-                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
-                        <span>🔄</span> Собрать вакансии
-                    </button>
-                    <button onclick="openShameListModal()"
-                        class="text-rose-400 hover:text-rose-300 text-xs px-2.5 py-1.5 rounded-lg border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/50 flex items-center gap-1 transition-all shadow-sm"
-                        title="Публичный реестр недобросовестных компаний (нарушения ТК РФ, ИП/СЗ, токсичные условия)">
-                        <span>💩</span> Доска позора (GitHub)
-                    </button>
-                    <button onclick="toggleModal('settings-modal')"
-                        class="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700">
-                        ⚙️ Настройки ИИ
-                    </button>
+                    
+                    <div class="relative">
+                        <button onclick="document.getElementById('nav-actions-menu').classList.toggle('hidden'); document.getElementById('nav-actions-overlay').classList.toggle('hidden');" 
+                            class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                            <span>🚀</span> <span class="hidden sm:inline">Действия</span> ▾
+                        </button>
+                        
+                        <div onclick="document.getElementById('nav-actions-menu').classList.add('hidden'); this.classList.add('hidden');" id="nav-actions-overlay" class="fixed inset-0 z-40 hidden"></div>
+                        
+                        <div id="nav-actions-menu" class="absolute right-0 top-full mt-2 hidden z-50 w-56">
+                            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden flex flex-col py-1">
+                                <a href="#" onclick="event.preventDefault(); toggleModal('bookmarklet-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-emerald-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🔖 Auto-Apply (Bookmarklet)</a>
+                                <button onclick="toggleModal('ai-parser-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-purple-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🪄 Добавить через ИИ</button>
+                                <button onclick="startHarvest(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-sky-400 hover:bg-slate-700 transition-colors flex items-center gap-2 border-b border-slate-700/50">🔄 Собрать вакансии</button>
+                                
+                                <button onclick="openShameListModal(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-rose-400 hover:bg-slate-700 transition-colors flex items-center gap-2">💩 Доска позора</button>
+                                <button onclick="toggleModal('settings-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2 border-t border-slate-700/50">⚙️ Настройки ИИ</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                
             </div>
         </div>
     </nav>
@@ -174,9 +190,9 @@
             </div>
         </div>
 
-        <div class="max-w-7xl mx-auto px-4 py-5 flex gap-6">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 flex flex-col lg:flex-row gap-6">
             <!-- Sidebar: Market Filter + Vacancy List -->
-            <div class="w-1/3 flex flex-col gap-3">
+            <div class="w-full lg:w-1/3 flex flex-col gap-3 lg:max-w-md shrink-0">
                 <!-- Market Filter Segmented Control -->
                 <div
                     class="glass-panel p-1 rounded-xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
@@ -261,7 +277,7 @@
             </div>
 
             <!-- Main Content: Vacancy Details -->
-            <div class="w-2/3 h-[calc(100vh-12rem)] overflow-y-auto pr-1" id="vacancy-details">
+            <div class="w-full lg:w-2/3 h-[calc(100vh-12rem)] overflow-y-auto pr-1 min-w-0" id="vacancy-details">
                 <div
                     class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
                     <span class="text-3xl mb-3">👈</span>
@@ -537,7 +553,7 @@
     </div>
 
     <!-- Blacklist Modal (Доска позора / Черный список) -->
-    <div id="blacklist-modal" class="modal">
+    <div id="blacklist-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
         <div class="glass-panel rounded-2xl max-w-lg w-full p-6 border border-rose-900/60 shadow-2xl relative">
             <div class="flex justify-between items-center pb-3 border-b border-slate-800">
                 <div class="flex items-center gap-2">
@@ -587,7 +603,7 @@
     </div>
 
     <!-- Shame List Public Export Modal -->
-    <div id="shame-list-modal" class="modal">
+    <div id="shame-list-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
         <div class="glass-panel rounded-2xl max-w-3xl w-full p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center pb-3 border-b border-slate-800">
                 <div class="flex items-center gap-2">

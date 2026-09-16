@@ -191,7 +191,7 @@ function onFilterChange() {
 }
 
 function selectVac(id) {
-    currentVac = vacancies.find(v => v.id === id);
+    currentVac = vacancies.find(v => String(v.id) === String(id));
     renderList();
     renderDetails();
 }
@@ -408,55 +408,25 @@ function renderDetails() {
         </div>` : ''}
 
         <div class="glass-panel rounded-xl p-5 border-l-4 ${isEn ? 'border-l-sky-500' : 'border-l-amber-500'} mb-4 shadow-sm">
-            <div class="flex justify-between items-start">
-                <div>
-                    <div class="flex items-center gap-2 mb-2 flex-wrap">
-                        <h2 class="text-xl font-bold text-white">${v.title}</h2>
-                        ${marketBadge}
-                        ${gradeBadge}
-                        ${v.score > 0 ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'bg-amber-900/50 text-amber-400 border border-amber-800'}">🔥 ${v.score}% Match</span>` : ''}
-                    </div>
-                    <div class="flex gap-3 items-center text-xs text-slate-400 flex-wrap">
-                        <span class="text-sky-400 font-medium">🏢 ${cleanComp !== v.company ? `${cleanComp} <span class="text-slate-500 text-[11px]">(${v.company})</span>` : v.company}</span>
-                        <span>•</span>
-                        <span>📍 ${v.location || (isEn ? 'Worldwide Remote' : 'Удаленно')}</span>
-                        ${v.salary && v.salary !== 'Не указана' ? `<span>•</span><span class="text-emerald-400 font-medium">💰 ${v.salary}</span>` : ''}
-                        ${pubDateStr ? `<span>•</span><span class="text-slate-300 font-mono" title="${pubDateStr}">⏱ ${pubRelative} (${pubDateStr.split('.')[0]})</span>` : ''}
-                        <span>•</span>
-                        <a href="${formatVacancyUrl(v.url)}" target="_blank" class="text-slate-400 hover:text-white underline">Оригинал вакансии ↗</a>
-                    </div>
+            <div class="flex flex-col gap-3">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-xl font-bold text-white">${v.title}</h2>
+                    ${marketBadge}
+                    ${gradeBadge}
+                    ${v.score > 0 ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'bg-amber-900/50 text-amber-400 border border-amber-800'}">🔥 ${v.score}% Match</span>` : ''}
                 </div>
-                <div class="flex flex-col gap-2 items-end">
+                <div class="flex gap-3 items-center text-xs text-slate-400 flex-wrap">
+                    <span class="text-sky-400 font-medium">🏢 ${cleanComp !== v.company ? `${cleanComp} <span class="text-slate-500 text-[11px]">(${v.company})</span>` : v.company}</span>
+                    <span>•</span>
+                    <span>📍 ${v.location || (isEn ? 'Worldwide Remote' : 'Удаленно')}</span>
+                    ${v.salary && v.salary !== 'Не указана' ? `<span>•</span><span class="text-emerald-400 font-medium">💰 ${v.salary}</span>` : ''}
+                    ${pubDateStr ? `<span>•</span><span class="text-slate-300 font-mono" title="${pubDateStr}">⏱ ${pubRelative} (${pubDateStr.split('.')[0]})</span>` : ''}
+                    <span>•</span>
+                    <a href="${formatVacancyUrl(v.url)}" target="_blank" class="text-slate-400 hover:text-white underline">Оригинал вакансии ↗</a>
+                </div>
+                
+                <div class="mt-1">
                     ${contactInfo}
-                </div>
-            </div>
-            
-            <div class="mt-3 pt-3 border-t border-slate-700/60">
-                <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                    <span class="flex items-center gap-1.5"><span class="text-amber-400">🎯</span> Прямой контакт & ATS (${cleanComp}):</span>
-                    <span class="text-slate-500 lowercase font-normal">без агрегаторов / OSINT Dorks</span>
-                </div>
-                <div class="flex gap-2 flex-wrap items-center">
-                    <a href="${directAtsUrl}" target="_blank" class="bg-indigo-950/70 hover:bg-indigo-900/80 text-indigo-200 hover:text-white flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-indigo-700/60 transition-colors" title="Найти официальную страницу отклика в Greenhouse, Lever, Ashby или на сайте компании">
-                        <span>🏢</span> Вакансия в ATS (Greenhouse / Lever)
-                    </a>
-                    
-                    ${!isEn ? `
-                    <a href="${setkaUrl}" target="_blank" class="bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 hover:text-white flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-emerald-700/60 transition-colors" title="Поиск людей и нетворкинга в Сетке (setka.ru)">
-                        <span>🕸</span> В Сетке (Setka.ru)
-                    </a>` : ''}
-
-                    <a href="${hrSearchUrl}" target="_blank" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-slate-700 transition-colors" title="Найти HR и рекрутеров этой компании">
-                        <span>👤</span> Найти HR (${isEn ? 'LinkedIn' : 'TG / Сетка / LinkedIn'})
-                    </a>
-
-                    <a href="${ctoSearchUrl}" target="_blank" class="bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 hover:text-amber-200 flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-amber-700/50 transition-colors" title="Найти CTO или тимлида разработки">
-                        <span>⚡️</span> Найти CTO / Тимлида
-                    </a>
-
-                    <a href="${emailSearchUrl}" target="_blank" class="bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-slate-700/80 transition-colors" title="Поиск корпоративных email компании">
-                        <span>✉️</span> Корп. Email
-                    </a>
                 </div>
             </div>
         </div>
@@ -467,16 +437,7 @@ function renderDetails() {
                 <span>🎯 Активное резюме под вакансию:</span>
                 <span class="font-medium text-purple-300">${personaHint}</span>
             </div>
-            <button onclick="setTab('profiles')" class="text-purple-400 hover:underline text-[11px]">Редактировать персоны ↗</button>
-        </div>
-
-        <div class="mb-4 flex gap-2 flex-wrap items-center">
-            <button onclick="rewriteAI('${v.id}')" id="btn-rewrite-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-2 px-3.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5">
-                <span>✨</span> Переписать через Gemini (${isEn ? 'EN' : 'RU'})
-            </button>
-            <a href="/cv/${v.id}" target="_blank" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
-                <span>📄</span> Открыть PDF-резюме
-            </a>
+            <button onclick="setTab('profiles')" class="text-purple-400 hover:underline text-[11px]">Редактировать ↗</button>
         </div>
 
         <div id="ai-progress-${v.id}" class="hidden mb-4 bg-slate-900/90 rounded-lg p-3 border border-slate-700 text-xs">
@@ -504,19 +465,42 @@ function renderDetails() {
             </div>
         </div>
 
-        <div class="pt-4 border-t border-slate-700/60 flex flex-wrap gap-2 items-center">
-            ${actionBtnHtml}
-            <div class="w-px h-6 bg-slate-800 mx-1"></div>
-            
-            ${(v.status === 'inbox' || v.status === 'new') ? `<button onclick="updateStatus('${v.id}', 'sent')" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5">✅ Отметить как Отправлено</button>` : ''}
-            ${v.status === 'sent' ? `<button onclick="updateStatus('${v.id}', 'replied')" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5">💬 HR ответил</button>` : ''}
-            
-            <button onclick="updateStatus('${v.id}', 'archive')" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800/60 text-xs font-medium py-2 px-3 rounded-lg transition-colors ml-auto">
-                В архив
-            </button>
-            <button onclick="openBlacklistModal('${v.id}')" class="bg-rose-950/60 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800/80 text-xs font-semibold py-2 px-3 rounded-lg transition-colors flex items-center gap-1 shadow-sm" title="Внести в Доску позора за нарушение ТК РФ или токсичные условия">
-                💩 В Черный список
-            </button>
+        <div class="pt-4 border-t border-slate-700/60 flex flex-col gap-3">
+            <div class="flex flex-wrap gap-2 items-center justify-between">
+                <div class="flex flex-wrap gap-2 items-center">
+                    ${actionBtnHtml}
+                    <button onclick="rewriteAI('${v.id}')" id="btn-rewrite-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm">
+                        <span>✨</span> Переписать (AI)
+                    </button>
+                    <a href="/cv/${v.id}" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm">
+                        <span>📄</span> PDF
+                    </a>
+                </div>
+                
+                <div class="flex gap-2 items-center mt-2 sm:mt-0">
+                    ${(v.status === 'inbox' || v.status === 'new') ? `<button onclick="updateStatus('${v.id}', 'sent')" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">✅ Отправлено</button>` : ''}
+                    ${v.status === 'sent' ? `<button onclick="updateStatus('${v.id}', 'replied')" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">💬 Ответили</button>` : ''}
+                    
+                    <div class="relative">
+                        <button onclick="toggleActionMenu('${v.id}')" id="btn-menu-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 border border-slate-700">
+                            ⚙️ Ещё ▾
+                        </button>
+                        <div onclick="closeActionMenu('${v.id}')" id="menu-overlay-${v.id}" class="fixed inset-0 z-40 hidden"></div>
+                        
+                        <div id="menu-${v.id}" class="absolute right-0 bottom-full mb-1 hidden z-50">
+                            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden w-64 flex flex-col">
+                                <a href="${directAtsUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-indigo-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">🏢</span> Вакансия в ATS (Greenhouse)</a>
+                                <a href="${hrSearchUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-sky-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">🔍</span> Найти HR (LinkedIn/TG)</a>
+                                <a href="${ctoSearchUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-amber-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">⚡</span> Найти CTO / Тимлида</a>
+                                <a href="${emailSearchUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">✉️</span> Корп. Email</a>
+                                
+                                <button onclick="closeActionMenu('${v.id}'); updateStatus('${v.id}', 'archive');" class="text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-1.5"><span class="text-[10px]">📦</span> В архив</button>
+                                <button onclick="closeActionMenu('${v.id}'); openBlacklistModal('${v.id}');" class="text-left px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/50 transition-colors border-t border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">💩</span> В Черный список (ТК РФ)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="mt-4 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
@@ -537,7 +521,7 @@ function copyFieldText(elementId) {
 }
 
 function openVacancyWithAutoApply(vacId) {
-    const v = vacancies.find(x => x.id === vacId);
+    const v = vacancies.find(x => String(x.id) === String(vacId));
     if (!v) return;
     const text = v.cover_letter || v.short_dm || '';
     if (text) {
@@ -578,7 +562,7 @@ async function rewriteAI(vac_id) {
             if (ptext) ptext.innerHTML = '<span class="text-emerald-400 font-medium">✅ Готово! Текст обновлен.</span>';
             setTimeout(() => { if (prog) prog.classList.add('hidden'); }, 2000);
 
-            const v = vacancies.find(v => v.id === vac_id);
+            const v = vacancies.find(v => String(v.id) === String(vac_id));
             if (v) {
                 v.short_dm = data.short_dm;
                 v.cover_letter = data.cover_letter;
@@ -626,7 +610,7 @@ async function applyTg(vacId) {
 async function updateStatus(vac_id, status, reason = null) {
     try {
         await api.updateVacancyStatus(vac_id, status, reason);
-        const v = vacancies.find(v => v.id === vac_id);
+        const v = vacancies.find(v => String(v.id) === String(vac_id));
         if (v) {
             v.status = status;
             if (reason) v.blacklist_reason = reason;
@@ -658,7 +642,7 @@ async function updateStatus(vac_id, status, reason = null) {
 
 function openBlacklistModal(vacId) {
     pendingBlacklistVacId = vacId;
-    const v = vacancies.find(x => x.id === vacId);
+    const v = vacancies.find(x => String(x.id) === String(vacId));
     const titleEl = document.getElementById('blacklist-modal-vac-info');
     if (titleEl && v) {
         titleEl.innerText = `${v.company} — ${v.title}`;
@@ -704,3 +688,36 @@ function copyShameListMarkdown() {
     }
 }
 
+function toggleActionMenu(vacId) {
+    const menu = document.getElementById(`menu-${vacId}`);
+    const overlay = document.getElementById(`menu-overlay-${vacId}`);
+    const btn = document.getElementById(`btn-menu-${vacId}`);
+    if (!menu) return;
+
+    const isOpening = menu.classList.contains('hidden');
+    if (isOpening) {
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            // If space above is less than 260px (menu height ~240px), open downwards instead of upwards
+            if (rect.top < 260) {
+                menu.classList.remove('bottom-full', 'mb-1');
+                menu.classList.add('top-full', 'mt-1');
+            } else {
+                menu.classList.remove('top-full', 'mt-1');
+                menu.classList.add('bottom-full', 'mb-1');
+            }
+        }
+        menu.classList.remove('hidden');
+        if (overlay) overlay.classList.remove('hidden');
+    } else {
+        menu.classList.add('hidden');
+        if (overlay) overlay.classList.add('hidden');
+    }
+}
+
+function closeActionMenu(vacId) {
+    const menu = document.getElementById(`menu-${vacId}`);
+    const overlay = document.getElementById(`menu-overlay-${vacId}`);
+    if (menu) menu.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
+}

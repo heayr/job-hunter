@@ -7,6 +7,11 @@ import re
 import urllib.parse
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+import subprocess
+
+harvest_process = None
+harvest_log_file = os.path.join(os.path.dirname(__file__), 'harvest.log')
 
 # Auto-inject virtual environment packages
 venv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.venv')
@@ -222,6 +227,15 @@ class CRMHandler(BaseHTTPRequestHandler):
             md = generate_shame_list_markdown()
             _send_json(self, {"markdown": md})
 
+        elif self.path == '/api/harvest/status':
+            global harvest_process, harvest_log_file
+            is_running = harvest_process is not None and harvest_process.poll() is None
+            logs = ""
+            if os.path.exists(harvest_log_file):
+                with open(harvest_log_file, 'r', encoding='utf-8') as f:
+                    logs = f.read()
+            _send_json(self, {"is_running": is_running, "logs": logs})
+
         elif self.path.startswith('/cv/'):
             vac_id = urllib.parse.unquote(self.path[4:])
             md_cv = self.get_cv(vac_id)
@@ -316,7 +330,6 @@ class CRMHandler(BaseHTTPRequestHandler):
 
         # ── Apply via Telegram ──
         elif self.path.startswith('/api/vacancies/') and self.path.endswith('/apply_tg'):
-            import subprocess
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
             script_path = os.path.join(os.path.dirname(__file__), 'auto_sender.py')
             result = subprocess.run(
@@ -387,14 +400,22 @@ class CRMHandler(BaseHTTPRequestHandler):
 
         # ── Run harvest ──
         elif self.path == '/api/harvest':
-            import subprocess
+            global harvest_process, harvest_log_file
+            if harvest_process and harvest_process.poll() is None:
+                _send_json(self, {"status": "running", "message": "Already running"})
+                return
+            
+            with open(harvest_log_file, 'w') as f:
+                f.write("🚀 Запуск сбора вакансий...\n")
+                
             script_path = os.path.join(os.path.dirname(__file__), 'harvest.py')
-            result = subprocess.run(
-                [sys.executable, script_path],   # use same python/venv
-                capture_output=True, text=True, timeout=120
+            harvest_process = subprocess.Popen(
+                [sys.executable, script_path],
+                stdout=open(harvest_log_file, 'a'),
+                stderr=subprocess.STDOUT,
+                cwd=os.path.dirname(__file__)
             )
-            logs = result.stdout + ("\n" + result.stderr if result.stderr else "")
-            _send_json(self, {"status": "done", "logs": logs.strip()})
+            _send_json(self, {"status": "started"})
 
         else:
             self.send_response(404)
