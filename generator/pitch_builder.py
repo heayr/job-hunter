@@ -176,14 +176,18 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, A
     # 1. Base score for qualified frontend/fullstack role
     score = 35
 
-    # 2. Core stack points (up to +30)
+    # 2. Positive target role boost
+    if any(k in title for k in ["frontend", "фронтенд", "react", "next.js", "nextjs", "web developer", "разработчик интерфейс"]):
+        score += 10
+
+    # 3. Core stack points (up to +30)
     matched_core = 0
     for tech, pts in [("react", 10), ("typescript", 10), ("next.js", 10), ("nextjs", 10), ("javascript", 5)]:
         if tech in full_text:
             matched_core = min(30, matched_core + pts)
     score += matched_core
 
-    # 3. Secondary stack / tools (up to +25)
+    # 4. Secondary stack / tools (up to +25)
     secondary_tech = [
         "tailwind", "fastapi", "docker", "redux", "node.js", "nodejs",
         "graphql", "rest", "postgresql", "ci/cd", "git", "vite",
@@ -192,13 +196,29 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, A
     matched_sec = sum(3 for tech in secondary_tech if tech in full_text)
     score += min(25, matched_sec)
 
-    # 4. Seniority / leadership bonus (up to +10)
+    # 5. Seniority / leadership bonus (up to +10)
     if any(k in title for k in ["lead", "senior", "лид", "ведущий", "architect", "founding"]):
         score += 10
     elif any(k in title for k in ["middle", "мидл", "fullstack", "фуллстек"]):
         score += 5
 
-    # 5. Mixed / foreign stack penalty (-15 to -20 points)
+    # 6. Role mismatch penalty (QA, SDET, DevOps, Data, PM, Design, HR) - drops non-target roles to bottom!
+    non_target_roles = [
+        r'\bqa\b', r'\bqa\s*(?:automation|engineer|lead|manual)?\b',
+        r'\bsdet\b', r'\bengineer\s+in\s+test\b', r'\bтестировщик\b', r'\bтестировани[еяю]\b',
+        r'\btest(?:ing)?\s+engineer\b', r'\bautomation\s+test\b',
+        r'\bdevops\b', r'\bsre\b', r'\bsysadmin\b', r'\bсистемн\w+\s+администратор\b',
+        r'\bdata\s*(?:scientist|engineer|analyst)\b', r'\bаналитик\b', r'\bml\s*engineer\b',
+        r'\bproduct\s*manager\b', r'\bproject\s*manager\b', r'\bscrum\s*master\b',
+        r'\bдизайнер\b', r'\bdesigner\b', r'\bui/ux\s*designer\b',
+        r'\brecruiter\b', r'\bрекрутер\b', r'\bhr\b', r'\bкопирайтер\b'
+    ]
+    for ntr in non_target_roles:
+        if re.search(ntr, title):
+            score -= 55
+            break
+
+    # 7. Mixed / foreign stack penalty (-15 to -20 points)
     # If the vacancy requires tech outside the candidate's core stack (e.g. PHP, C#, .NET, Java, 1C, Bitrix)
     foreign_tech = [
         r'\bphp\b', r'\blaravel\b', r'\bc#\b', r'\.net\b', r'\bjava(?!script)\b',
@@ -210,7 +230,7 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, A
             score -= 15
             break
 
-    return max(20, min(98, score))
+    return max(5, min(98, score))
 
 
 # ─────────────────────────────────────────────
@@ -223,35 +243,35 @@ def select_dynamic_achievements(full_text: str, lang: str = "ru") -> List[str]:
     text_lower = full_text.lower()
 
     if lang == "en":
-        if any(w in text_lower for w in ["next", "react", "frontend", "ui", "performance", "speed", "tailwind", "css"]):
-            bullets.append("Lead Engineer at NoLogs SaaS: production web app on Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS v4, achieving 100/100 Google PageSpeed Insights.")
-        if any(w in text_lower for w in ["fullstack", "backend", "fastapi", "python", "node", "postgres", "sql", "docker", "api"]):
-            bullets.append("Fullstack architecture & ownership: built REST APIs with FastAPI & Node.js, PostgreSQL, multi-stage Docker builds, Traefik v3 reverse proxy with TLS, automated billing & webhooks.")
-        if any(w in text_lower for w in ["animat", "gsap", "motion", "creative", "design", "figma"]):
-            bullets.append("Rich interactive UI engineering: custom animation sequences via GSAP (@gsap/react), Lottie, and Embla Carousel with zero heavy external motion bloat.")
+        if any(w in text_lower for w in ["performance", "pagespeed", "core web vitals", "speed", "оптимиз"]):
+            bullets.append("Core Web Vitals & performance optimization: achieved 100/100 PageSpeed on Next.js 16 (App Router) via bundle optimization and SSR streaming.")
+        if any(w in text_lower for w in ["component", "design system", "ui kit", "ui-kit", "figma", "animat", "gsap", "motion"]):
+            bullets.append("Design systems & interactive UI: built modular component libraries (Cloveri for Mintsifry) and rich interactive animations via GSAP (@gsap/react), Lottie, and Embla Carousel.")
         if any(w in text_lower for w in ["auth", "security", "rbac", "cms", "dashboard", "admin"]):
             bullets.append("Shipped end-to-end admin dashboards & CMS platforms (Radiotochka), implementing RBAC, secure session cookies (httpOnly/SameSite), and robust SSR hydration.")
-        if any(w in text_lower for w in ["speed", "startup", "scale", "hackathon", "mvp", "lead", "senior"]):
-            bullets.append("1st place at Droog hackathon (delivered 3 role-based interfaces in 48h) and contributed to public component libraries with clean design systems.")
+        if any(w in text_lower for w in ["fullstack", "backend", "fastapi", "python", "node", "postgres", "sql", "docker", "api"]):
+            bullets.append("Fullstack architecture & ownership: built REST APIs with FastAPI & Node.js, PostgreSQL, multi-stage Docker builds, Traefik v3 reverse proxy with TLS, automated billing & webhooks.")
+        if any(w in text_lower for w in ["hackathon", "speed", "startup", "scale", "mvp", "lead", "senior"]):
+            bullets.append("1st place at Droog hackathon: architected and shipped 3 role-based interfaces with React/Redux in 48 hours under tight deadline.")
 
         if not bullets:
-            bullets.append("Lead Engineer at NoLogs SaaS (Next.js 16, React 19, TypeScript, FastAPI, 100/100 PageSpeed).")
+            bullets.append("Lead Frontend Engineer at NoLogs SaaS: client architecture on Next.js 16 (App Router), React 19, and TypeScript 5.")
             bullets.append("Full-cycle production delivery: from Figma design systems to Docker containerization and live deployment.")
     else:
-        if any(w in text_lower for w in ["next", "react", "frontend", "ui", "performance", "speed", "tailwind", "верстк", "интерфейс"]):
-            bullets.append("Lead-разработчик NoLogs SaaS: продакшен-сервис на Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS v4, результат 100/100 в Google PageSpeed Insights.")
+        if any(w in text_lower for w in ["performance", "pagespeed", "скорость", "оптимиз"]):
+            bullets.append("Оптимизация производительности и Core Web Vitals: результат 100/100 в PageSpeed на Next.js 16 (App Router) за счет оптимизации бандла и SSR-стриминга.")
+        if any(w in text_lower for w in ["компонент", "дизайн-систем", "ui-kit", "ui kit", "figma", "анимац", "animat", "gsap", "motion", "дизайн"]):
+            bullets.append("Дизайн-системы и сложный UI: опыт создания компонентных библиотек (Cloveri для Минцифры) и интерактивных сценариев на GSAP (@gsap/react), Lottie и Embla Carousel.")
+        if any(w in text_lower for w in ["auth", "авториз", "rbac", "cms", "админ", "панел"]):
+            bullets.append("Разработка админ-панелей и CMS (Radiotochka): реализация RBAC, безопасных session-cookies и устранение рассинхронизации SSR-гидратации с NextAuth.")
         if any(w in text_lower for w in ["fullstack", "backend", "бэкенд", "фуллстек", "fastapi", "python", "node", "postgres", "sql", "docker", "api"]):
             bullets.append("Полный стек и инфраструктура: разработка REST API на FastAPI и Node.js, PostgreSQL, multi-stage сборки в Docker, Traefik v3 c авто-TLS, интеграция эквайринга и вебхуков.")
-        if any(w in text_lower for w in ["анимац", "animat", "gsap", "motion", "дизайн", "figma"]):
-            bullets.append("Сложный анимированный UI: интерактивные сценарии на GSAP (@gsap/react), Lottie и Embla Carousel без лишних тяжелых библиотек.")
-        if any(w in text_lower for w in ["auth", "авториз", "rbac", "cms", "админ", "панел"]):
-            bullets.append("Разработка админ-панелей и CMS (Radiotochka): реализация RBAC, безопасных session-cookies и стабильной SSR-гидратации.")
-        if any(w in text_lower for w in ["скорость", "стартап", "хакатон", "mvp", "лид", "senior", "сеньор"]):
-            bullets.append("1 место на хакатоне Droog (с нуля разработал 3 ролевых интерфейса за 48 часов) и опыт создания компонентных библиотек (Cloveri для Минцифры).")
+        if any(w in text_lower for w in ["стартап", "хакатон", "mvp", "лид", "senior", "сеньор"]):
+            bullets.append("1 место на хакатоне Droog: с нуля разработал 3 ролевых интерфейса за 48 часов в условиях жестких дедлайнов.")
 
         if not bullets:
-            bullets.append("Lead-разработчик NoLogs SaaS (Next.js 16, React 19, TypeScript, FastAPI, 100/100 PageSpeed).")
-            bullets.append("Полный цикл владения продуктом: от архитектуры и дизайн-системы до деплоя в Docker и поддержки реальных пользователей.")
+            bullets.append("Lead Frontend-разработчик NoLogs SaaS: архитектура клиентской части на Next.js 16 (App Router), React 19, TypeScript 5.")
+            bullets.append("Сквозная разработка фич от архитектуры и дизайн-системы до деплоя в Docker и поддержки пользователей.")
 
     return bullets[:3]
 

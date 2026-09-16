@@ -24,7 +24,7 @@ class HabrScraper(BaseScraper):
         seen_ids = set()
 
         for query in self.queries:
-            url = f"https://career.habr.com/vacancies?type=all&q={urllib.request.quote(query)}"
+            url = f"https://career.habr.com/vacancies?sort=date&q={urllib.request.quote(query)}"
             try:
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=10) as resp:

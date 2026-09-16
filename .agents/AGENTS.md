@@ -124,3 +124,9 @@ Every feature MUST be implemented end-to-end with real data and contracts.
    - NEVER make silent architectural changes or take hidden shortcuts.
    - Clearly inform the user what data is missing, why a DB/backend change is necessary, and what is being modified.
    - Speak directly and honestly as a Tech Lead.
+
+---
+
+## Refactoring Policy
+
+All refactoring operations must strictly adhere to [.agents/REFACTORING_RULES.md](file:///Users/egor/.gemini/antigravity/scratch/job_hunter/.agents/REFACTORING_RULES.md).

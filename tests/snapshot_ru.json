@@ -1,0 +1,98 @@
+{
+  "id": "profile_ru",
+  "lang": "ru",
+  "name": "Егор Мышинский",
+  "full_name": "Егор Мышинский",
+  "first_name": "Егор",
+  "last_name": "Мышинский",
+  "role": "Frontend / Fullstack-разработчик",
+  "contacts": "Telegram: @PotatoChipasu | Email: egormyshinsky@gmail.com | Телефон: +7 (999) 829-17-88 | GitHub: https://github.com/heayr | LinkedIn: https://linkedin.com/in/potatochipasu",
+  "contacts_structured": {
+    "telegram": "@PotatoChipasu",
+    "telegram_url": "https://t.me/PotatoChipasu",
+    "email": "egormyshinsky@gmail.com",
+    "phone": "+7 (999) 829-17-88",
+    "github": "https://github.com/heayr",
+    "linkedin": "https://linkedin.com/in/potatochipasu",
+    "portfolio": "https://nologs.website"
+  },
+  "location": {
+    "city": "Москва",
+    "country": "",
+    "raw": "Москва | Удалённо / гибрид",
+    "remote": true,
+    "hybrid": true,
+    "office": true
+  },
+  "summary": "Опытный разработчик с фокусом на современные веб-технологии и производительность.",
+  "keywords": "React 19, Next.js 16, TypeScript, Tailwind CSS, Python, FastAPI, Node.js, PostgreSQL, Docker, Git, CI/CD",
+  "skills_categorized": {
+    "Frontend": [
+      "React 19",
+      "Next.js 16",
+      "TypeScript",
+      "Tailwind CSS"
+    ],
+    "Backend": [
+      "Python",
+      "FastAPI",
+      "Node.js",
+      "PostgreSQL"
+    ],
+    "DevOps": [
+      "Docker",
+      "Git",
+      "CI/CD"
+    ]
+  },
+  "experience": "### Senior Frontend Developer | TechCorp (Январь 2023 — настоящее время)\nКомпания разрабатывает финтех-платформу.\nСайт: Сайт: https://techcorp.example.com\n• Разработал ключевую архитектуру клиентского приложения\n• Оптимизировал скорость загрузки страниц на 40%\n• Внедрил Vitest и Playwright для E2E тестирования\n\n### Frontend Developer | StartupHub (Март 2021 — Декабрь 2022)\n• Создал личный кабинет пользователя с нуля\n• Настроил сборку через Vite и автоматический деплой",
+  "experience_structured": [
+    {
+      "role": "Senior Frontend Developer",
+      "company": "TechCorp",
+      "period": "Январь 2023 — настоящее время",
+      "bullets": [
+        "Разработал ключевую архитектуру клиентского приложения",
+        "Оптимизировал скорость загрузки страниц на 40%",
+        "Внедрил Vitest и Playwright для E2E тестирования"
+      ],
+      "description": "Компания разрабатывает финтех-платформу.",
+      "site": "Сайт: https://techcorp.example.com"
+    },
+    {
+      "role": "Frontend Developer",
+      "company": "StartupHub",
+      "period": "Март 2021 — Декабрь 2022",
+      "bullets": [
+        "Создал личный кабинет пользователя с нуля",
+        "Настроил сборку через Vite и автоматический деплой"
+      ],
+      "description": "",
+      "site": ""
+    }
+  ],
+  "education": [
+    {
+      "grade": "МГТУ им. Баумана",
+      "field": "",
+      "institution": "",
+      "years": ""
+    },
+    {
+      "grade": "Информатика и вычислительная техника",
+      "field": "",
+      "institution": "",
+      "years": "2016 — 2020"
+    }
+  ],
+  "languages": [
+    {
+      "language": "Русский",
+      "level": "Родной"
+    },
+    {
+      "language": "Английский",
+      "level": "C1 (Advanced)"
+    }
+  ]
+}

@@ -10,11 +10,13 @@ from scrapers.telegram_scraper import TelegramScraper
 from scrapers.habr_scraper import HabrScraper
 from scrapers.wwr_scraper import WWRScraper
 from scrapers.hh_scraper import HHScraper
-from scrapers.remoteok_scraper import RemoteOKScraper
 from scrapers.crypto_scraper import CryptoScraper
 from scrapers.remotive_scraper import RemotiveScraper
 from scrapers.superjob_scraper import SuperJobScraper
 from scrapers.rabotaru_scraper import RabotaRuScraper
+from scrapers.ats_scraper import ATSScraper
+from scrapers.hackernews_scraper import HackerNewsScraper
+from scrapers.jobicy_scraper import JobicyScraper
 from tracker.db import init_db, save_vacancy
 from generator.pitch_builder import generate_pitch
 from filter.profile_filter import is_qualified_vacancy, detect_vacancy_grade
@@ -26,9 +28,11 @@ def run():
 
     scrapers = [
         TelegramScraper(),
+        ATSScraper(),
+        HackerNewsScraper(),
+        JobicyScraper(),
         HabrScraper(),
         WWRScraper(),
-        RemoteOKScraper(),
         CryptoScraper(),
         RemotiveScraper(),
         HHScraper(),
@@ -126,6 +130,13 @@ def run():
         conn.close()
 
     print(f"\n✅ Sourcing Finished: Saved: {saved} | Filtered: {skipped_filter} | Duplicates: {skipped_duplicate}")
+
+    # Automatically purge any closed vacancies from the feed
+    try:
+        from tracker.cleanup_closed import archive_closed_vacancies
+        archive_closed_vacancies()
+    except Exception as e:
+        print(f"Warning: Closed vacancies cleanup error: {e}")
 
 
 if __name__ == "__main__":

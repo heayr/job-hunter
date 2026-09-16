@@ -52,6 +52,10 @@ def init_db():
     if 'published_at' not in columns:
         cursor.execute("ALTER TABLE vacancies ADD COLUMN published_at TEXT")
         cursor.execute("UPDATE vacancies SET published_at = created_at WHERE published_at IS NULL")
+    if 'blacklist_reason' not in columns:
+        cursor.execute("ALTER TABLE vacancies ADD COLUMN blacklist_reason TEXT")
+    if 'blacklisted_at' not in columns:
+        cursor.execute("ALTER TABLE vacancies ADD COLUMN blacklisted_at TIMESTAMP")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pitches (

@@ -5,6 +5,7 @@ import sys
 import glob
 import re
 import urllib.parse
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Auto-inject virtual environment packages
@@ -68,12 +69,13 @@ class CRMHandler(BaseHTTPRequestHandler):
                 COALESCE(v.language, p.language, 'ru') AS language,
                 COALESCE(v.published_at, v.created_at) AS published_at,
                 v.created_at,
+                v.blacklist_reason,
+                v.blacklisted_at,
                 MAX(CASE WHEN p.pitch_type = 'short_dm'     THEN p.content END) AS short_dm,
                 MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.content END) AS cover_letter,
                 MAX(CASE WHEN p.pitch_type = 'tailored_cv'  THEN p.content END) AS tailored_cv
             FROM vacancies v
             LEFT JOIN pitches p ON p.vacancy_id = v.id
-            WHERE v.status != 'archive'
             GROUP BY v.id
             ORDER BY COALESCE(v.published_at, v.created_at) DESC
         ''')
@@ -90,12 +92,26 @@ class CRMHandler(BaseHTTPRequestHandler):
         conn.close()
         return row['content'] if row else None
 
-    def update_vacancy_status(self, vac_id, status):
+    def update_vacancy_status(self, vac_id, status, reason=None):
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
-        cur.execute("UPDATE vacancies SET status = ? WHERE id = ?", (status, vac_id))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if status == 'blacklist':
+            cur.execute("""
+                UPDATE vacancies 
+                SET status = ?, blacklist_reason = ?, blacklisted_at = ?
+                WHERE id = ?
+            """, (status, reason or 'Токсичные условия / Нарушение ТК РФ', now, vac_id))
+        else:
+            cur.execute("UPDATE vacancies SET status = ? WHERE id = ?", (status, vac_id))
         conn.commit()
         conn.close()
+
+        try:
+            from tracker.shame_list import update_shame_list_file
+            update_shame_list_file()
+        except Exception as e:
+            print(f"[SHAME_LIST] Error updating markdown: {e}")
 
     def upsert_pitch(self, cur, vac_id, pitch_type, lang, content):
         """INSERT or UPDATE a pitch row (handles both new and existing pitches)."""
@@ -127,10 +143,15 @@ class CRMHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             self._handle_get()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
         except Exception as e:
             import traceback
             traceback.print_exc()
-            _send_json(self, {"error": str(e)}, status=500)
+            try:
+                _send_json(self, {"error": str(e)}, status=500)
+            except Exception:
+                pass
 
     def _handle_get(self):
         if self.path == '/':
@@ -142,6 +163,33 @@ class CRMHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        elif self.path.startswith('/static/'):
+            clean_path = self.path.split('?')[0].lstrip('/')
+            file_path = os.path.join(os.path.dirname(__file__), clean_path)
+            static_root = os.path.join(os.path.dirname(__file__), 'static')
+            real_path = os.path.realpath(file_path)
+            if os.path.exists(real_path) and os.path.commonpath([real_path, static_root]) == static_root and os.path.isfile(real_path):
+                import mimetypes
+                mime_type, _ = mimetypes.guess_type(real_path)
+                if not mime_type:
+                    if real_path.endswith('.js'): mime_type = 'text/javascript'
+                    elif real_path.endswith('.css'): mime_type = 'text/css'
+                    else: mime_type = 'application/octet-stream'
+                with open(real_path, 'rb') as sf:
+                    content = sf.read()
+                self.send_response(200)
+                self.send_header('Content-Type', f'{mime_type}; charset=utf-8' if 'text' in mime_type or 'javascript' in mime_type else mime_type)
+                self.send_header('Content-Length', str(len(content)))
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        elif self.path == '/api/status':
+            _send_json(self, {"status": "ok", "version": "2.0"})
 
         elif self.path == '/api/pitches':
             data = self.get_vacancies()
@@ -168,6 +216,11 @@ class CRMHandler(BaseHTTPRequestHandler):
                     except Exception:
                         pass
             _send_json(self, config)
+
+        elif self.path == '/api/shame_list':
+            from tracker.shame_list import generate_shame_list_markdown
+            md = generate_shame_list_markdown()
+            _send_json(self, {"markdown": md})
 
         elif self.path.startswith('/cv/'):
             vac_id = urllib.parse.unquote(self.path[4:])
@@ -199,10 +252,15 @@ class CRMHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             self._handle_post()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
         except Exception as e:
             import traceback
             traceback.print_exc()
-            _send_json(self, {"success": False, "error": str(e)}, status=500)
+            try:
+                _send_json(self, {"success": False, "error": str(e)}, status=500)
+            except Exception:
+                pass
 
     def _read_body(self):
         length = int(self.headers.get('Content-Length', 0))
@@ -228,16 +286,18 @@ class CRMHandler(BaseHTTPRequestHandler):
             v_dict = dict(row)
             pitch_data = generate_pitch(v_dict, use_ai=True)
 
-            self.upsert_pitch(cur, vac_id, 'short_dm',     pitch_data['language'], pitch_data['short_dm'])
-            self.upsert_pitch(cur, vac_id, 'cover_letter', pitch_data['language'], pitch_data['cover_letter'])
-            self.upsert_pitch(cur, vac_id, 'tailored_cv',  pitch_data['language'], pitch_data['tailored_cv'])
+            if pitch_data.get("ai_generated"):
+                self.upsert_pitch(cur, vac_id, 'short_dm',     pitch_data['language'], pitch_data['short_dm'])
+                self.upsert_pitch(cur, vac_id, 'cover_letter', pitch_data['language'], pitch_data['cover_letter'])
+                self.upsert_pitch(cur, vac_id, 'tailored_cv',  pitch_data['language'], pitch_data['tailored_cv'])
 
-            # Always save score (even 0)
-            score = pitch_data.get('score')
-            if score is not None:
-                cur.execute("UPDATE vacancies SET score = ? WHERE id = ?", (score, vac_id))
+                # Always save score (even 0)
+                score = pitch_data.get('score')
+                if score is not None:
+                    cur.execute("UPDATE vacancies SET score = ? WHERE id = ?", (score, vac_id))
 
-            conn.commit()
+                conn.commit()
+
             conn.close()
             _send_json(self, {
                 "success": pitch_data.get("ai_generated", False),
@@ -251,8 +311,22 @@ class CRMHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/vacancies/') and self.path.endswith('/status'):
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
             body = json.loads(self._read_body().decode('utf-8'))
-            self.update_vacancy_status(vac_id, body.get('status'))
+            self.update_vacancy_status(vac_id, body.get('status'), body.get('reason'))
             _send_json(self, {"success": True})
+
+        # ── Apply via Telegram ──
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/apply_tg'):
+            import subprocess
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            script_path = os.path.join(os.path.dirname(__file__), 'auto_sender.py')
+            result = subprocess.run(
+                [sys.executable, script_path, "--id", vac_id],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                _send_json(self, {"success": True, "logs": result.stdout})
+            else:
+                _send_json(self, {"success": False, "error": result.stderr or result.stdout}, status=500)
 
         # ── Upload and parse resume ──
         elif self.path == '/api/upload_resume':
@@ -297,6 +371,19 @@ class CRMHandler(BaseHTTPRequestHandler):
             with open(profiles_path, 'w', encoding='utf-8') as pf:
                 json.dump(profiles, pf, ensure_ascii=False, indent=2)
             _send_json(self, {"success": True})
+
+        # ── Universal AI Vacancy Parser ──
+        elif self.path == '/api/vacancies/ai-parse':
+            from enricher.ai_parser import ingest_vacancy_with_ai
+            body = json.loads(self._read_body().decode('utf-8'))
+            raw_input = body.get('input') or body.get('text') or body.get('url') or ''
+            is_url = bool(body.get('is_url', False))
+            profile_id = body.get('profile_id')
+            res = ingest_vacancy_with_ai(raw_input, is_url=is_url, profile_id=profile_id)
+            if res.get('success'):
+                _send_json(self, res)
+            else:
+                _send_json(self, res, status=400)
 
         # ── Run harvest ──
         elif self.path == '/api/harvest':

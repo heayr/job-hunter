@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Hunter CRM V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .tab-btn {
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .tab-btn.active {
+            border-bottom-color: #38bdf8;
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal {
+            display: none;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .terminal {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            height: 220px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+
+        .market-btn {
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .market-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .market-btn.active {
+            background: #38bdf8;
+            color: #0f172a;
+            font-weight: 700;
+            border-color: #38bdf8;
+            box-shadow: 0 1px 4px rgba(56, 189, 248, 0.3);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <!-- Navbar -->
+    <nav class="border-b border-slate-800 bg-slate-900/50 sticky top-0 z-10 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14 items-center">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⚡️</span>
+                        <h1
+                            class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent">
+                            Job Hunter CRM</h1>
+                    </div>
+                    <div class="flex gap-1 border-l border-slate-800 pl-4 h-full items-center">
+                        <button onclick="setTab('inbox')" id="tab-inbox"
+                            class="tab-btn active px-3 py-1.5 text-slate-400">Inbox (<span
+                                id="count-inbox">0</span>)</button>
+                        <button onclick="setTab('sent')" id="tab-sent"
+                            class="tab-btn px-3 py-1.5 text-slate-400">Отправлено (<span
+                                id="count-sent">0</span>)</button>
+                        <button onclick="setTab('replied')" id="tab-replied"
+                            class="tab-btn px-3 py-1.5 text-slate-400">Ответили (<span
+                                id="count-replied">0</span>)</button>
+                        <button onclick="setTab('profiles')" id="tab-profiles"
+                            class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300">👤 Профили</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+                        <span class="text-purple-400 font-semibold">🎯 Резюме:</span>
+                        <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1">
+                            <option value="">Загрузка...</option>
+                        </select>
+                    </div>
+                    <a id="bookmarklet-btn" href="#"
+                        onclick="event.preventDefault(); toggleModal('bookmarklet-modal');"
+                        class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md cursor-grab flex items-center gap-1.5 select-none"
+                        title="Перетащите на панель закладок или нажмите для инструкции">
+                        <span>🔖</span> Auto-Apply
+                    </a>
+                    <button onclick="toggleModal('ai-parser-modal')"
+                        class="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-md flex items-center gap-1.5"
+                        title="Универсальный парсинг вакансии по ссылке или тексту через ИИ">
+                        <span>🪄</span> Добавить через ИИ
+                    </button>
+                    <button onclick="startHarvest()"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                        <span>🔄</span> Собрать вакансии
+                    </button>
+                    <button onclick="toggleModal('settings-modal')"
+                        class="text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700">
+                        ⚙️ Настройки ИИ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main View: Vacancies -->
+    <div id="main-view">
+        <!-- Analytics Dashboard -->
+        <div class="max-w-7xl mx-auto px-4 pt-5">
+            <div class="glass-panel rounded-xl p-3 flex justify-around items-center mb-1 shadow-sm flex-wrap gap-2">
+                <div class="text-center px-3">
+                    <div class="text-slate-400 text-xs font-medium">Всего вакансий</div>
+                    <div class="text-xl font-bold text-white mt-0.5" id="stat-total">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">🇷🇺 РФ и СНГ (RU)</div>
+                    <div class="text-xl font-bold text-amber-400 mt-0.5" id="stat-ru">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">🌍 Remote (EN)</div>
+                    <div class="text-xl font-bold text-sky-400 mt-0.5" id="stat-en">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">Отправлено (Sent)</div>
+                    <div class="text-xl font-bold text-indigo-400 mt-0.5" id="stat-sent">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">Ответили (Replied)</div>
+                    <div class="text-xl font-bold text-emerald-400 mt-0.5" id="stat-replied">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
+                    <div class="text-slate-400 text-xs font-medium">Win Rate</div>
+                    <div class="text-xl font-bold text-purple-400 mt-0.5" id="stat-winrate">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 py-5 flex gap-6">
+            <!-- Sidebar: Market Filter + Vacancy List -->
+            <div class="w-1/3 flex flex-col gap-3">
+                <!-- Market Filter Segmented Control -->
+                <div
+                    class="glass-panel p-1 rounded-xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
+                    <button onclick="setMarket('all')" id="market-btn-all"
+                        class="market-btn active flex-1 py-1.5 px-2 rounded-lg font-medium text-center transition-all flex items-center justify-center gap-1">
+                        <span>🌐</span> Все (<span id="market-count-all">0</span>)
+                    </button>
+                    <button onclick="setMarket('ru')" id="market-btn-ru"
+                        class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                        <span>🇷🇺</span> RU (<span id="market-count-ru">0</span>)
+                    </button>
+                    <button onclick="setMarket('en')" id="market-btn-en"
+                        class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                        <span>🌍</span> Remote (<span id="market-count-en">0</span>)
+                    </button>
+                </div>
+
+                <!-- Search & Filter Controls -->
+                <div class="glass-panel p-2.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <div class="relative">
+                        <input type="text" id="filter-search" oninput="onFilterChange()" placeholder="🔍 Поиск (React, Сбер, Remote...)"
+                            class="w-full bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Грейд:</label>
+                            <select id="filter-grade" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Все грейды</option>
+                                <option value="Lead">Lead / Arch</option>
+                                <option value="Senior">Senior</option>
+                                <option value="Middle">Middle</option>
+                                <option value="Junior">Junior</option>
+                                <option value="Intern">Intern / Стажер</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Мэтч %:</label>
+                            <select id="filter-match" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Любой скор</option>
+                                <option value="80">🔥 80%+ (Топ мэтч)</option>
+                                <option value="60">⚡ 60%+ (Хороший)</option>
+                                <option value="mixed">⚠️ Смешанный (&lt;60%)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Источник:</label>
+                            <select id="filter-source" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="all">Все источники</option>
+                                <option value="tg">Telegram</option>
+                                <option value="hh">HeadHunter</option>
+                                <option value="habr">Хабр Карьера</option>
+                                <option value="superjob">SuperJob</option>
+                                <option value="rabota">Rabota.ru</option>
+                                <option value="crypto">Crypto / Web3</option>
+                                <option value="remote">WWR & Remote</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Сортировка:</label>
+                            <select id="filter-sort" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                                <option value="newest">⚡ Свежие (по времени публикации)</option>
+                                <option value="score_desc">🔥 Топ мэтч (% совпадения)</option>
+                                <option value="salary">💰 По зарплате</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vacancy List -->
+                <div class="flex flex-col gap-2.5 h-[calc(100vh-16rem)] overflow-y-auto pr-1" id="vacancy-list">
+                    <div class="p-4 text-center text-slate-500">Загрузка вакансий...</div>
+                </div>
+            </div>
+
+            <!-- Main Content: Vacancy Details -->
+            <div class="w-2/3 h-[calc(100vh-12rem)] overflow-y-auto pr-1" id="vacancy-details">
+                <div
+                    class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
+                    <span class="text-3xl mb-3">👈</span>
+                    <p class="text-sm font-medium">Выберите вакансию из списка слева</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profiles View -->
+    <div id="profiles-view" class="max-w-7xl mx-auto px-4 py-6 hidden">
+        <div class="glass-panel rounded-xl p-6">
+            <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-700/60">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>👤</span> Персоны и Резюме
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Управляйте профилями для откликов на русском и английском
+                        языках</p>
+                </div>
+                <button onclick="addProfile()"
+                    class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1">
+                    ➕ Добавить профиль
+                </button>
+            </div>
+            <div class="flex gap-6">
+                <div class="w-1/3 flex flex-col gap-2 h-[calc(100vh-14rem)] overflow-y-auto pr-1" id="profiles-list">
+                </div>
+                <div class="w-2/3" id="profile-editor">
+                    <div class="text-slate-400 text-center py-16 text-sm">Выберите профиль слева</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="glass-panel p-5 rounded-xl w-[420px] border border-slate-700 shadow-2xl">
+            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ
+                (Gemini)</h2>
+            <div class="mb-3">
+                <label class="block text-xs font-medium text-slate-400 mb-1">Gemini API Key</label>
+                <input type="password" id="gemini-key" placeholder="AIzaSy..."
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с
+                    <code>AIzaSy...</code></p>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="toggleModal('settings-modal')"
+                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
+                <button onclick="saveConfig()"
+                    class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Universal AI Parser Modal -->
+    <div id="ai-parser-modal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="glass-panel p-6 rounded-2xl w-[640px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+                        🪄
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Умный ИИ-Импорт Вакансий
+                        </h2>
+                        <p class="text-[11px] text-slate-400">Прямой парсинг любой вакансии по URL или тексту через Gemini с авто-скорингом и питчем</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('ai-parser-modal')" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
+            </div>
+
+            <!-- Mode selector tabs -->
+            <div class="flex items-center gap-2 mb-4 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+                <button id="ai-tab-url" onclick="setAiParseMode('url')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white transition-all flex items-center justify-center gap-1.5">
+                    <span>🔗</span> По ссылке (URL)
+                </button>
+                <button id="ai-tab-text" onclick="setAiParseMode('text')" class="flex-1 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-lg transition-all flex items-center justify-center gap-1.5">
+                    <span>📝</span> Текст из Telegram / LinkedIn / Email
+                </button>
+            </div>
+
+            <!-- URL Input Container -->
+            <div id="ai-input-url-container" class="mb-4">
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Ссылка на вакансию (Setka, HH, LinkedIn, сайт компании или ATS):</label>
+                <input type="url" id="ai-input-url" placeholder="https://example.com/careers/senior-frontend-engineer"
+                    class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono">
+                <p class="text-[10px] text-slate-500 mt-1.5">ИИ загрузит страницу, очистит HTML и извлечет стек, зарплату, грейд и контакты.</p>
+            </div>
+
+            <!-- Text Input Container -->
+            <div id="ai-input-text-container" class="mb-4 hidden">
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Сырой текст вакансии:</label>
+                <textarea id="ai-input-text" rows="7" placeholder="Вставьте сюда скопированный пост из Telegram, личное сообщение от рекрутера, описание с закрытого сайта..."
+                    class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"></textarea>
+                <p class="text-[10px] text-slate-500 mt-1.5">ИИ структурирует текст, выделит ключевые требования, найдет контакты и сформирует питч.</p>
+            </div>
+
+            <!-- Loader / Status indicator -->
+            <div id="ai-parse-loader" class="hidden mb-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/60">
+                <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                    <div class="text-xs text-purple-200">
+                        <div class="font-bold">ИИ анализирует вакансию...</div>
+                        <div class="text-[11px] text-purple-300/80">Извлечение требований, расчет мэтч-скора и генерация кастомного отклика.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error message container -->
+            <div id="ai-parse-error" class="hidden mb-4 p-3 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 flex items-center gap-2">
+                <span>⚠️</span>
+                <span id="ai-parse-error-msg">Ошибка</span>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                <span class="text-[11px] text-slate-500">Автоматически сохраняется в статус «Новые»</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleModal('ai-parser-modal')" type="button"
+                        class="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
+                    <button id="ai-parse-submit-btn" onclick="executeAiParse()" type="button"
+                        class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/20 flex items-center gap-2">
+                        <span>🪄</span> Распарсить и добавить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Harvest Modal -->
+    <div id="harvest-modal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="glass-panel p-6 rounded-2xl w-[620px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div id="harvest-radar" class="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-lg animate-pulse">
+                        🔄
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            Сбор вакансий по источникам
+                        </h2>
+                        <p class="text-[11px] text-slate-400">Greenhouse, Lever, Hacker News, Jobicy, HH.ru, SuperJob, Rabota.ru, Хабр, Telegram, WWR, Crypto</p>
+                    </div>
+                </div>
+                <div id="harvest-badge" class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                    <span>Сканирование...</span>
+                </div>
+            </div>
+
+            <!-- Active animated progress card -->
+            <div id="harvest-status-card" class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2 text-xs">
+                    <span id="harvest-current-step" class="font-semibold text-slate-200">Инициализация модулей поиска...</span>
+                    <span id="harvest-percent" class="text-indigo-400 font-mono font-bold">В процессе</span>
+                </div>
+                <!-- Progress bar -->
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div id="harvest-progress-bar" class="bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full w-1/3 transition-all duration-500 animate-pulse"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mt-3 text-[11px] text-slate-400 text-center">
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-500 text-[10px]">Источники</div>
+                        <div class="font-bold text-slate-300 mt-0.5">9 площадок</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-500 text-[10px]">Анти-BS & Резюме</div>
+                        <div class="font-bold text-emerald-400 mt-0.5">Фильтр активен</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                        <div class="text-slate-500 text-[10px]">Целевое резюме</div>
+                        <div id="harvest-active-profile-label" class="font-bold text-purple-400 mt-0.5 truncate">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible Terminal Details -->
+            <div class="mb-4">
+                <button onclick="toggleTerminalLogs()" type="button" class="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 py-1 px-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                    <span class="flex items-center gap-1.5">
+                        <span>📟</span>
+                        <span id="toggle-logs-text">Показать подробный лог терминала</span>
+                    </span>
+                    <span id="toggle-logs-arrow">▼</span>
+                </button>
+                <div id="terminal-container" class="hidden mt-2">
+                    <div class="terminal text-[11px] h-44 overflow-y-auto font-mono leading-relaxed" id="harvest-logs">Ожидание запуска...</div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeHarvest()" id="harvest-close-btn"
+                    class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-2 ring-2 ring-emerald-500/40 hidden">
+                    <span>🎉</span> Посмотреть найденные вакансии
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper Modal -->
+    <div id="cropper-modal" class="modal fixed inset-0 z-[60] items-center justify-center">
+        <div class="glass-panel p-5 rounded-xl w-[500px] border border-slate-700 shadow-2xl">
+            <h2 class="text-base font-bold mb-3 text-white">Центрирование фото (1:1)</h2>
+            <div class="w-full h-[320px] bg-slate-900 mb-3 overflow-hidden flex justify-center rounded-lg">
+                <img id="cropper-image" class="max-w-full hidden">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="toggleModal('cropper-modal')"
+                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
+                <button onclick="saveCrop()"
+                    class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Применить
+                    аватар</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookmarklet Info & Setup Modal -->
+    <div id="bookmarklet-modal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="glass-panel p-6 rounded-2xl w-[560px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-base">
+                        🔖
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white">Установка Auto-Apply Закладки (v3.0)</h2>
+                        <p class="text-[11px] text-slate-400">Универсальный авто-отклик: Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('bookmarklet-modal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+            </div>
+
+            <div class="space-y-4 text-xs text-slate-300">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                        <div class="font-semibold text-white mb-1">Способ 1 (Самый быстрый):</div>
+                        <p class="text-[11px] text-slate-400">Зажмите зеленую кнопку и перетащите её на панель закладок браузера (Cmd+Shift+B в Chrome, чтобы показать панель):</p>
+                    </div>
+                    <a id="bookmarklet-modal-btn" href="#" onclick="event.preventDefault(); alert('Зажмите кнопку левой кнопкой мыши и перетащите её наверх, на панель закладок!');"
+                        class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg cursor-grab select-none whitespace-nowrap flex items-center gap-2 ring-2 ring-emerald-500/30">
+                        <span>🔖</span> Auto-Apply
+                    </a>
+                </div>
+
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                    <div class="font-semibold text-white mb-1">Способ 2 (Вручную):</div>
+                    <p class="text-[11px] text-slate-400 mb-2">Создайте любую закладку в браузере, отредактируйте её и вставьте этот код в поле URL:</p>
+                    <div class="flex items-center gap-2">
+                        <input id="bookmarklet-code-input" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-emerald-400 font-mono select-all">
+                        <button onclick="copyBookmarkletCode()" class="bg-slate-800 hover:bg-slate-700 text-white font-medium px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+                            📋 Копировать
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-950/40 border border-indigo-900/60 rounded-xl p-3.5 text-[11px] space-y-1.5 text-indigo-200">
+                    <div class="font-bold text-indigo-300">Универсальный авто-заполнитель анкет (ATS & Forms):</div>
+                    <div>1. Откройте любую страницу вакансии или форму отклика (<strong>Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</strong> и др.).</div>
+                    <div>2. Нажмите закладку <strong>«🔖 Auto-Apply»</strong> на панели закладок браузера.</div>
+                    <div>⚡️ Скрипт мгновенно определит форму и автоматически заполнит: <strong>Имя, Фамилию, Email, Телефон, LinkedIn, GitHub, Портфолио, Локацию и Сопроводительное письмо</strong>, а также подсветит поле прикрепления CV!</div>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-4 mt-4 border-t border-slate-800">
+                <button onclick="toggleModal('bookmarklet-modal')" class="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-4 py-2 rounded-lg">
+                    Понятно
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let vacancies = [];
+        let profiles = [];
+        let currentTab = 'inbox';
+        let currentMarket = 'all';
+        let currentVac = null;
+        let currentProfile = null;
+        let cropper = null;
+        let activeProfileId = null;
+
+        // --- Filter & Search State ---
+        let filterSearch = '';
+        let filterGrade = 'all';
+        let filterMatch = 'all';
+        let filterSource = 'all';
+        let filterSort = 'newest';
+
+        window.onload = async () => {
+            initBookmarklet();
+            await loadProfilesList();
+            await loadConfig();
+            loadPitches();
+        };
+
+        function onFilterChange() {
+            filterSearch = (document.getElementById('filter-search')?.value || '').toLowerCase().trim();
+            filterGrade = document.getElementById('filter-grade')?.value || 'all';
+            filterMatch = document.getElementById('filter-match')?.value || 'all';
+            filterSource = document.getElementById('filter-source')?.value || 'all';
+            filterSort = document.getElementById('filter-sort')?.value || 'newest';
+
+            renderList();
+        }
+
+        function parseSalaryValue(s) {
+            if (!s || s === 'Не указана') return 0;
+            const nums = s.replace(/\s+/g, '').match(/\d+/g);
+            return nums ? parseInt(nums[0], 10) : 0;
+        }
+
+        function formatRelativeTime(dateStr) {
+            if (!dateStr) return '';
+            const cleanStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+            const date = new Date(cleanStr);
+            if (isNaN(date.getTime())) return dateStr;
+            const now = new Date();
+            const diffMs = now - date;
+            if (diffMs < 0) return 'только что';
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffMins < 1) return 'только что';
+            if (diffMins < 60) return `${diffMins} мин назад`;
+            if (diffHours < 24) return `${diffHours} ч назад`;
+            if (diffDays === 1) return 'вчера';
+            if (diffDays < 7) return `${diffDays} дн назад`;
+            return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+        }
+
+        function renderActiveProfileDropdown() {
+            const select = document.getElementById('active-profile-select');
+            const modalLabel = document.getElementById('harvest-active-profile-label');
+            if (!select) return;
+
+            if (!profiles || profiles.length === 0) {
+                select.innerHTML = '<option value="">(Нет профилей)</option>';
+                if (modalLabel) modalLabel.innerText = 'По умолчанию';
+                return;
+            }
+
+            if (!activeProfileId || !profiles.some(p => p.id === activeProfileId)) {
+                activeProfileId = profiles[0].id;
+            }
+
+            select.innerHTML = profiles.map(p => `
+                <option value="${p.id}" ${p.id === activeProfileId ? 'selected' : ''}>
+                    ${p.role || p.name || p.id} (${(p.lang || 'ru').toUpperCase()})
+                </option>
+            `).join('');
+
+            const cur = profiles.find(p => p.id === activeProfileId) || profiles[0];
+            if (modalLabel && cur) {
+                modalLabel.innerText = `${cur.role || cur.name} (${(cur.lang || 'ru').toUpperCase()})`;
+            }
+        }
+
+        async function changeActiveProfile(profileId) {
+            activeProfileId = profileId;
+            renderActiveProfileDropdown();
+            initBookmarklet();
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active_profile_id: profileId })
+                });
+                showToast('🎯 Активное резюме переключено!');
+                renderDetails();
+            } catch (e) {
+                console.error("Error saving active profile", e);
+            }
+        }
+
+        function cleanCompanyName(rawName, title, desc) {
+            if (!rawName) rawName = "";
+            let name = rawName.trim();
+
+            const isPlaceholder = /компания|работодатель|unknown|remote company|не указана/i.test(name);
+            if (isPlaceholder && title) {
+                const patterns = [
+                    /[\|\@]\s*([A-Za-zА-Яа-я0-9\-\.\s]{2,30})$/,
+                    /\b(?:в|at|for|для)\s+([A-Za-zА-Яа-я0-9\-\.\s]{2,30})$/,
+                    /\b(?:в|at|for|для)\s+([А-ЯA-Z][a-zA-Zа-яА-Я0-9\-_]+)/
+                ];
+                for (const pat of patterns) {
+                    const m = title.match(pat);
+                    if (m && m[1]) {
+                        const cand = m[1].trim();
+                        if (cand.length >= 2 && !/команда|проект|отдел/i.test(cand)) {
+                            name = cand;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Remove legal noise
+            name = name.replace(/[\"\'«»„“”]/g, '');
+            name = name.replace(/\b(?:ооо|пао|зао|нао|ао|ип)\b/gi, '');
+            name = name.replace(/\b(?:llc|ltd|inc|corp|corporation|gmbh|co\.)\b/gi, '');
+            name = name.replace(/\((?:пао|ооо|зао|ао|ип)\)/gi, '');
+            name = name.replace(/\(\s*\)|\[\s*\]/g, '');
+            name = name.replace(/\s+/g, ' ').trim().replace(/^[ \-.,/|]+|[ \-.,/|]+$/g, '');
+
+            return name || rawName.trim() || 'Компания';
+        }
+
+        function copyBookmarkletCode() {
+            const input = document.getElementById('bookmarklet-code-input');
+            if (input) {
+                navigator.clipboard.writeText(input.value);
+                showToast('📋 Код букмарклета скопирован в буфер обмена!');
+            }
+        }
+
+        function initBookmarklet() {
+            const p = (profiles && profiles.find(pr => pr.id === activeProfileId)) || (profiles && profiles[0]) || {};
+            const contacts = p.contacts_structured || {};
+
+            const rawName = p.name || 'Егор Мышинский';
+            const nameParts = rawName.split(/\s+/);
+            const fn_ru = p.first_name || nameParts[0] || 'Егор';
+            const ln_ru = p.last_name || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Мышинский');
+
+            const fn_en = fn_ru.toLowerCase().includes('егор') ? 'Egor' : fn_ru;
+            const ln_en = ln_ru.toLowerCase().includes('мышин') ? 'Myshinsky' : ln_ru;
+            const name_en = `${fn_en} ${ln_en}`;
+            const name_ru = `${fn_ru} ${ln_ru}`;
+
+            const email = contacts.email || 'egormyshinsky@gmail.com';
+            const phone = contacts.phone || '+79998291788';
+            const linkedin = contacts.linkedin || 'https://linkedin.com/in/potatochipasu';
+            const github = contacts.github || 'https://github.com/heayr';
+            const portfolio = contacts.portfolio || 'https://nologs.website';
+            const telegram = contacts.telegram || '@PotatoChipasu';
+            const telegram_url = contacts.telegram_url || (telegram.startsWith('@') ? `https://t.me/${telegram.slice(1)}` : telegram);
+            const loc_en = p.location || 'Yerevan, Armenia / Remote';
+            const loc_ru = 'Ереван, Армения / Удаленно';
+
+            const cand = {
+                fn_en, ln_en, name_en,
+                fn_ru, ln_ru, name_ru,
+                email, phone, linkedin, github, portfolio,
+                telegram, telegram_url,
+                loc_en, loc_ru
+            };
+
+            const candJson = JSON.stringify(cand);
+
+            const code = `javascript:(async function(){try{const C=${candJson};const isRu=/[а-яёА-ЯЁ]/.test(document.title+' '+(document.body?document.body.innerText.slice(0,400):''))||(document.documentElement.lang||'').startsWith('ru');const c_fn=isRu?C.fn_ru:C.fn_en;const c_ln=isRu?C.ln_ru:C.ln_en;const c_name=isRu?C.name_ru:C.name_en;const c_loc=isRu?C.loc_ru:C.loc_en;let coverText='';if(window.location.hash&&window.location.hash.includes('jh_cover=')){try{coverText=decodeURIComponent(window.location.hash.split('jh_cover=')[1]);}catch(e){}}if(!coverText&&navigator.clipboard&&navigator.clipboard.readText){try{const clip=await navigator.clipboard.readText();if(clip&&clip.length>40&&!clip.startsWith('http'))coverText=clip;}catch(e){}}const hhToggle=document.querySelector('[data-qa="vacancy-response-letter-toggle"],[data-qa="vacancy-response-popup-letter-toggle"]');if(hhToggle&&hhToggle.offsetParent!==null){hhToggle.click();await new Promise(r=>setTimeout(r,300));}const genToggles=Array.from(document.querySelectorAll('button, a, span[role="button"]'));const fToggle=genToggles.find(el=>el.offsetParent!==null&&/сопроводительн|cover/i.test(el.innerText||''));if(fToggle&&!document.querySelector('textarea')){fToggle.click();await new Promise(r=>setTimeout(r,300));}function setVal(el,val){if(!el||val===undefined||val===null||val==='')return false;el.focus();const isTa=el.tagName==='TEXTAREA';const proto=isTa?window.HTMLTextAreaElement.prototype:window.HTMLInputElement.prototype;const setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;if(setter){setter.call(el,val);}else{el.value=val;}el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('blur',{bubbles:true}));el.style.transition='all 0.3s ease';el.style.borderColor='#10b981';el.style.boxShadow='0 0 0 2px rgba(16, 185, 129, 0.25)';return true;}function getCtx(el){let t=[el.name,el.id,el.placeholder,el.getAttribute('aria-label'),el.autocomplete].filter(Boolean).join(' ');if(el.id){const lbl=document.querySelector(\`label[for="\${el.id}"]\`);if(lbl)t+=' '+lbl.innerText;}const pLbl=el.closest('label');if(pLbl)t+=' '+pLbl.innerText;const prev=el.previousElementSibling;if(prev&&(prev.tagName==='LABEL'||(prev.className&&typeof prev.className==='string'&&prev.className.includes('label'))))t+=' '+prev.innerText;const parent=el.parentElement;if(parent&&parent.previousElementSibling&&parent.previousElementSibling.tagName==='LABEL')t+=' '+parent.previousElementSibling.innerText;return t.toLowerCase().replace(/[^a-z0-9а-яё]/gi,' ');}const inputs=Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, [contenteditable="true"]'));let filledCount=0;const filledFields=[];for(const el of inputs){if(el.offsetParent===null&&el.type!=='text')continue;const ctx=getCtx(el);const pad=' '+ctx+' ';const has=(...words)=>words.some(w=>pad.includes(' '+w+' '));const tag=el.tagName;const type=(el.type||'').toLowerCase();if(type==='email'||has('email','e mail','mail','почта')){if(setVal(el,C.email)){filledCount++;filledFields.push('Email');}}else if(type==='tel'||has('phone','mobile','cell','tel','телефон','тел')){if(setVal(el,C.phone)){filledCount++;filledFields.push('Телефон');}}else if(pad.includes('linkedin')||pad.includes('linked in')){if(setVal(el,C.linkedin)){filledCount++;filledFields.push('LinkedIn');}}else if(pad.includes('github')||pad.includes('git hub')){if(setVal(el,C.github)){filledCount++;filledFields.push('GitHub');}}else if(has('telegram','телеграм','tg')){const tgVal=ctx.includes('url')||ctx.includes('link')?C.telegram_url:C.telegram;if(setVal(el,tgVal)){filledCount++;filledFields.push('Telegram');}}else if(has('portfolio','website','web site','personal site','портфолио','веб сайт')){if(setVal(el,C.portfolio)){filledCount++;filledFields.push('Портфолио');}}else if(has('first name','firstname','имя','given name')||(pad.includes(' first ')&&!pad.includes(' last '))){if(setVal(el,c_fn)){filledCount++;filledFields.push('Имя');}}else if(has('last name','lastname','фамилия','surname')||(pad.includes(' last ')&&!pad.includes(' first '))){if(setVal(el,c_ln)){filledCount++;filledFields.push('Фамилия');}}else if(has('full name','your name','applicant name','фио')||(pad.includes(' name ')&&!pad.includes(' first ')&&!pad.includes(' last ')&&!pad.includes(' company ')&&!pad.includes(' file '))){if(setVal(el,c_name)){filledCount++;filledFields.push('ФИО');}}else if(has('city','город','location','residence','проживание')&&!pad.includes('cover')){if(setVal(el,c_loc)){filledCount++;filledFields.push('Локация');}}else if(tag==='TEXTAREA'||has('cover letter','сопроводительн','letter','message','comments','additional info','pitch','note')){if(coverText&&setVal(el,coverText)){filledCount++;filledFields.push('Сопроводительное');}}}const fileInp=document.querySelector('input[type="file"]');let fileNoticed=false;if(fileInp){fileNoticed=true;const container=fileInp.closest('div')||fileInp;container.style.transition='all 0.4s ease';container.style.outline='3px dashed #38bdf8';container.style.backgroundColor='rgba(56, 189, 248, 0.08)';}const toast=document.createElement('div');toast.style.cssText='position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:16px 22px;border-radius:14px;z-index:99999999;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:13px;line-height:1.5;box-shadow:0 20px 40px rgba(0,0,0,0.5);border:1px solid #10b981;max-width:380px;';if(filledCount>0){toast.innerHTML=\`<div style="display:flex;align-items:flex-start;gap:10px;"><span style="font-size:20px;">⚡️</span><div><div style="font-weight:700;color:#34d399;margin-bottom:2px;">Job Hunter: Успешно заполнено!</div><div style="color:#cbd5e1;font-size:12px;">Полей: <b>\${filledCount}</b> (\${filledFields.slice(0, 5).join(', ')}\${filledFields.length > 5 ? '...' : ''})</div>\${fileNoticed ? '<div style="color:#38bdf8;font-size:11px;margin-top:4px;font-weight:600;">📎 Выделено поле прикрепления резюме (CV)</div>' : ''}</div></div>\`;}else{toast.style.borderColor='#f59e0b';toast.innerHTML='<div style="display:flex;align-items:flex-start;gap:10px;"><span style="font-size:20px;">⚠️</span><div><div style="font-weight:700;color:#fbbf24;">Job Hunter: Форма не найдена</div><div style="color:#cbd5e1;font-size:12px;">Если форма внутри всплывающего окна, сначала нажмите «Откликнуться» / «Apply», а затем повторно нажмите закладку.</div></div></div>';}document.body.appendChild(toast);setTimeout(()=>toast.remove(),5500);}catch(err){alert('❌ Job Hunter Error: '+err.message);}})();`;
+
+            const btn = document.getElementById('bookmarklet-btn');
+            if (btn) btn.href = code;
+            const modalBtn = document.getElementById('bookmarklet-modal-btn');
+            if (modalBtn) modalBtn.href = code;
+            const codeArea = document.getElementById('bookmarklet-code-input');
+            if (codeArea) codeArea.value = code;
+        }
+
+        // --- VACANCIES & MARKETS ---
+        async function loadPitches() {
+            try {
+                const res = await fetch('/api/pitches');
+                vacancies = await res.json();
+                updateCounts();
+                renderList();
+                renderDetails();
+            } catch (e) {
+                console.error("Failed to load vacancies", e);
+            }
+        }
+
+        function setMarket(market) {
+            currentMarket = market;
+            document.querySelectorAll('.market-btn').forEach(b => {
+                b.classList.remove('active');
+                b.classList.add('text-slate-400');
+            });
+            const btn = document.getElementById(`market-btn-${market}`);
+            if (btn) {
+                btn.classList.add('active');
+                btn.classList.remove('text-slate-400');
+            }
+
+            // If current vacancy is filtered out, re-select
+            const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
+            let filtered = vacancies.filter(v => targetStatus.includes(v.status));
+            if (currentMarket === 'ru') {
+                filtered = filtered.filter(v => (v.language || 'ru') === 'ru');
+            } else if (currentMarket === 'en') {
+                filtered = filtered.filter(v => v.language === 'en');
+            }
+
+            if (currentVac && !filtered.some(v => v.id === currentVac.id)) {
+                currentVac = filtered.length > 0 ? filtered[0] : null;
+            }
+
+            renderList();
+            renderDetails();
+        }
+
+        function setTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('active', 'text-slate-400');
+                if (b.id === `tab-${tab}`) {
+                    b.classList.add('active');
+                } else if (b.id !== 'tab-profiles') {
+                    b.classList.add('text-slate-400');
+                }
+            });
+
+            if (tab === 'profiles') {
+                document.getElementById('main-view').classList.add('hidden');
+                document.getElementById('profiles-view').classList.remove('hidden');
+                loadProfilesList();
+            } else {
+                document.getElementById('main-view').classList.remove('hidden');
+                document.getElementById('profiles-view').classList.add('hidden');
+                currentVac = null;
+                updateCounts();
+                renderList();
+                renderDetails();
+            }
+        }
+
+        function updateCounts() {
+            const statusFilter = (v, s) => (s === 'inbox') ? (v.status === 'inbox' || v.status === 'new') : (v.status === s);
+
+            const countInbox = vacancies.filter(v => statusFilter(v, 'inbox')).length;
+            const countSent = vacancies.filter(v => statusFilter(v, 'sent')).length;
+            const countReplied = vacancies.filter(v => statusFilter(v, 'replied')).length;
+
+            document.getElementById('count-inbox').innerText = countInbox;
+            document.getElementById('count-sent').innerText = countSent;
+            document.getElementById('count-replied').innerText = countReplied;
+
+            // Market counts for currently active tab
+            const tabVacs = vacancies.filter(v => statusFilter(v, currentTab));
+            const marketAll = tabVacs.length;
+            const marketRu = tabVacs.filter(v => (v.language || 'ru') === 'ru').length;
+            const marketEn = tabVacs.filter(v => v.language === 'en').length;
+
+            const cAll = document.getElementById('market-count-all');
+            if (cAll) cAll.innerText = marketAll;
+            const cRu = document.getElementById('market-count-ru');
+            if (cRu) cRu.innerText = marketRu;
+            const cEn = document.getElementById('market-count-en');
+            if (cEn) cEn.innerText = marketEn;
+
+            // Analytics Totals
+            const totalRu = vacancies.filter(v => (v.language || 'ru') === 'ru').length;
+            const totalEn = vacancies.filter(v => v.language === 'en').length;
+
+            const statTotal = document.getElementById('stat-total');
+            if (statTotal) statTotal.innerText = vacancies.length;
+            const statRu = document.getElementById('stat-ru');
+            if (statRu) statRu.innerText = totalRu;
+            const statEn = document.getElementById('stat-en');
+            if (statEn) statEn.innerText = totalEn;
+            const statSent = document.getElementById('stat-sent');
+            if (statSent) statSent.innerText = countSent;
+            const statReplied = document.getElementById('stat-replied');
+            if (statReplied) statReplied.innerText = countReplied;
+
+            const winRate = countSent > 0 ? Math.round((countReplied / countSent) * 100) : 0;
+            const statWinrate = document.getElementById('stat-winrate');
+            if (statWinrate) statWinrate.innerText = winRate + '%';
+        }
+
+        function selectVac(id) {
+            currentVac = vacancies.find(v => v.id === id);
+            renderList();
+            renderDetails();
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('vacancy-list');
+            const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
+            let filtered = vacancies.filter(v => targetStatus.includes(v.status));
+
+            // 1. Market filter (ru / en)
+            if (currentMarket === 'ru') {
+                filtered = filtered.filter(v => (v.language || 'ru') === 'ru');
+            } else if (currentMarket === 'en') {
+                filtered = filtered.filter(v => v.language === 'en');
+            }
+
+            // 2. Search query filter (title, company, description, skills, location)
+            if (filterSearch) {
+                filtered = filtered.filter(v => {
+                    const text = `${v.title || ''} ${v.company || ''} ${v.description || ''} ${v.skills || ''} ${v.location || ''}`.toLowerCase();
+                    return text.includes(filterSearch);
+                });
+            }
+
+            // 3. Grade filter (Junior, Middle, Senior, Lead, Intern)
+            if (filterGrade !== 'all') {
+                filtered = filtered.filter(v => (v.grade || 'Middle').toLowerCase() === filterGrade.toLowerCase());
+            }
+
+            // 4. Match score filter
+            if (filterMatch === '80') {
+                filtered = filtered.filter(v => (v.score || 0) >= 80);
+            } else if (filterMatch === '60') {
+                filtered = filtered.filter(v => (v.score || 0) >= 60);
+            } else if (filterMatch === 'mixed') {
+                filtered = filtered.filter(v => (v.score || 0) < 60);
+            }
+
+            // 5. Source filter
+            if (filterSource !== 'all') {
+                filtered = filtered.filter(v => (v.source || '').toLowerCase().includes(filterSource));
+            }
+
+            // 6. Sorting
+            if (filterSort === 'score_desc') {
+                filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
+            } else if (filterSort === 'newest') {
+                filtered.sort((a, b) => {
+                    const timeA = new Date((a.published_at || a.created_at || '').replace(' ', 'T')).getTime() || 0;
+                    const timeB = new Date((b.published_at || b.created_at || '').replace(' ', 'T')).getTime() || 0;
+                    return timeB - timeA;
+                });
+            } else if (filterSort === 'salary') {
+                filtered.sort((a, b) => parseSalaryValue(b.salary) - parseSalaryValue(a.salary));
+            }
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-900/50 rounded-lg border border-slate-800 text-xs">Нет вакансий по выбранным фильтрам</div>`;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(v => {
+                const isEn = v.language === 'en';
+                const langBadge = isEn
+                    ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-950/80 text-sky-400 border border-sky-800/70 flex items-center gap-1">🌍 EN</span>`
+                    : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/70 flex items-center gap-1">🇷🇺 RU</span>`;
+
+                const grade = v.grade || 'Middle';
+                let gradeClass = 'bg-sky-950/80 text-sky-400 border-sky-800/70';
+                if (grade === 'Junior' || grade === 'Intern') {
+                    gradeClass = 'bg-emerald-950/80 text-emerald-400 border-emerald-800/70';
+                } else if (grade === 'Senior') {
+                    gradeClass = 'bg-purple-950/80 text-purple-300 border-purple-800/70';
+                } else if (grade === 'Lead') {
+                    gradeClass = 'bg-amber-950/80 text-amber-300 border-amber-800/70';
+                }
+                const gradeBadge = `<span class="text-[10px] font-semibold px-2 py-0.5 rounded border ${gradeClass}">${grade}</span>`;
+
+                const timeStr = formatRelativeTime(v.published_at || v.created_at);
+                const timeBadge = timeStr ? `<span class="text-[10px] text-slate-400 font-mono" title="${v.published_at || v.created_at || ''}">⏱ ${timeStr}</span>` : '';
+
+                const hasDirectContact = Boolean(v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me') || v.contact_type === 'email' || v.contact_handle.includes('@')));
+                const directBadge = hasDirectContact ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/70 flex items-center gap-1" title="Прямой контакт: ${v.contact_handle}">✈️ Прямой контакт</span>` : '';
+
+                return `
+                <div onclick="selectVac('${v.id}')" 
+                     class="cursor-pointer p-3 rounded-xl border transition-all ${currentVac?.id === v.id ? 'bg-slate-800/90 border-sky-500 shadow-sm' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'}">
+                    <div class="flex items-center justify-between gap-1.5 mb-1.5 flex-wrap">
+                        <div class="flex items-center gap-1 flex-wrap">
+                            <span class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">${v.source || 'WEB'}</span>
+                            ${gradeBadge}
+                            ${langBadge}
+                            ${directBadge}
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            ${timeBadge}
+                            ${v.score > 0 ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/80' : v.score >= 50 ? 'bg-amber-900/50 text-amber-400 border border-amber-800/80' : 'bg-rose-900/50 text-rose-400 border border-rose-800/80'}">🔥 ${v.score}% Match</span>` : ''}
+                        </div>
+                    </div>
+                    <h3 class="font-semibold text-slate-200 text-sm truncate" title="${v.title}">${v.title}</h3>
+                    <div class="text-sky-400 text-xs mt-1 flex items-center justify-between">
+                        <span class="truncate pr-2">🏢 ${v.company}</span>
+                        ${v.salary && v.salary !== 'Не указана' ? `<span class="text-emerald-400 font-medium whitespace-nowrap">${v.salary}</span>` : ''}
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function renderDetails() {
+            const detailsEl = document.getElementById('vacancy-details');
+            if (!currentVac) {
+                detailsEl.innerHTML = `
+                    <div class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
+                        <span class="text-3xl mb-3">👈</span>
+                        <p class="text-sm font-medium">Выберите вакансию из списка слева</p>
+                    </div>`;
+                return;
+            }
+
+            const v = currentVac;
+            const isEn = v.language === 'en';
+            let contactInfo = '';
+            let actionBtnHtml = '';
+
+            if (v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me'))) {
+                const tgHandle = v.contact_handle.replace('https://t.me/', '').replace('@', '');
+                contactInfo = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || '')}" class="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium bg-sky-900/30 px-3 py-1 rounded-lg text-xs border border-sky-800/50"><span>✈️</span> Telegram HR</a>`;
+                actionBtnHtml = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || '')}" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5">✈️ Написать в TG</a>`;
+            } else {
+                contactInfo = `<span class="text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg text-xs">Контакты скрыты</span>`;
+                actionBtnHtml = `<button onclick="openVacancyWithAutoApply('${v.id}')" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-all shadow-md flex items-center gap-1.5 ring-1 ring-emerald-400/30">🚀 Откликнуться (Скопировать + Открыть)</button>`;
+            }
+
+            const cleanComp = cleanCompanyName(v.company, v.title, v.description);
+            const cleanRole = (v.title || '').replace(/[\|\(\)\/].*$/, '').trim() || 'Frontend';
+
+            // 1. Direct ATS / Careers page search in Google
+            const directAtsQuery = `"${cleanComp}" (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com OR site:workable.com OR inurl:careers OR inurl:jobs) "${cleanRole}"`;
+            const directAtsUrl = `https://www.google.com/search?q=${encodeURIComponent(directAtsQuery)}`;
+
+            // 2. Setka (Сетка от hh.ru - Russian professional tech network)
+            const setkaQuery = `site:setka.ru "${cleanComp}" (HR OR рекрутер OR CTO OR тимлид OR frontend)`;
+            const setkaUrl = `https://www.google.com/search?q=${encodeURIComponent(setkaQuery)}`;
+
+            // 3. HR Search
+            const hrQuery = isEn
+                ? `site:linkedin.com/in "${cleanComp}" ("Technical Recruiter" OR "Talent Acquisition" OR "Recruiter" OR "Head of HR")`
+                : `(site:linkedin.com/in OR site:t.me OR site:habr.com/ru/users OR site:setka.ru) "${cleanComp}" (рекрутер OR HR OR "talent acquisition" OR "найм")`;
+            const hrSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(hrQuery)}`;
+
+            // 4. CTO / Tech Lead Search
+            const ctoQuery = isEn
+                ? `site:linkedin.com/in "${cleanComp}" ("CTO" OR "Engineering Manager" OR "Head of Engineering" OR "Tech Lead" OR "VP of Engineering")`
+                : `(site:linkedin.com/in OR site:habr.com/ru/users OR site:setka.ru) "${cleanComp}" (CTO OR "Engineering Manager" OR "Tech Lead" OR "Тимлид Frontend" OR "Руководитель разработки")`;
+            const ctoSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(ctoQuery)}`;
+
+            // 5. Corporate Email Search
+            const emailQuery = `"${cleanComp}" ("careers@" OR "jobs@" OR "hr@" OR email) hiring`;
+            const emailSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(emailQuery)}`;
+
+            const marketBadge = isEn
+                ? `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-950 text-sky-300 border border-sky-700 flex items-center gap-1">🌍 International · Remote (EN)</span>`
+                : `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700 flex items-center gap-1">🇷🇺 Локальная / РФ и СНГ (RU)</span>`;
+
+            const grade = v.grade || 'Middle';
+            let gradeBadgeClass = 'bg-sky-950/90 text-sky-300 border-sky-700';
+            if (grade === 'Junior' || grade === 'Intern') {
+                gradeBadgeClass = 'bg-emerald-950/90 text-emerald-300 border-emerald-700';
+            } else if (grade === 'Senior') {
+                gradeBadgeClass = 'bg-purple-950/90 text-purple-300 border-purple-700';
+            } else if (grade === 'Lead') {
+                gradeBadgeClass = 'bg-amber-950/90 text-amber-300 border-amber-700';
+            }
+            const gradeBadge = `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${gradeBadgeClass}">Грейд: ${grade}</span>`;
+
+            const activeP = profiles.find(p => p.id === activeProfileId);
+            const personaHint = activeP
+                ? `${activeP.role || activeP.name} (${(activeP.lang || 'ru').toUpperCase()})`
+                : (isEn ? `🇬🇧 Международный профиль (English · Frontend / Full-stack Engineer)` : `🇷🇺 Локальный профиль (Русский · Frontend разработчик)`);
+
+            const pubDateStr = v.published_at || v.created_at || '';
+            const pubRelative = formatRelativeTime(pubDateStr);
+
+            detailsEl.innerHTML = `
+                <div class="glass-panel rounded-xl p-5 border-l-4 ${isEn ? 'border-l-sky-500' : 'border-l-amber-500'} mb-4 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <h2 class="text-xl font-bold text-white">${v.title}</h2>
+                                ${marketBadge}
+                                ${gradeBadge}
+                                ${v.score > 0 ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'bg-amber-900/50 text-amber-400 border border-amber-800'}">🔥 ${v.score}% Match</span>` : ''}
+                            </div>
+                            <div class="flex gap-3 items-center text-xs text-slate-400 flex-wrap">
+                                <span class="text-sky-400 font-medium">🏢 ${cleanComp !== v.company ? `${cleanComp} <span class="text-slate-500 text-[11px]">(${v.company})</span>` : v.company}</span>
+                                <span>•</span>
+                                <span>📍 ${v.location || (isEn ? 'Worldwide Remote' : 'Удаленно')}</span>
+                                ${v.salary && v.salary !== 'Не указана' ? `<span>•</span><span class="text-emerald-400 font-medium">💰 ${v.salary}</span>` : ''}
+                                ${pubDateStr ? `<span>•</span><span class="text-slate-300 font-mono" title="${pubDateStr}">⏱ ${pubRelative} (${pubDateStr.split('.')[0]})</span>` : ''}
+                                <span>•</span>
+                                <a href="${formatVacancyUrl(v.url)}" target="_blank" class="text-slate-400 hover:text-white underline">Оригинал вакансии ↗</a>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2 items-end">
+                            ${contactInfo}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 pt-3 border-t border-slate-700/60">
+                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span class="flex items-center gap-1.5"><span class="text-amber-400">🎯</span> Прямой контакт & ATS (${cleanComp}):</span>
+                            <span class="text-slate-500 lowercase font-normal">без агрегаторов / OSINT Dorks</span>
+                        </div>
+                        <div class="flex gap-2 flex-wrap items-center">
+                            <a href="${directAtsUrl}" target="_blank" class="bg-indigo-950/70 hover:bg-indigo-900/80 text-indigo-200 hover:text-white flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-indigo-700/60 transition-colors" title="Найти официальную страницу отклика в Greenhouse, Lever, Ashby или на сайте компании">
+                                <span>🏢</span> Вакансия в ATS (Greenhouse / Lever)
+                            </a>
+                            
+                            ${!isEn ? `
+                            <a href="${setkaUrl}" target="_blank" class="bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 hover:text-white flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-emerald-700/60 transition-colors" title="Поиск людей и нетворкинга в Сетке (setka.ru)">
+                                <span>🕸</span> В Сетке (Setka.ru)
+                            </a>` : ''}
+
+                            <a href="${hrSearchUrl}" target="_blank" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-slate-700 transition-colors" title="Найти HR и рекрутеров этой компании">
+                                <span>👤</span> Найти HR (${isEn ? 'LinkedIn' : 'TG / Сетка / LinkedIn'})
+                            </a>
+
+                            <a href="${ctoSearchUrl}" target="_blank" class="bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 hover:text-amber-200 flex items-center gap-1.5 font-medium px-2.5 py-1.5 rounded-lg text-xs border border-amber-700/50 transition-colors" title="Найти CTO или тимлида разработки">
+                                <span>⚡️</span> Найти CTO / Тимлида
+                            </a>
+
+                            <a href="${emailSearchUrl}" target="_blank" class="bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-slate-700/80 transition-colors" title="Поиск корпоративных email компании">
+                                <span>✉️</span> Корп. Email
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Persona Active Indicator -->
+                <div class="bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span>🎯 Активное резюме под вакансию:</span>
+                        <span class="font-medium text-purple-300">${personaHint}</span>
+                    </div>
+                    <button onclick="setTab('profiles')" class="text-purple-400 hover:underline text-[11px]">Редактировать персоны ↗</button>
+                </div>
+
+                <div class="mb-4 flex gap-2 flex-wrap items-center">
+                    <button onclick="rewriteAI('${v.id}')" id="btn-rewrite-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-2 px-3.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5">
+                        <span>✨</span> Переписать через Gemini (${isEn ? 'EN' : 'RU'})
+                    </button>
+                    <a href="/cv/${v.id}" target="_blank" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                        <span>📄</span> Открыть PDF-резюме
+                    </a>
+                </div>
+
+                <div id="ai-progress-${v.id}" class="hidden mb-4 bg-slate-900/90 rounded-lg p-3 border border-slate-700 text-xs">
+                    <div class="text-slate-400 flex items-center gap-2">
+                        <span class="animate-spin">⏳</span>
+                        <span id="ai-text-${v.id}">Генерация текста и оценка матчинга...</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-4 mb-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">💬 Short DM (${isEn ? 'English' : 'Русский'})</h3>
+                            <button onclick="copyText('dm-box')" class="text-[11px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Копировать</button>
+                        </div>
+                        <textarea id="dm-box" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-300 h-28 focus:outline-none focus:border-sky-500 font-sans leading-relaxed">${v.short_dm || ''}</textarea>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">📧 Cover Letter (${isEn ? 'English' : 'Русский'})</h3>
+                            <button onclick="copyText('cl-box')" class="text-[11px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Копировать</button>
+                        </div>
+                        <textarea id="cl-box" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-300 h-44 focus:outline-none focus:border-sky-500 font-sans leading-relaxed">${v.cover_letter || ''}</textarea>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-700/60 flex flex-wrap gap-2 items-center">
+                    ${actionBtnHtml}
+                    <div class="w-px h-6 bg-slate-800 mx-1"></div>
+                    
+                    ${(v.status === 'inbox' || v.status === 'new') ? `<button onclick="updateStatus('${v.id}', 'sent')" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5">✅ Отметить как Отправлено</button>` : ''}
+                    ${v.status === 'sent' ? `<button onclick="updateStatus('${v.id}', 'replied')" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-2 px-3.5 rounded-lg transition-colors flex items-center gap-1.5">💬 HR ответил</button>` : ''}
+                    
+                    <button onclick="updateStatus('${v.id}', 'archive')" class="bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800/60 text-xs font-medium py-2 px-3 rounded-lg transition-colors ml-auto">
+                        В архив
+                    </button>
+                </div>
+
+                <div class="mt-4 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">📋 Описание вакансии</h3>
+                    <div class="text-xs text-slate-400 whitespace-pre-wrap leading-relaxed">${v.description || 'Нет описания.'}</div>
+                </div>
+            `;
+        }
+
+        function formatVacancyUrl(url) {
+            if (!url) return '#';
+            let u = url.trim();
+            if (u.startsWith('@')) return `https://t.me/${u.slice(1)}`;
+            if (u.includes('@') && !u.startsWith('http') && !u.startsWith('mailto:')) return `mailto:${u}`;
+            if (!u.startsWith('http') && !u.startsWith('tg://') && !u.startsWith('mailto:') && !u.startsWith('#')) return `https://${u}`;
+            return u;
+        }
+
+        function openVacancyWithAutoApply(vacId) {
+            const v = vacancies.find(x => x.id === vacId);
+            if (!v) return;
+            const text = v.cover_letter || v.short_dm || '';
+            if (text) {
+                try {
+                    navigator.clipboard.writeText(text);
+                } catch(e) {}
+                showToast('📋 Письмо скопировано в буфер! Открываем сайт вакансии...');
+            }
+
+            const rawUrl = formatVacancyUrl(v.url);
+            if (rawUrl.startsWith('mailto:')) {
+                const mailUrl = rawUrl + (rawUrl.includes('?') ? '&' : '?') + 'subject=' + encodeURIComponent('Отклик: ' + (v.title || '')) + '&body=' + encodeURIComponent(text);
+                window.location.href = mailUrl;
+                return;
+            }
+
+            // Safely encode text into hash payload for zero-network bookmarklet reading
+            const safePayload = encodeURIComponent(text);
+            const targetUrl = rawUrl.includes('#') ? rawUrl : (rawUrl + '#jh_cover=' + safePayload);
+            window.open(targetUrl, '_blank');
+        }
+
+        async function rewriteAI(vac_id) {
+            const btn = document.getElementById(`btn-rewrite-${vac_id}`);
+            const prog = document.getElementById(`ai-progress-${vac_id}`);
+            const ptext = document.getElementById(`ai-text-${vac_id}`);
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            prog.classList.remove('hidden');
+            ptext.innerText = 'Запрос в Gemini... (подбираем персону и генерируем pitch)';
+
+            try {
+                const res = await fetch(`/api/vacancies/${vac_id}/rewrite`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.success) {
+                    ptext.innerHTML = '<span class="text-emerald-400 font-medium">✅ Готово! Текст обновлен.</span>';
+                    setTimeout(() => prog.classList.add('hidden'), 2000);
+
+                    const v = vacancies.find(v => v.id === vac_id);
+                    if (v) {
+                        v.short_dm = data.short_dm;
+                        v.cover_letter = data.cover_letter;
+                        if (data.score) v.score = data.score;
+                    }
+                    renderDetails();
+                    renderList();
+                } else {
+                    ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ ${data.error || 'Ошибка генерации'}</span>`;
+                }
+            } catch (e) {
+                ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ Ошибка сети. Проверьте VPN и консоль сервера.</span>`;
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+        }
+
+        async function updateStatus(vac_id, status) {
+            try {
+                await fetch(`/api/vacancies/${vac_id}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                const v = vacancies.find(v => v.id === vac_id);
+                if (v) v.status = status;
+                updateCounts();
+                currentVac = null;
+                renderList();
+                renderDetails();
+            } catch (e) {
+                alert("Ошибка: " + e);
+            }
+        }
+
+        function copyText(elementId) {
+            const el = document.getElementById(elementId);
+            el.select();
+            document.execCommand('copy');
+            const originalBorder = el.style.borderColor;
+            el.style.borderColor = '#10b981';
+            setTimeout(() => { el.style.borderColor = originalBorder; }, 600);
+        }
+
+        // --- PROFILES ---
+        async function loadProfilesList() {
+            try {
+                const res = await fetch('/api/profiles');
+                profiles = await res.json();
+                renderProfilesList();
+                renderProfileEditor();
+                renderActiveProfileDropdown();
+                initBookmarklet();
+            } catch (e) { console.error("Error loading profiles", e); }
+        }
+
+        function renderProfilesList() {
+            const list = document.getElementById('profiles-list');
+            list.innerHTML = profiles.map((p, idx) => `
+                <div onclick="selectProfile(${idx})" class="p-3.5 rounded-xl cursor-pointer border transition-all ${currentProfile === idx
+                    ? 'bg-slate-800/90 border-purple-500/80 shadow-md ring-1 ring-purple-500/30'
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            ${p.photo_url ? `<img src="${p.photo_url}" class="w-full h-full object-cover">` : `<span class="text-xs font-bold text-slate-400">${(p.name || 'P')[0]}</span>`}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs font-bold text-white truncate">${p.role || 'Без роли'}</span>
+                                <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">${p.lang || 'ru'}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 truncate mt-0.5">${p.name || 'Имя не указано'}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectProfile(i) {
+            currentProfile = i;
+            renderProfilesList();
+            renderProfileEditor();
+        }
+
+        async function addProfile() {
+            const newId = 'profile_' + Date.now();
+            const newP = {
+                id: newId,
+                lang: 'ru',
+                role: 'Frontend / Fullstack-разработчик',
+                name: 'Имя Фамилия',
+                photo_url: '',
+                contacts: 'Telegram: @username | Email: candidate@example.com | Телефон: +79990000000 | GitHub: https://github.com/username | LinkedIn: https://linkedin.com/in/username',
+                contacts_structured: {
+                    telegram: '@username',
+                    email: 'candidate@example.com',
+                    phone: '+79990000000',
+                    github: 'https://github.com/username',
+                    linkedin: 'https://linkedin.com/in/username',
+                    portfolio: 'https://example.com'
+                },
+                location: { city: 'Москва', country: 'Россия', remote: true, hybrid: true, office: true },
+                summary: 'Разрабатываю продукты и довожу их до production — от архитектурных решений до деплоя с реальными пользователями.',
+                keywords: 'Next.js 16, React 19, TypeScript, JavaScript, Tailwind CSS v4, FastAPI, Node.js, Docker, Traefik, Git, CI/CD',
+                experience: '',
+                experience_structured: [],
+                education: [
+                    { grade: 'Высшее образование', field: 'Информационные технологии', institution: 'Университет', years: '2016–2020' }
+                ],
+                languages: [
+                    { language: 'Русский', level: 'родной' },
+                    { language: 'Английский', level: 'B2' }
+                ]
+            };
+            profiles.push(newP);
+            await fetch('/api/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(profiles)
+            });
+            showToast('✅ Создан и сохранен новый профиль!');
+            selectProfile(profiles.length - 1);
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 border transition-all transform duration-200 ${isError ? 'bg-rose-950 border-rose-700 text-rose-200' : 'bg-emerald-950 border-emerald-600 text-emerald-200'
+                }`;
+            toast.innerHTML = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderProfileEditor() {
+            const ed = document.getElementById('profile-editor');
+            if (currentProfile === null || !profiles[currentProfile]) {
+                ed.innerHTML = '<div class="text-center py-16 text-slate-500 text-xs">Выберите профиль слева</div>';
+                return;
+            }
+            const p = profiles[currentProfile];
+            const c = p.contacts_structured || {};
+            const loc = p.location || {};
+            const expList = p.experience_structured || [];
+            const eduList = p.education || [];
+            const langList = p.languages || [];
+
+            ed.innerHTML = `
+                <div class="flex flex-col gap-4 bg-slate-900/50 p-5 rounded-xl border border-slate-800 h-[calc(100vh-14rem)] overflow-y-auto pr-2">
+                    <!-- Top Upload Bar -->
+                    <div class="flex justify-between items-center bg-slate-900/90 p-3 rounded-lg border border-slate-700/80 shadow-sm">
+                        <div>
+                            <div class="text-xs font-semibold text-white flex items-center gap-2">
+                                <span>📄</span> Автопарсинг резюме под стандарты площадок
+                            </div>
+                            <div class="text-[11px] text-slate-400">Парсит PDF/DOCX: поля разбиваются на опыт, компании, контакты, стек и грейды образования</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="bg-indigo-600 hover:bg-indigo-500 cursor-pointer text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                                <span>📤</span> Загрузить файл
+                                <input type="file" class="hidden" accept=".pdf,.docx,.txt" onchange="uploadResume(this)">
+                            </label>
+                            <span id="resume-status" class="text-xs"></span>
+                        </div>
+                    </div>
+
+                    <!-- 1. Basic Info (HH.ru / LinkedIn / Habr) -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <span>👤</span> Основная информация (HH.ru / LinkedIn)
+                        </h3>
+                        <div class="grid grid-cols-3 gap-3 mb-3">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">ID профиля</label>
+                                <input id="p-id" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono" value="${escapeHtml(p.id || '')}">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Язык откликов</label>
+                                <select id="p-lang" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                                    <option value="ru" ${p.lang !== 'en' ? 'selected' : ''}>🇷🇺 Русский</option>
+                                    <option value="en" ${p.lang === 'en' ? 'selected' : ''}>🇺🇸 English</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Желаемая должность / Headline</label>
+                                <input id="p-role" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-medium" value="${escapeHtml(p.role || '')}">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Имя и Фамилия</label>
+                                <input id="p-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(p.name || '')}">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Город / Локация</label>
+                                <input id="p-city" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(loc.city || 'Москва')}">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Аватар</label>
+                                <div class="flex gap-2">
+                                    <input id="p-photo" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white truncate" value="${escapeHtml(p.photo_url || '')}">
+                                    <label class="bg-slate-800 hover:bg-slate-700 border border-slate-700 cursor-pointer px-2.5 py-1.5 rounded-lg text-xs flex items-center" title="Загрузить фото и центрировать">
+                                        📷 <input type="file" class="hidden" accept="image/*" onchange="initCrop(this)">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Structured Contact Channels -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <span>📞</span> Контакты для откликов
+                        </h3>
+                        <div class="grid grid-cols-3 gap-3 mb-2">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Telegram</label>
+                                <input id="p-tg" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(c.telegram || '')}" placeholder="@username">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Email</label>
+                                <input id="p-email" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(c.email || '')}" placeholder="email@gmail.com">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Телефон</label>
+                                <input id="p-phone" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(c.phone || '')}" placeholder="+7 (999) 000-00-00">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">GitHub</label>
+                                <input id="p-gh" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(c.github || '')}" placeholder="https://github.com/...">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">LinkedIn</label>
+                                <input id="p-li" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(c.linkedin || '')}" placeholder="https://linkedin.com/in/...">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-medium text-slate-400 mb-1 block">Портфолио / Сайт</label>
+                                <input id="p-portfolio" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(c.portfolio || '')}" placeholder="https://...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Skills & ATS Keywords -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <span>⚡</span> Ключевые навыки (ATS & Matching)
+                        </h3>
+                        <p class="text-[11px] text-slate-500 mb-2">Список тегов через запятую — используется для расчета % совпадения с вакансией</p>
+                        <input id="p-keys" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono" value="${escapeHtml(p.keywords || '')}">
+                    </div>
+
+                    <!-- 4. Summary -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <span>📝</span> О себе (Professional Summary)
+                        </h3>
+                        <textarea id="p-summary" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 h-24 focus:outline-none focus:border-sky-500 leading-relaxed font-sans">${escapeHtml(p.summary || '')}</textarea>
+                    </div>
+
+                    <!-- 5. Structured Work Experience -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>💼</span> Места работы (Структурированный опыт)
+                            </h3>
+                            <button type="button" onclick="addExperienceRow()" class="text-[11px] bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                                <span>+</span> Добавить место работы
+                            </button>
+                        </div>
+                        <div id="exp-rows-container" class="flex flex-col gap-3">
+                            ${expList.map((job, idx) => `
+                                <div class="exp-row bg-slate-900/90 p-3.5 rounded-lg border border-slate-700/80 flex flex-col gap-2.5">
+                                    <div class="grid grid-cols-12 gap-2.5">
+                                        <div class="col-span-5">
+                                            <label class="text-[10px] text-slate-400 block mb-0.5">Должность / Позиция</label>
+                                            <input class="exp-role w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white font-medium" value="${escapeHtml(job.role || '')}" placeholder="Senior Frontend Engineer">
+                                        </div>
+                                        <div class="col-span-4">
+                                            <label class="text-[10px] text-slate-400 block mb-0.5">Компания / Проект</label>
+                                            <input class="exp-company w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" value="${escapeHtml(job.company || '')}" placeholder="Название компании">
+                                        </div>
+                                        <div class="col-span-2">
+                                            <label class="text-[10px] text-slate-400 block mb-0.5">Период</label>
+                                            <input class="exp-period w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-white font-mono text-center" value="${escapeHtml(job.period || '')}" placeholder="2023 — н.в.">
+                                        </div>
+                                        <div class="col-span-1 text-right pt-4">
+                                            <button type="button" onclick="this.closest('.exp-row').remove()" class="text-rose-400 hover:text-rose-300 p-1.5 text-xs" title="Удалить">🗑️</button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block mb-0.5">Краткое описание / Стек технологий</label>
+                                        <input class="exp-desc w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-300" value="${escapeHtml(job.description || '')}" placeholder="Краткая суть проекта и стек">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 block mb-0.5">Ключевые достижения и результаты (по одному на строку)</label>
+                                        <textarea class="exp-bullets w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 h-20 focus:outline-none focus:border-sky-500 leading-relaxed font-sans" placeholder="• Описание достижения...">${escapeHtml((job.bullets || []).join('\n'))}</textarea>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-slate-800">
+                            <label class="text-[11px] font-medium text-slate-400 mb-1 block">Полный текст опыта (для генератора питчей и резюме)</label>
+                            <textarea id="p-exp" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 h-36 focus:outline-none focus:border-sky-500 leading-relaxed font-sans">${escapeHtml(p.experience || '')}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- 6. Education with Editable Grades -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🎓</span> Образование (Грейды, Специальности, ВУЗы)
+                            </h3>
+                            <button onclick="addEducationRow()" class="text-[11px] bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                                <span>+</span> Добавить образование
+                            </button>
+                        </div>
+                        <div id="edu-rows-container" class="flex flex-col gap-2.5">
+                            ${eduList.map((e, idx) => `
+                                <div class="edu-row grid grid-cols-12 gap-2 bg-slate-900/90 p-2.5 rounded-lg border border-slate-700/80 items-center">
+                                    <div class="col-span-3">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Грейд / Уровень</label>
+                                        <input class="edu-grade w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${escapeHtml(e.grade || '')}" placeholder="Магистратура, Бакалавр...">
+                                    </div>
+                                    <div class="col-span-4">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Специальность / Программа</label>
+                                        <input class="edu-field w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${escapeHtml(e.field || '')}" placeholder="PR и маркетинг...">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">ВУЗ / Организация</label>
+                                        <input class="edu-inst w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${escapeHtml(e.institution || '')}" placeholder="РУТ (МИИТ)...">
+                                    </div>
+                                    <div class="col-span-1">
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Годы</label>
+                                        <input class="edu-years w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white font-mono text-center" value="${escapeHtml(e.years || '')}" placeholder="2015-2017">
+                                    </div>
+                                    <div class="col-span-1 text-right pt-3">
+                                        <button onclick="this.closest('.edu-row').remove()" class="text-rose-400 hover:text-rose-300 p-1 text-xs" title="Удалить">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- 7. Languages -->
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🌐</span> Знание языков
+                            </h3>
+                            <button onclick="addLanguageRow()" class="text-[11px] bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                                <span>+</span> Добавить язык
+                            </button>
+                        </div>
+                        <div id="lang-rows-container" class="flex flex-col gap-2">
+                            ${langList.map((l, idx) => `
+                                <div class="lang-row flex gap-2 items-center bg-slate-900/90 p-2 rounded-lg border border-slate-700/80">
+                                    <input class="lang-name flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${escapeHtml(l.language || '')}" placeholder="Язык (например: Английский)">
+                                    <input class="lang-level flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" value="${escapeHtml(l.level || '')}" placeholder="Уровень (например: B2, родной)">
+                                    <button onclick="this.closest('.lang-row').remove()" class="text-rose-400 hover:text-rose-300 px-2 py-1 text-xs" title="Удалить">🗑️</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Save Actions -->
+                    <div class="flex gap-2 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900/95 py-2.5">
+                        <button onclick="saveProfiles()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-lg transition-colors">
+                            <span>💾</span> Сохранить профиль
+                        </button>
+                        <button onclick="deleteProfile()" class="bg-rose-900/30 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 text-xs font-medium px-3.5 py-2.5 rounded-lg ml-auto transition-colors">
+                            🗑️ Удалить профиль
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addExperienceRow() {
+            const container = document.getElementById('exp-rows-container');
+            const div = document.createElement('div');
+            div.className = "exp-row bg-slate-900/90 p-3.5 rounded-lg border border-slate-700/80 flex flex-col gap-2.5";
+            div.innerHTML = `
+                <div class="grid grid-cols-12 gap-2.5">
+                    <div class="col-span-5">
+                        <label class="text-[10px] text-slate-400 block mb-0.5">Должность / Позиция</label>
+                        <input class="exp-role w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white font-medium" placeholder="Senior Frontend Engineer">
+                    </div>
+                    <div class="col-span-4">
+                        <label class="text-[10px] text-slate-400 block mb-0.5">Компания / Проект</label>
+                        <input class="exp-company w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" placeholder="Название компании">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="text-[10px] text-slate-400 block mb-0.5">Период</label>
+                        <input class="exp-period w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-white font-mono text-center" placeholder="2023 — н.в.">
+                    </div>
+                    <div class="col-span-1 text-right pt-4">
+                        <button type="button" onclick="this.closest('.exp-row').remove()" class="text-rose-400 hover:text-rose-300 p-1.5 text-xs" title="Удалить">🗑️</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 block mb-0.5">Краткое описание / Стек</label>
+                    <input class="exp-desc w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-300" placeholder="Краткая суть проекта и стек">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 block mb-0.5">Ключевые достижения и результаты (по одному на строку)</label>
+                    <textarea class="exp-bullets w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 h-20 focus:outline-none focus:border-sky-500 leading-relaxed font-sans" placeholder="• Описание достижения..."></textarea>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function addEducationRow() {
+            const container = document.getElementById('edu-rows-container');
+            const div = document.createElement('div');
+            div.className = "edu-row grid grid-cols-12 gap-2 bg-slate-900/90 p-2.5 rounded-lg border border-slate-700/80 items-center";
+            div.innerHTML = `
+                <div class="col-span-3">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">Грейд / Уровень</label>
+                    <input class="edu-grade w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Магистратура, Бакалавр...">
+                </div>
+                <div class="col-span-4">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">Специальность / Программа</label>
+                    <input class="edu-field w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Специальность...">
+                </div>
+                <div class="col-span-3">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">ВУЗ / Организация</label>
+                    <input class="edu-inst w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="ВУЗ...">
+                </div>
+                <div class="col-span-1">
+                    <label class="text-[10px] text-slate-500 block mb-0.5">Годы</label>
+                    <input class="edu-years w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white font-mono text-center" placeholder="2015-2017">
+                </div>
+                <div class="col-span-1 text-right pt-3">
+                    <button onclick="this.closest('.edu-row').remove()" class="text-rose-400 hover:text-rose-300 p-1 text-xs" title="Удалить">🗑️</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function addLanguageRow() {
+            const container = document.getElementById('lang-rows-container');
+            const div = document.createElement('div');
+            div.className = "lang-row flex gap-2 items-center bg-slate-900/90 p-2 rounded-lg border border-slate-700/80";
+            div.innerHTML = `
+                <input class="lang-name flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Язык">
+                <input class="lang-level flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" placeholder="Уровень">
+                <button onclick="this.closest('.lang-row').remove()" class="text-rose-400 hover:text-rose-300 px-2 py-1 text-xs" title="Удалить">🗑️</button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function saveProfiles() {
+            if (currentProfile === null || !profiles[currentProfile]) return;
+            const p = profiles[currentProfile];
+
+            p.id = document.getElementById('p-id').value.trim() || ('profile_' + Date.now());
+            p.lang = document.getElementById('p-lang').value;
+            p.role = document.getElementById('p-role').value;
+            p.name = document.getElementById('p-name').value;
+            p.photo_url = document.getElementById('p-photo').value;
+            p.summary = document.getElementById('p-summary').value;
+            p.keywords = document.getElementById('p-keys').value;
+            p.experience = document.getElementById('p-exp').value;
+
+            p.location = p.location || {};
+            p.location.city = document.getElementById('p-city').value;
+
+            p.contacts_structured = p.contacts_structured || {};
+            p.contacts_structured.telegram = document.getElementById('p-tg').value;
+            p.contacts_structured.email = document.getElementById('p-email').value;
+            p.contacts_structured.phone = document.getElementById('p-phone').value;
+            p.contacts_structured.github = document.getElementById('p-gh').value;
+            p.contacts_structured.linkedin = document.getElementById('p-li').value;
+            p.contacts_structured.portfolio = document.getElementById('p-portfolio').value;
+
+            p.contacts = [
+                p.contacts_structured.telegram,
+                p.contacts_structured.email,
+                p.contacts_structured.phone,
+                p.contacts_structured.github,
+                p.contacts_structured.linkedin
+            ].filter(Boolean).join(' | ');
+
+            // Collect structured experience rows
+            const expRows = document.querySelectorAll('#exp-rows-container .exp-row');
+            p.experience_structured = [];
+            expRows.forEach(row => {
+                const role = row.querySelector('.exp-role')?.value.trim();
+                const company = row.querySelector('.exp-company')?.value.trim();
+                const period = row.querySelector('.exp-period')?.value.trim();
+                const description = row.querySelector('.exp-desc')?.value.trim();
+                const bulletsRaw = row.querySelector('.exp-bullets')?.value || '';
+                const bullets = bulletsRaw.split('\n').map(b => b.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean);
+                if (role || company || description || bullets.length > 0) {
+                    p.experience_structured.push({ role, company, period, description, bullets });
+                }
+            });
+
+            // Collect education rows
+            const eduRows = document.querySelectorAll('#edu-rows-container .edu-row');
+            p.education = [];
+            eduRows.forEach(row => {
+                const grade = row.querySelector('.edu-grade')?.value.trim();
+                const field = row.querySelector('.edu-field')?.value.trim();
+                const institution = row.querySelector('.edu-inst')?.value.trim();
+                const years = row.querySelector('.edu-years')?.value.trim();
+                if (grade || field || institution) {
+                    p.education.push({ grade, field, institution, years });
+                }
+            });
+
+            // Collect language rows
+            const langRows = document.querySelectorAll('#lang-rows-container .lang-row');
+            p.languages = [];
+            langRows.forEach(row => {
+                const language = row.querySelector('.lang-name')?.value.trim();
+                const level = row.querySelector('.lang-level')?.value.trim();
+                if (language) {
+                    p.languages.push({ language, level });
+                }
+            });
+
+            try {
+                const res = await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profiles)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Профиль «${p.name || p.role}» успешно сохранен!`);
+                    renderProfilesList();
+                    renderProfileEditor();
+                } else {
+                    showToast(`❌ Ошибка сохранения: ${data.error}`, true);
+                }
+            } catch (e) {
+                showToast(`❌ Ошибка сети при сохранении`, true);
+            }
+        }
+
+        async function deleteProfile() {
+            if (currentProfile === null || !profiles[currentProfile]) return;
+            const p = profiles[currentProfile];
+            if (!confirm(`Удалить профиль «${p.name || p.role}»?`)) return;
+
+            profiles.splice(currentProfile, 1);
+            currentProfile = profiles.length > 0 ? 0 : null;
+
+            try {
+                await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profiles)
+                });
+                showToast('🗑️ Профиль удален');
+                renderProfilesList();
+                renderProfileEditor();
+            } catch (e) {
+                showToast('❌ Ошибка сети при удалении', true);
+            }
+        }
+        async function uploadResume(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const status = document.getElementById('resume-status');
+            status.innerHTML = `<span class="text-sky-400 animate-pulse">Парсинг через Gemini...</span>`;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const res = await fetch('/api/upload_resume', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename: file.name, base64: e.target.result })
+                    });
+                    const data = await res.json();
+                    if (data.success && data.profile) {
+                        profiles[currentProfile] = Object.assign(profiles[currentProfile] || {}, data.profile);
+                        await fetch('/api/profiles', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(profiles)
+                        });
+                        showToast('✅ Резюме распарсено и сохранено!');
+                        renderProfilesList();
+                        renderProfileEditor();
+                        status.innerHTML = `<span class="text-emerald-400 font-medium">✅ Распарсено и сохранено!</span>`;
+                    } else {
+                        status.innerHTML = `<span class="text-rose-400">❌ ${data.error || 'Ошибка'}</span>`;
+                    }
+                } catch (err) {
+                    status.innerHTML = `<span class="text-rose-400">❌ Ошибка сети</span>`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- CROPPER ---
+        function initCrop(input) {
+            if (input.files && input.files[0]) {
+                const r = new FileReader();
+                r.onload = (e) => {
+                    const img = document.getElementById('cropper-image');
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                    toggleModal('cropper-modal');
+                    if (cropper) cropper.destroy();
+                    cropper = new Cropper(img, { aspectRatio: 1, viewMode: 2 });
+                };
+                r.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function saveCrop() {
+            if (!cropper) return;
+            const canvas = cropper.getCroppedCanvas({ width: 400, height: 400 });
+            document.getElementById('p-photo').value = canvas.toDataURL('image/jpeg', 0.85);
+            toggleModal('cropper-modal');
+            saveProfiles();
+        }
+
+        // --- SYSTEM / MODALS ---
+        function toggleModal(id) {
+            document.getElementById(id).classList.toggle('active');
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                document.getElementById('gemini-key').value = data.gemini_api_key || '';
+                activeProfileId = data.active_profile_id || null;
+                renderActiveProfileDropdown();
+            } catch (e) { }
+        }
+
+        async function saveConfig() {
+            const key = document.getElementById('gemini-key').value.trim();
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gemini_api_key: key, active_profile_id: activeProfileId })
+            });
+            toggleModal('settings-modal');
+        }
+
+        let terminalVisible = false;
+        function toggleTerminalLogs() {
+            terminalVisible = !terminalVisible;
+            const container = document.getElementById('terminal-container');
+            const text = document.getElementById('toggle-logs-text');
+            const arrow = document.getElementById('toggle-logs-arrow');
+            if (container) {
+                if (terminalVisible) {
+                    container.classList.remove('hidden');
+                    if (text) text.innerText = 'Скрыть лог терминала';
+                    if (arrow) arrow.innerText = '▲';
+                    const logs = document.getElementById('harvest-logs');
+                    if (logs) logs.scrollTop = logs.scrollHeight;
+                } else {
+                    container.classList.add('hidden');
+                    if (text) text.innerText = 'Показать подробный лог терминала';
+                    if (arrow) arrow.innerText = '▼';
+                }
+            }
+        }
+
+        async function startHarvest() {
+            const logs = document.getElementById('harvest-logs');
+            const btn = document.getElementById('harvest-close-btn');
+            const pBar = document.getElementById('harvest-progress-bar');
+            const pText = document.getElementById('harvest-percent');
+            const pStep = document.getElementById('harvest-current-step');
+
+            // Reset modal UI
+            if (logs) logs.innerText = '🚀 Запуск сборщика вакансий...\n';
+            if (btn) btn.classList.add('hidden');
+            if (pBar) {
+                pBar.style.width = '15%';
+                pBar.className = 'bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full transition-all duration-700 animate-pulse';
+            }
+            if (pText) pText.innerText = '15%';
+            if (pStep) pStep.innerText = 'Подключение к источникам (HH, SuperJob, Rabota, TG, RemoteOK)...';
+
+            toggleModal('harvest-modal');
+
+            // Simulated progress while background harvest runs
+            let currentProg = 15;
+            const progressInterval = setInterval(() => {
+                if (currentProg < 88) {
+                    currentProg += Math.floor(Math.random() * 10) + 4;
+                    if (currentProg > 88) currentProg = 88;
+                    if (pBar) pBar.style.width = currentProg + '%';
+                    if (pText) pText.innerText = currentProg + '%';
+                    if (currentProg > 35 && currentProg <= 65) {
+                        if (pStep) pStep.innerText = 'Анти-BS фильтрация, отсеивание рекламы и кандидатов...';
+                    } else if (currentProg > 65) {
+                        if (pStep) pStep.innerText = 'Расчет грейдов (Junior-Lead) и сопоставление со стеком...';
+                    }
+                }
+            }, 1200);
+
+            try {
+                const res = await fetch('/api/harvest', { method: 'POST' });
+                const data = await res.json();
+                clearInterval(progressInterval);
+
+                if (pBar) {
+                    pBar.style.width = '100%';
+                    pBar.classList.remove('animate-pulse');
+                }
+                if (pText) pText.innerText = '100%';
+                if (pStep) pStep.innerHTML = '<span class="text-emerald-400 font-bold">✨ Сбор завершен успешно!</span>';
+
+                if (logs) {
+                    logs.innerText += (data.logs || data.error || 'Готово.') + '\n\n🏁 Процесс завершен.';
+                    logs.scrollTop = logs.scrollHeight;
+                }
+            } catch (e) {
+                clearInterval(progressInterval);
+                if (pStep) pStep.innerHTML = '<span class="text-rose-400 font-bold">❌ Ошибка сбора</span>';
+                if (logs) {
+                    logs.innerText += '\n❌ Ошибка соединения с сервером: ' + e;
+                    logs.scrollTop = logs.scrollHeight;
+                }
+            }
+
+            if (btn) {
+                btn.classList.remove('hidden');
+                btn.classList.add('animate-bounce');
+                setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
+            }
+        }
+
+        function closeHarvest() {
+            toggleModal('harvest-modal');
+            loadPitches();
+        }
+
+        // --- UNIVERSAL AI VACANCY PARSER ---
+        let aiParseMode = 'url';
+
+        function setAiParseMode(mode) {
+            aiParseMode = mode;
+            const tabUrl = document.getElementById('ai-tab-url');
+            const tabText = document.getElementById('ai-tab-text');
+            const boxUrl = document.getElementById('ai-input-url-container');
+            const boxText = document.getElementById('ai-input-text-container');
+            const err = document.getElementById('ai-parse-error');
+            if (err) err.classList.add('hidden');
+
+            if (mode === 'url') {
+                if (tabUrl) tabUrl.className = 'flex-1 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white transition-all flex items-center justify-center gap-1.5';
+                if (tabText) tabText.className = 'flex-1 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-lg transition-all flex items-center justify-center gap-1.5';
+                if (boxUrl) boxUrl.classList.remove('hidden');
+                if (boxText) boxText.classList.add('hidden');
+            } else {
+                if (tabText) tabText.className = 'flex-1 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white transition-all flex items-center justify-center gap-1.5';
+                if (tabUrl) tabUrl.className = 'flex-1 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-lg transition-all flex items-center justify-center gap-1.5';
+                if (boxText) boxText.classList.remove('hidden');
+                if (boxUrl) boxUrl.classList.add('hidden');
+            }
+        }
+
+        async function executeAiParse() {
+            const urlInput = document.getElementById('ai-input-url');
+            const textInput = document.getElementById('ai-input-text');
+            const loader = document.getElementById('ai-parse-loader');
+            const errBox = document.getElementById('ai-parse-error');
+            const errMsg = document.getElementById('ai-parse-error-msg');
+            const submitBtn = document.getElementById('ai-parse-submit-btn');
+
+            if (errBox) errBox.classList.add('hidden');
+
+            const rawVal = aiParseMode === 'url' ? (urlInput?.value || '').trim() : (textInput?.value || '').trim();
+            if (!rawVal) {
+                if (errMsg) errMsg.innerText = aiParseMode === 'url' ? 'Пожалуйста, введите корректный URL вакансии' : 'Пожалуйста, вставьте текст вакансии';
+                if (errBox) errBox.classList.remove('hidden');
+                return;
+            }
+
+            if (loader) loader.classList.remove('hidden');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            try {
+                const res = await fetch('/api/vacancies/ai-parse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        input: rawVal,
+                        is_url: aiParseMode === 'url',
+                        profile_id: activeProfileId
+                    })
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Не удалось распознать вакансию через ИИ');
+                }
+
+                // Success: clear inputs, close modal, reload pitches
+                if (urlInput) urlInput.value = '';
+                if (textInput) textInput.value = '';
+                toggleModal('ai-parser-modal');
+
+                // Switch to inbox (new) and refresh list
+                currentTab = 'new';
+                updateTabUI();
+                await loadPitches();
+
+            } catch (err) {
+                if (errMsg) errMsg.innerText = err.message || 'Ошибка обработки вакансии';
+                if (errBox) errBox.classList.remove('hidden');
+            } finally {
+                if (loader) loader.classList.add('hidden');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

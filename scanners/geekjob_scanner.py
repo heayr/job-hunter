@@ -24,6 +24,8 @@ def parse_geekjob_json(json_content_or_str: Any) -> List[Dict[str, Any]]:
 
     items = data.get("data", [])
     for item in items:
+        if item.get("status") in ("closed", "archived") or item.get("is_closed") or item.get("archived"):
+            continue
         vac_id_raw = item.get("id")
         if not vac_id_raw:
             continue

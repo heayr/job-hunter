@@ -1,0 +1,79 @@
+{
+  "id": "profile_en",
+  "lang": "en",
+  "name": "John Doe",
+  "full_name": "John Doe",
+  "first_name": "John",
+  "last_name": "Doe",
+  "role": "Senior Software Engineer",
+  "contacts": "Telegram: @johndoe | Email: john.doe@example.com | Телефон: +79990000000 | GitHub: https://github.com/johndoe | LinkedIn: https://linkedin.com/in/johndoe",
+  "contacts_structured": {
+    "telegram": "@johndoe",
+    "telegram_url": "https://t.me/johndoe",
+    "email": "john.doe@example.com",
+    "phone": "+79990000000",
+    "github": "https://github.com/johndoe",
+    "linkedin": "https://linkedin.com/in/johndoe",
+    "portfolio": "https://nologs.website"
+  },
+  "location": {
+    "city": "",
+    "country": "",
+    "raw": "Remote / London, UK",
+    "remote": true,
+    "hybrid": true,
+    "office": true
+  },
+  "summary": "Versatile full-stack engineer with 6+ years of experience delivering scalable web apps.",
+  "keywords": "TypeScript, JavaScript, FastAPI, PostgreSQL, Docker, Git, CI/CD",
+  "skills_categorized": {},
+  "experience": "### Lead Software Engineer | Acme Corp (January 2022 — Present)\nFintech SaaS provider.\n• Led a team of 5 engineers to deliver multi-tenant billing\n• Designed real-time event streaming pipeline using Kafka\n• Built automated CI/CD pipeline reducing release time by 60%",
+  "experience_structured": [
+    {
+      "role": "Lead Software Engineer",
+      "company": "Acme Corp",
+      "period": "January 2022 — Present",
+      "bullets": [
+        "Led a team of 5 engineers to deliver multi-tenant billing",
+        "Designed real-time event streaming pipeline using Kafka",
+        "Built automated CI/CD pipeline reducing release time by 60%"
+      ],
+      "description": "Fintech SaaS provider.",
+      "site": ""
+    }
+  ],
+  "education": [
+    {
+      "grade": "Computer Science",
+      "field": "",
+      "institution": "University of London",
+      "years": "2015 — 2018"
+    },
+    {
+      "grade": "LANGUAGES",
+      "field": "",
+      "institution": "University of London",
+      "years": ""
+    },
+    {
+      "grade": "English — Native · German — B2",
+      "field": "",
+      "institution": "University of London",
+      "years": ""
+    }
+  ],
+  "languages": [
+    {
+      "language": ": TypeScript, JavaScript, Python, Go",
+      "level": ""
+    },
+    {
+      "language": "Frameworks: React, Next.js, FastAPI",
+      "level": ""
+    },
+    {
+      "language": "Databases & Cloud: PostgreSQL, Redis, Docker, AWS",
+      "level": ""
+    }
+  ]
+}

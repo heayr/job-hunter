@@ -14,7 +14,7 @@ class HHScraper(BaseScraper):
 
     def scrape(self) -> List[Dict[str, Any]]:
         vacancies: List[Dict[str, Any]] = []
-        url = "https://api.hh.ru/vacancies?text=Frontend+OR+React+OR+Next.js&search_field=name&per_page=20"
+        url = "https://api.hh.ru/vacancies?text=Frontend+OR+React+OR+Next.js&search_field=name&order_by=publication_time&period=14&per_page=20"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'application/json',
@@ -26,6 +26,8 @@ class HHScraper(BaseScraper):
                 data = json.loads(response.read().decode('utf-8'))
 
             for item in data.get('items', []):
+                if item.get('archived'):
+                    continue
                 vac_id = f"hh:{item.get('id', '')}"
                 desc_clean = ""
 

@@ -14,28 +14,29 @@ def parse_docx(file_bytes):
     doc = Document(io.BytesIO(file_bytes))
     return "\n".join([p.text for p in doc.paragraphs])
 
-def parse_resume_locally(text: str) -> dict:
-    """
-    Production-grade parser specifically calibrated for Russian and English tech CVs
-    and standard job platforms (HH.ru, LinkedIn, Habr Career, ATS).
-    """
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
+# ── RESUME PARSER HELPER FUNCTIONS ───────────────────────────────────────────
 
-    # 0. Clean common PDF header/footer artifacts
+def _clean_resume_text(text: str) -> str:
+    """Cleans common PDF/DOCX header and footer artifacts and standardizes newlines."""
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
     clean_lines = []
     for l in text.split('\n'):
         s = l.strip()
-        if not s: continue
-        if re.search(r'file:///.*Страница\s+\d+', s) or re.search(r'Страница\s+\d+\s+из\s+\d+', s): continue
-        if re.search(r'.+?\s*—\s*(?:Frontend|Backend|Fullstack|Developer|Engineer|DevOps)', s, re.I): continue
-        if s.lower() == 'фото': continue
+        if not s:
+            continue
+        if re.search(r'file:///.*Страница\s+\d+', s) or re.search(r'Страница\s+\d+\s+из\s+\d+', s):
+            continue
+        if re.search(r'.+?\s*—\s*(?:Frontend|Backend|Fullstack|Developer|Engineer|DevOps)', s, re.I):
+            continue
+        if s.lower() == 'фото':
+            continue
         clean_lines.append(s)
-    clean_text = '\n'.join(clean_lines)
+    return '\n'.join(clean_lines)
 
-    # 1. Detect language
+def _split_resume_sections(clean_text: str) -> tuple[dict, bool]:
+    """Detects resume language and splits text into standard sections."""
     is_russian = bool(re.search(r'[а-яёА-ЯЁ]', clean_text))
 
-    # 2. Section splitting
     headers_patterns = {
         "about": r'(?m)^О СЕБЕ\b|^PROFESSIONAL SUMMARY\b|^ABOUT\b|^SUMMARY\b',
         "stack": r'(?m)^СТЕК И ИНСТРУМЕНТЫ\b|^TECHNICAL SKILLS\b|^SKILLS\b|^НАВЫКИ\b',
@@ -59,8 +60,11 @@ def parse_resume_locally(text: str) -> dict:
         end_idx = pos_list[i+1][0] if i + 1 < len(pos_list) else len(clean_text)
         sec_content[s_name] = clean_text[start_idx:end_idx].strip()
 
-    # --- Header (Name, Role, Location, Contacts) ---
-    h_lines = [l for l in sec_content.get("header", "").split('\n') if l.strip()]
+    return sec_content, is_russian
+
+def _extract_header_and_contacts(header_text: str, full_text: str, is_russian: bool) -> dict:
+    """Extracts candidate identity, target role, contact channels and location."""
+    h_lines = [l for l in header_text.split('\n') if l.strip()]
     full_name = h_lines[0] if h_lines else ("Имя Фамилия" if is_russian else "Candidate Name")
     name_parts = full_name.split()
     first_name = name_parts[0] if name_parts else ""
@@ -68,37 +72,54 @@ def parse_resume_locally(text: str) -> dict:
 
     role = h_lines[1] if len(h_lines) > 1 else ("Frontend / Fullstack-разработчик" if is_russian else "Frontend / Fullstack Engineer")
 
-    # Contacts
-    email_m = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', clean_text)
+    # Email
+    email_m = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', full_text)
     email = email_m.group(0) if email_m else "candidate@example.com"
 
-    phone_m = re.search(r'(\+?7\d{10}|\+?7[\s\(-]*\d{3}[\s\)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2})', clean_text)
+    # Phone
+    phone_m = re.search(r'(\+?7\d{10}|\+?7[\s\(-]*\d{3}[\s\)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2})', full_text)
     phone = phone_m.group(0) if phone_m else "+79990000000"
 
-    tg_m = re.search(r'(?:Telegram:\s*|t\.me/)(?:@)?([\w\d_]+)', clean_text, re.I)
+    # Telegram
+    tg_m = re.search(r'(?:Telegram:\s*|t\.me/)(?:@)?([\w\d_]+)', full_text, re.I)
     if not tg_m:
-        tg_m = re.search(r'(?<!\w)@([\w\d_]+)(?!\.[\w\.]+)', clean_text)
+        tg_m = re.search(r'(?<!\w)@([\w\d_]+)(?!\.[\w\.]+)', full_text)
     tg_val = tg_m.group(1) if tg_m else "username"
     telegram = f"@{tg_val}"
     telegram_url = f"https://t.me/{tg_val}"
 
-    gh_m = re.search(r'github\.com/([\w\d_-]+)', clean_text)
+    # GitHub & LinkedIn
+    gh_m = re.search(r'github\.com/([\w\d_-]+)', full_text)
     github = f"https://github.com/{gh_m.group(1)}" if gh_m else "https://github.com/username"
 
-    li_m = re.search(r'linkedin\.com/in/([\w\d_-]+)', clean_text)
+    li_m = re.search(r'linkedin\.com/in/([\w\d_-]+)', full_text)
     linkedin = f"https://linkedin.com/in/{li_m.group(1)}" if li_m else "https://linkedin.com/in/username"
 
     loc_m = next((l for l in h_lines if any(k in l.lower() for k in ['москва', 'moscow', 'удален', 'remote', 'гибрид', 'офис'])), "Москва | Удалённо / гибрид / офис")
-    city = "Москва" if any(k in clean_text.lower() for k in ['москва', 'moscow']) else ""
-    country = "Россия" if any(k in clean_text.lower() for k in ['россия', 'russia']) else ""
+    city = "Москва" if any(k in full_text.lower() for k in ['москва', 'moscow']) else ""
+    country = "Россия" if any(k in full_text.lower() for k in ['россия', 'russia']) else ""
 
     contacts_formatted = f"Telegram: {telegram} | Email: {email} | Телефон: {phone} | GitHub: {github} | LinkedIn: {linkedin}"
 
-    # --- About (Summary) ---
-    summary = sec_content.get("about", "")
+    return {
+        "full_name": full_name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "role": role,
+        "email": email,
+        "phone": phone,
+        "telegram": telegram,
+        "telegram_url": telegram_url,
+        "github": github,
+        "linkedin": linkedin,
+        "loc_raw": loc_m,
+        "city": city,
+        "country": country,
+        "contacts_formatted": contacts_formatted
+    }
 
-    # --- Stack & Tools (Categorized by platform requirements) ---
-    stack_text = sec_content.get("stack", "")
+def _extract_categorized_stack(stack_text: str, full_text: str) -> tuple[dict, list]:
+    """Parses skill categories and compiles keyword list."""
     categorized_stack = {}
     all_keywords = []
 
@@ -115,10 +136,12 @@ def parse_resume_locally(text: str) -> dict:
             "Next.js 16", "React 19", "TypeScript", "JavaScript", "Tailwind CSS v4", "FastAPI",
             "Node.js", "PostgreSQL", "Docker", "Traefik", "Vitest", "ESLint", "Git", "CI/CD"
         ]
-        all_keywords = [k for k in kw_defaults if k.lower() in clean_text.lower()]
+        all_keywords = [k for k in kw_defaults if k.lower() in full_text.lower()]
 
-    # --- Work Experience ---
-    exp_text = sec_content.get("experience", "")
+    return categorized_stack, all_keywords
+
+def _extract_work_experience(exp_text: str) -> tuple[list, str]:
+    """Parses work experience items, periods, companies and achievements."""
     months_re = r'(?:Январь|Февраль|Март|Апрель|Май|Июнь|Июль|Август|Сентябрь|Октябрь|Ноябрь|Декабрь|Авг\.|Сент\.|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December|\b\d{4}\b)'
     date_range_re = r'(' + months_re + r'(?:\s*\d{4})?\s*[—–-]\s*(?:настоящее время|present|по н\.в\.|\b' + months_re + r'(?:\s*\d{4})?|\b\d{4}\b)(?:\s*·\s*[\w\s-]+)?)'
 
@@ -131,8 +154,10 @@ def parse_resume_locally(text: str) -> dict:
     ]
 
     def is_bullet_line(l):
-        if l.startswith(('•', '·', '*', '-', '—')): return True
-        if re.match(r'^\d+/\d+', l): return True
+        if l.startswith(('•', '·', '*', '-', '—')):
+            return True
+        if re.match(r'^\d+/\d+', l):
+            return True
         return any(l.lower().startswith(v) for v in action_verbs)
 
     role_re = r'^(?:(?:Lead|Senior|Middle|Junior|Principal)\s+)?(?:Frontend|Fullstack|Backend|Software|Web|Product|Sales\s*&\s*Marketing|Mobile|DevOps)\s+(?:Engineer|Developer|Specialist|Manager|Architect|Lead)\b|^(?:Frontend|Fullstack|Backend|Lead|Senior)\s*[-/]\s*разработчик\b|^Специалист по продажам\b'
@@ -149,7 +174,8 @@ def parse_resume_locally(text: str) -> dict:
 
         # Case 1: Role and Date on same line (RU format)
         if m_date and any(t in line.lower() for t in ['разработчик', 'инженер', 'developer', 'engineer', 'специалист', 'specialist', 'lead', 'стажировка', 'internship']):
-            if curr_job: jobs.append(curr_job)
+            if curr_job:
+                jobs.append(curr_job)
             date_str = m_date.group(0).strip()
             before_date = line[:m_date.start()].strip(' ·—')
             if '·' in before_date:
@@ -161,17 +187,16 @@ def parse_resume_locally(text: str) -> dict:
 
         # Case 2: Role on separate line (EN format or standalone line)
         if is_role and not m_date:
-            if curr_job: jobs.append(curr_job)
+            if curr_job:
+                jobs.append(curr_job)
             curr_job = {"role": line, "company": "", "period": "", "bullets": [], "description": "", "site": ""}
             continue
 
         if curr_job:
-            # If period not set, but line is date range
             if not curr_job["period"] and m_date:
                 curr_job["period"] = m_date.group(0).strip()
                 continue
 
-            # If company not set and line is not bullet
             if not curr_job["company"] and not is_bullet_line(line) and not m_date:
                 if '—' in line:
                     c_name, c_desc = line.split('—', 1)
@@ -181,18 +206,17 @@ def parse_resume_locally(text: str) -> dict:
                     curr_job["company"] = line.strip()
                 continue
 
-            # Website
             if 'website' in line.lower() or 'http' in line.lower():
                 curr_job["site"] = line.strip()
                 continue
 
-            # Subtitle / description if bullets haven't started
             if not is_bullet_line(line) and len(curr_job["bullets"]) == 0 and not m_date:
-                if curr_job["description"]: curr_job["description"] += " " + line.strip()
-                else: curr_job["description"] = line.strip()
+                if curr_job["description"]:
+                    curr_job["description"] += " " + line.strip()
+                else:
+                    curr_job["description"] = line.strip()
                 continue
 
-            # Bullets
             if is_bullet_line(line):
                 curr_job["bullets"].append(line.lstrip('•·*-— ').strip())
             else:
@@ -202,16 +226,21 @@ def parse_resume_locally(text: str) -> dict:
     if curr_job:
         jobs.append(curr_job)
 
-    # Formatted plain text experience for quick copy
     exp_formatted = ""
     for j in jobs:
         exp_formatted += f"### {j['role']} | {j['company']} ({j['period']})\n"
-        if j['description']: exp_formatted += f"{j['description']}\n"
-        if j['site']: exp_formatted += f"Сайт: {j['site']}\n"
-        for b in j['bullets']: exp_formatted += f"• {b}\n"
+        if j['description']:
+            exp_formatted += f"{j['description']}\n"
+        if j['site']:
+            exp_formatted += f"Сайт: {j['site']}\n"
+        for b in j['bullets']:
+            exp_formatted += f"• {b}\n"
         exp_formatted += "\n"
 
-    # --- Education with Grades & Institutions ---
+    return jobs, exp_formatted.strip()
+
+def _extract_education_and_languages(sec_content: dict) -> tuple[list, list]:
+    """Parses education degrees, institutions, and declared language proficiencies."""
     edu_text = sec_content.get("education", "")
     edu_items = []
     edu_lines = [l.strip() for l in edu_text.split('\n') if l.strip()]
@@ -269,12 +298,12 @@ def parse_resume_locally(text: str) -> dict:
             edu_items.append({"grade": line, "field": "", "institution": inst, "years": ""})
             i += 1
 
-    # --- Languages ---
     lang_text = sec_content.get("languages", "")
     lang_items = []
     for lp in re.split(r'[·\n]', lang_text):
         lp = lp.strip()
-        if not lp: continue
+        if not lp:
+            continue
         if '—' in lp:
             l_name, l_lvl = lp.split('—', 1)
             lang_items.append({"language": l_name.strip(), "level": l_lvl.strip()})
@@ -284,36 +313,60 @@ def parse_resume_locally(text: str) -> dict:
         else:
             lang_items.append({"language": lp, "level": ""})
 
+    return edu_items, lang_items
+
+# ── MAIN ORCHESTRATOR ────────────────────────────────────────────────────────
+
+def parse_resume_locally(text: str) -> dict:
+    """
+    Production-grade parser specifically calibrated for Russian and English tech CVs
+    and standard job platforms (HH.ru, LinkedIn, Habr Career, ATS).
+    """
+    clean_text = _clean_resume_text(text)
+    sec_content, is_russian = _split_resume_sections(clean_text)
+
+    # 1. Header and contacts
+    hdr = _extract_header_and_contacts(sec_content.get("header", ""), clean_text, is_russian)
+
+    # 2. Skills and keywords
+    categorized_stack, all_keywords = _extract_categorized_stack(sec_content.get("stack", ""), clean_text)
+
+    # 3. Work experience
+    jobs, exp_formatted = _extract_work_experience(sec_content.get("experience", ""))
+
+    # 4. Education and languages
+    edu_items, lang_items = _extract_education_and_languages(sec_content)
+
     return {
         "id": "profile_ru" if is_russian else "profile_en",
         "lang": "ru" if is_russian else "en",
-        "name": full_name,
-        "full_name": full_name,
-        "first_name": first_name,
-        "last_name": last_name,
-        "role": role,
-        "contacts": contacts_formatted,
+        "name": hdr["full_name"],
+        "full_name": hdr["full_name"],
+        "first_name": hdr["first_name"],
+        "last_name": hdr["last_name"],
+        "role": hdr["role"],
+        "contacts": hdr["contacts_formatted"],
         "contacts_structured": {
-            "telegram": telegram,
-            "telegram_url": telegram_url,
-            "email": email,
-            "phone": phone,
-            "github": github,
-            "linkedin": linkedin,
+            "telegram": hdr["telegram"],
+            "telegram_url": hdr["telegram_url"],
+            "email": hdr["email"],
+            "phone": hdr["phone"],
+            "github": hdr["github"],
+            "linkedin": hdr["linkedin"],
             "portfolio": "https://nologs.website"
         },
         "location": {
-            "city": city,
-            "country": country,
-            "raw": loc_m,
+            "city": hdr["city"],
+            "country": hdr["country"],
+            "raw": hdr["loc_raw"],
             "remote": True,
             "hybrid": True,
             "office": True
         },
-        "summary": summary,
+        "summary": sec_content.get("about", ""),
         "keywords": ", ".join(all_keywords),
         "skills_categorized": categorized_stack,
-        "experience": exp_formatted.strip(),
+        "experience": exp_formatted,
         "experience_structured": jobs,
         "education": edu_items,
         "languages": lang_items
@@ -327,7 +380,7 @@ def extract_profile_with_ai(text: str) -> dict:
     """
     local_profile = parse_resume_locally(text)
     api_key = get_api_key()
-    if not api_key or not api_key.startswith("AIzaSy"):
+    if not api_key or not api_key.strip():
         return local_profile
 
     prompt = f"""
@@ -337,7 +390,7 @@ def extract_profile_with_ai(text: str) -> dict:
     Resume:
     {text[:4000]}
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.1}
