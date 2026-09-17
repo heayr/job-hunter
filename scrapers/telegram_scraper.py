@@ -102,6 +102,12 @@ class TelegramScraper(BaseScraper):
                     contacts = extract_contacts(text)
                     post_url = f"https://t.me/{post_id}"
 
+                    # Only mark as "direct contact" if we found a REAL personal handle
+                    # (not a channel name, not the post URL itself)
+                    has_real_contact = bool(contacts.get("primary_handle"))
+                    contact_handle = contacts.get("primary_handle") or ""
+                    contact_type = contacts.get("primary_type") or "portal"
+
                     # Skills extraction from text
                     skill_keywords = ["React", "Next.js", "TypeScript", "JavaScript", "Vue", "Node.js", "Redux", "Tailwind", "CSS", "HTML"]
                     found_skills = [sk for sk in skill_keywords if re.search(rf'\b{re.escape(sk)}\b', text, re.I)]
@@ -124,8 +130,8 @@ class TelegramScraper(BaseScraper):
                         "skills": skills_str,
                         "language": "ru",
                         "contact_name": contacts.get("contact_name") or "",
-                        "contact_handle": contacts.get("primary_handle") or post_url,
-                        "contact_type": contacts.get("primary_type") or "telegram",
+                        "contact_handle": contact_handle,
+                        "contact_type": contact_type,
                         "published_at": published_at
                     })
 

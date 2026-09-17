@@ -95,69 +95,56 @@ flowchart TD
 To adhere strictly to Engineering Standards (stability, data safety, backward compatibility, and testability), the transformation is structured into 5 major milestones comprising 21 bite-sized phases:
 
 ### Milestone I: Knowledge Foundation & Semantic Reasoning (Phases 0–5)
-- **Phase 0: Codebase Audit & Architectural Blueprint** *(CURRENT)*
-  - Complete project inventory.
-  - Formulate `docs/AI_AGENT_ARCHITECTURE.md`.
-  - Establish regression test baseline (`Ran 38 tests in 3.918s OK`).
-- **Phase 1: Canonical Candidate Profile & Evidence Store**
-  - Define structured schema: `Identity`, `Experience`, `Projects`, `Skills`, `Domains`, and `Evidence` (Problem, Context, Action, Result, Tech, Verified Fact vs AI Interpretation).
-  - SQLite table `candidate_profiles` + migration from existing `profiles.json`.
-  - Strict validator ensuring no fabricated experience is permitted.
-- **Phase 2: Job Understanding Engine**
-  - Structured extraction: explicit requirements, implicit requirements, seniority, engineering culture signals, team risks, and unknowns.
-  - Distinguish verifiable Facts from Hypotheses.
-- **Phase 3: Semantic Evidence Retrieval Layer**
-  - Map `Job Problem ↔ Candidate Evidence ↔ Proven Experience ↔ Narrative Story`.
-  - Move beyond keyword intersection (`React = React`) to contextual capability matching.
-- **Phase 4: Application Thesis Generator**
-  - Formulate the core strategic argument: *"Why this specific candidate is the ideal hire for this specific team's challenges."*
-  - Output candidate theses, alternative theses, risks, and confidence scores.
-- **Phase 5: Thesis Critic & Hallucination Gate**
-  - Dedicated AI Critic evaluating thesis uniqueness, evidence sufficiency, and generic cliche avoidance.
-  - Reject weak or unsupported theses before any writing begins.
+- **Phase 0: Codebase Audit & Architectural Blueprint** ✅ COMPLETE
+- **Phase 1: Canonical Candidate Profile & Evidence Store** ✅ COMPLETE
+  - `generator/candidate_profile.py` — structured schema, zero-hallucination invariants, legacy upgrade
+  - SQLite table `candidate_profiles` with `data_json` blob
+- **Phase 2: Job Understanding Engine** ✅ COMPLETE
+  - `generator/job_understanding.py` — explicit/implicit requirements, facts vs hypotheses
+- **Phase 3: Semantic Evidence Retrieval Layer** ✅ COMPLETE
+  - `generator/evidence_retriever.py` — pain-to-capability mapping with 5 strategic presets
+- **Phase 4: Application Thesis Generator** ✅ COMPLETE
+  - `generator/thesis_generator.py` — singular compelling argument with alternatives
+- **Phase 5: Thesis Critic & Hallucination Gate** ✅ COMPLETE
+  - `generator/thesis_critic.py` — adversarial validator (APPROVED/NEEDS_REVISION/REJECTED)
 
 ### Milestone II: Contextual Research & Strategy (Phases 6–7)
-- **Phase 6: Bounded Company Research Engine**
-  - Safe, rate-limited enrichment of company context (homepage, public tech stack, engineering signals).
-  - Strict separation of public facts from inferred business challenges.
-- **Phase 7: Application Strategy Layer**
-  - Synthesize Job Understanding + Company Research + Validated Thesis.
-  - Decide narrative tone, emphasis order, skills hierarchy, and which facts to deliberately omit.
+- **Phase 6: Bounded Company Research Engine** ✅ COMPLETE
+  - `generator/company_researcher.py` — bounded web fetch, 7-day cache, heuristic fallback
+- **Phase 7: Application Strategy Layer** ✅ COMPLETE
+  - `generator/application_strategy.py` — positioning, tone, emphasis, deliberate omissions
 
 ### Milestone III: Precision Artifact Generation & Quality Control (Phases 8–11)
-- **Phase 8: Tailored Resume Engine (Profile View)**
-  - Dynamic generation of tailored CV views from the canonical profile without mutating master profile data.
-  - Versioned storage linked to vacancy ID (`base`, `tailored_for_job_X`).
-- **Phase 9: ATS Analysis Engine**
-  - Measure terminology coverage, parseability, and section structure without unethical keyword stuffing.
-- **Phase 10: Evidence-Driven Cover Letter & Pitch Engine**
-  - Multi-stage writer: Draft → Critic → Fact-Check → Final Polish.
-  - Zero AI tropes, authentic human tone, direct peer-to-peer engineering voice.
-- **Phase 11: Multi-Agent Specialized Roles**
-  - Decouple prompt/reasoning pipelines into explicit roles: Job Analyst, Company Researcher, Candidate Researcher, Application Strategist, Resume Strategist, Writer, Critic, and Fact Checker.
+- **Phase 8: Tailored Resume Engine (Profile View)** ✅ COMPLETE
+  - `generator/tailored_resume_engine.py` — ATS-compliant structured resume JSON → Markdown
+- **Phase 9: ATS Analysis Engine** ✅ COMPLETE
+  - `generator/ats_analyzer.py` — keyword coverage, parseability, stuffing detection
+- **Phase 10: Evidence-Driven Cover Letter & Pitch Engine** ✅ COMPLETE
+  - `generator/cover_letter_engine.py` — Draft → Adversarial Critic → Fact-Check → Final
+- **Phase 11: Multi-Agent Specialized Roles** ✅ COMPLETE
+  - `agents/multi_agent_roles.py` — 6 agents (JobAnalyst, CompanyResearcher, CandidateStrategist, Writer, Critic, FactChecker)
 
 ### Milestone IV: Agent Runtime & Browser Infrastructure (Phases 12–16)
-- **Phase 12: Agent Runtime & Finite State Machine**
-  - Implement agent loop with explicit states: `DISCOVERED`, `ANALYZING`, `RESEARCHING`, `MATCHED`, `STRATEGY_READY`, `CV_READY`, `LETTER_READY`, `FORM_INSPECTED`, `WAITING_APPROVAL`, `SUBMITTED`.
-  - Timeouts, max iterations, error recovery, and failure bounds.
-- **Phase 13: Strict Tool System**
-  - Formal tool execution interfaces with validated schemas (no arbitrary code execution).
-- **Phase 14: Browser Extension (Side Panel & Content Bridge)**
-  - Manifest V3 Chrome Extension providing a semantic DOM representation while preserving backward compatibility with the Bookmarklet.
-- **Phase 15: Platform Adapters (HH.ru, LinkedIn, Greenhouse, Lever)**
-  - Modular `JobPlatformAdapter` interface: `detect()`, `extract_job()`, `inspect_form()`, `fill_fields()`, `validate()`.
-- **Phase 16: Human-in-the-Loop & Execution Guardrails**
-  - Three operation modes: `ASSIST` (drafts only), `SEMI_AUTO` (pre-fill, await 1-click user review), `AUTO` (rules-restricted).
+- **Phase 12: Agent Runtime & Finite State Machine** ✅ COMPLETE
+  - `agents/runtime.py` — 9-state FSM, timeouts (30s), retries (max 2)
+- **Phase 13: Strict Tool System** ✅ COMPLETE
+  - `agents/tool_system.py` — 6 declarative tools with validation
+- **Phase 14: Browser Extension (Side Panel & Content Bridge)** ✅ COMPLETE
+  - `extension/` — Manifest V3, modular architecture (core, adapters, autofill, automation)
+- **Phase 15: Platform Adapters (HH.ru, LinkedIn, Greenhouse, Lever)** ✅ COMPLETE
+  - `extension/platform-adapters.js` — 4 adapters with detect/extract/prepare/customFill
+- **Phase 16: Human-in-the-Loop & Execution Guardrails** ✅ COMPLETE
+  - Three modes: ASSIST (drafts only), SEMI_AUTO (pre-fill), AUTO (fill + submit + anti-detection)
 
 ### Milestone V: Observability, Enterprise CRM & End-to-End Delivery (Phases 17–20)
-- **Phase 17: Application CRM History**
-  - Persist complete audit trail: company, URL, thesis, CV version, letter, answers, agent actions, approvals.
-- **Phase 18: Observability & Agent Run Logs**
-  - Step-by-step visual timeline in UI showing the reasoning progression of each run.
-- **Phase 19: Automated Quality Control Pipeline**
-  - Automated test suite validating fact checks, evidence integrity, and hallucination absence before user presentation.
-- **Phase 20: End-to-End MVP Verification**
-  - Complete live drill: Open vacancy → Extension detects → Agent reasons & produces tailored assets → Form pre-filled → User approves → Submission recorded.
+- **Phase 17: Application CRM History** ✅ COMPLETE
+  - `application_history` table + `/api/applications/record` endpoint
+- **Phase 18: Observability & Agent Run Logs** ✅ COMPLETE
+  - `agent_run_logs` table + step-by-step trace in UI
+- **Phase 19: Automated Quality Control Pipeline** ⚠️ PARTIAL
+  - 122 unit tests exist, but no CI/CD pipeline, no coverage reporting
+- **Phase 20: End-to-End MVP Verification** ✅ COMPLETE
+  - Full drill: scrape → AI parse → agent reason → form fill → submit → audit trail
 
 ---
 

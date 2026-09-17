@@ -281,7 +281,14 @@ function renderList() {
         const timeStr = formatRelativeTime(v.published_at || v.created_at);
         const timeBadge = timeStr ? `<span class="text-[10px] text-slate-400 font-mono" title="${v.published_at || v.created_at || ''}">⏱ ${timeStr}</span>` : '';
 
-        const hasDirectContact = Boolean(v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me') || v.contact_type === 'email' || v.contact_handle.includes('@')));
+        const hasDirectContact = Boolean(
+            v.contact_handle && 
+            v.contact_handle.trim() !== '' &&
+            (
+                (v.contact_type === 'telegram' && v.contact_handle.startsWith('@') && !v.contact_handle.includes('t.me/')) ||
+                (v.contact_type === 'email' && v.contact_handle.includes('@') && v.contact_handle.includes('.'))
+            )
+        );
         const directBadge = hasDirectContact ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/70 flex items-center gap-1" title="Прямой контакт: ${v.contact_handle}">✈️ Прямой контакт</span>` : '';
         const isBlacklist = v.status === 'blacklist';
         const blacklistBadge = isBlacklist
@@ -560,10 +567,11 @@ async function triggerAgentAutoApply(vacId) {
     const origHtml = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span>⏳</span> Запуск агента...';
+        btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Агент открывает вакансию...';
+        btn.className = btn.className.replace('from-indigo-600', 'from-amber-600').replace('to-indigo-600', 'to-amber-600');
     }
 
-    showToast('🚀 Задача передана браузерному агенту! Он открывает вакансию и заполняет отклик...');
+    showToast('🚀 Задача передана агенту! Открываю вкладку в браузере...');
 
     try {
         const res = await fetch('/api/agent/queue-task', {
@@ -580,26 +588,66 @@ async function triggerAgentAutoApply(vacId) {
         });
         const data = await res.json();
         if (data.success) {
-            showToast('✅ Агент приступил к выполнению задачи в фоновой вкладке браузера!');
             if (btn) {
-                btn.innerHTML = '<span>⚡️</span> В работе у агента...';
+                btn.innerHTML = '<span class="inline-block animate-pulse">📝</span> Заполняю форму...';
             }
-            // Poll for task completion to automatically move to Sent
+
+            // Poll for task completion with resilient error handling
+            let pollCount = 0;
+            const maxPolls = 20; // 60 seconds max
             const pollInterval = setInterval(async () => {
+                pollCount++;
                 try {
                     const statusRes = await fetch(`/api/vacancies/${vacId}/runtime_state`);
                     const stateData = await statusRes.json();
                     if (stateData.fsm_state === 'SUBMITTED') {
                         clearInterval(pollInterval);
-                        showToast('🎉 Агент успешно отправил отклик на вакансию!');
+                        if (btn) {
+                            btn.innerHTML = '<span>✅</span> Отклик заполнен!';
+                            btn.className = btn.className.replace('from-amber-600', 'from-emerald-600').replace('to-amber-600', 'to-emerald-600');
+                            setTimeout(() => {
+                                btn.disabled = false;
+                                btn.innerHTML = origHtml;
+                                btn.className = btn.className.replace('from-emerald-600', 'from-indigo-600').replace('to-emerald-600', 'to-indigo-600');
+                            }, 4000);
+                        }
+                        showToast('🎉 Агент заполнил форму! Проверьте вкладку в браузере.');
                         await updateStatus(vacId, 'sent');
+                    } else if (stateData.fsm_state === 'FAILED') {
+                        clearInterval(pollInterval);
+                        if (btn) {
+                            btn.innerHTML = '<span>❌</span> Ошибка';
+                            btn.className = btn.className.replace('from-amber-600', 'from-rose-600').replace('to-amber-600', 'to-rose-600');
+                            setTimeout(() => {
+                                btn.disabled = false;
+                                btn.innerHTML = origHtml;
+                                btn.className = btn.className.replace('from-rose-600', 'from-indigo-600').replace('to-rose-600', 'to-indigo-600');
+                            }, 4000);
+                        }
+                        showToast('❌ Агент не смог заполнить форму. Откройте вакансию вручную.');
+                    } else if (pollCount >= maxPolls) {
+                        clearInterval(pollInterval);
+                        if (btn) {
+                            btn.innerHTML = '<span>⏱</span> Таймаут — проверьте вкладку';
+                            btn.className = btn.className.replace('from-amber-600', 'from-slate-600').replace('to-amber-600', 'to-slate-600');
+                            setTimeout(() => {
+                                btn.disabled = false;
+                                btn.innerHTML = origHtml;
+                                btn.className = btn.className.replace('from-slate-600', 'from-indigo-600').replace('to-slate-600', 'to-indigo-600');
+                            }, 4000);
+                        }
+                    } else {
+                        // Update button with progress
+                        if (btn && pollCount % 2 === 0) {
+                            const dots = '.'.repeat((pollCount % 4) + 1);
+                            btn.innerHTML = `<span class="inline-block animate-pulse">📝</span> Заполняю${dots}`;
+                        }
                     }
                 } catch (e) {
-                    clearInterval(pollInterval);
+                    // Transient network error — don't break polling, just retry
+                    console.debug('[Agent] Poll retry:', e.message);
                 }
             }, 3000);
-            // Cancel polling after 60s
-            setTimeout(() => clearInterval(pollInterval), 60000);
         } else {
             alert('Ошибка постановки задачи агенту: ' + (data.error || 'Неизвестная ошибка'));
             if (btn) {

@@ -74,8 +74,8 @@ def heuristic_fallback_parse(raw_text: str, source_url: str = "") -> Dict[str, A
 
     # Detect Contacts
     contacts = extract_contacts(raw_text)
-    contact_handle = contacts.get("primary_handle") or source_url or ""
-    contact_type = contacts.get("primary_type") or ("email" if "@" in contact_handle else "portal")
+    contact_handle = contacts.get("primary_handle") or ""
+    contact_type = contacts.get("primary_type") or "portal"
 
     grade = detect_vacancy_grade(title, raw_text[:1000])
 
@@ -160,6 +160,27 @@ Job Posting Text:
                 parsed = json.loads(text)
                 
                 # Validation & sensible defaults
+                # Validate contact_handle: AI can hallucinate non-existent TG handles
+                ai_handle = str(parsed.get("contact_handle") or "").strip()
+                ai_type = str(parsed.get("contact_type") or "portal").strip()
+
+                # Cross-validate: also extract contacts from raw text via regex
+                regex_contacts = extract_contacts(raw_text)
+                regex_handle = regex_contacts.get("primary_handle") or ""
+                regex_type = regex_contacts.get("primary_type") or "portal"
+
+                # Prefer regex-extracted contact over AI-generated (AI hallucinates)
+                if regex_handle:
+                    final_handle = regex_handle
+                    final_type = regex_type
+                elif ai_handle and not ai_handle.startswith("http") and not ai_handle.startswith("www."):
+                    # Only trust AI handle if it looks like a real contact (not a URL)
+                    final_handle = ai_handle
+                    final_type = ai_type
+                else:
+                    final_handle = source_url if source_url else ""
+                    final_type = "portal"
+
                 return {
                     "title": str(parsed.get("title") or "Software Engineer").strip(),
                     "company": str(parsed.get("company") or "Direct Employer").strip(),
@@ -171,8 +192,8 @@ Job Posting Text:
                     "skills": str(parsed.get("skills") or "React, TypeScript, Frontend").strip(),
                     "description": str(parsed.get("description") or raw_text[:2000]).strip(),
                     "contact_name": str(parsed.get("contact_name") or "").strip(),
-                    "contact_handle": str(parsed.get("contact_handle") or source_url or "").strip(),
-                    "contact_type": str(parsed.get("contact_type") or "portal").strip()
+                    "contact_handle": final_handle,
+                    "contact_type": final_type
                 }
         except Exception as e:
             print(f"  [ai_parser] Model {model} attempt failed: {e}")
@@ -225,7 +246,7 @@ def ingest_vacancy_with_ai(
         "source": "ai_import",
         "title": parsed["title"],
         "company": parsed["company"],
-        "url": source_url or parsed.get("contact_handle") or "",
+        "url": source_url or "",
         "salary": parsed["salary"],
         "location": parsed["location"],
         "is_remote": parsed["is_remote"],

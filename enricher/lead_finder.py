@@ -18,17 +18,28 @@ def extract_contacts(text: str) -> Dict[str, Any]:
 
     # 1. Telegram extraction
     tg_patterns = [
-        r'(?:t\.me/|@)([a-zA-Z0-9_]{4,32})',
-        r'телеграм[^\w]*[@]?([a-zA-Z0-9_]{4,32})',
-        r'тг[^\w]*[@]?([a-zA-Z0-9_]{4,32})'
+        r'(?:t\.me/)(?!s/)([a-zA-Z0-9_]{4,32})',
+        r'(?:пишите?\s+в\s+(?:телеграм|тг|tg))\s*[@]?([a-zA-Z0-9_]{4,32})',
+        r'(?:контакт| hr| рекрутер| тимлид| lead| cto)[:\s]+[@]?([a-zA-Z0-9_]{4,32})'
     ]
+    # Known channel names, bots, and non-personal handles to ignore
+    ignored_channels = {
+        'telegram', 'channel', 'bot', 'react_jobs', 'frontend_jobs', 'devjobs',
+        'habr_career', 'type', 'context', 'id', 'vocab', 'job_react', 'forfrontend',
+        'normrabota', 'javascript_jobs_feed', 'remote_it_jobs', 'getitrussia',
+        'job_hunter', 'react_channels', 'frontend_channels', 'hh_ru', 'headhunter',
+        'superjob', 'rabota', 'linkedin', 'github', 'gitlab', 'stackoverflow',
+        'medium', 'devto', 'habr', 'vc', 'career', 'jobs', 'hiring', 'remote',
+        'startup', 'vacancy', 'job', 'work', 'resume', 'cv', 'apply',
+        's', 'p', 'join', 'chat', 'group', 'public', 'news', 'blog',
+        'instagram', 'twitter', 'facebook', 'youtube', 'tiktok', 'reddit',
+        'google', 'apple', 'microsoft', 'amazon', 'meta', 'openai',
+    }
     for pattern in tg_patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            handle = match.group(1)
-            # Avoid channel names or common non-personal handles / json-ld keywords
-            ignored = ['telegram', 'channel', 'bot', 'react_jobs', 'frontend_jobs', 'devjobs', 'habr_career', 'type', 'context', 'id', 'vocab']
-            if handle.lower() not in ignored:
+            handle = match.group(1).strip().rstrip('.,;:!?')
+            if handle.lower() not in ignored_channels and len(handle) >= 4:
                 contacts["telegram"] = f"@{handle}"
                 break
 

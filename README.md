@@ -57,14 +57,25 @@ Automatically detects toxic job descriptions and flags recruiter red flags:
 - Generates human-toned, high-impact **Short DMs** (for Telegram/LinkedIn cold outreach) and **Cover Letters** without robotic AI clichés.
 - Integrated with Google Gemini API (`gemini-2.5-flash` / `gemini-flash-latest`) with automatic model fallback.
 
-### 5. 🔖 Stealth Auto-Apply Bookmarklet
-Why battle Cloudflare, DataDome, and 2FA with flaky headless browsers?
-- The CRM compiles a **Smart JavaScript Bookmarklet** that you drag onto your browser's bookmarks bar.
-- On any job posting page (HH.ru, LinkedIn, Greenhouse, etc.), simply click the bookmarklet:
-  - It fetches your approved pitch directly from `http://localhost:8115/api/pitches`.
-  - Heuristically detects input fields and textareas.
-  - Injects your cover letter and dispatches native DOM input events within your **already authenticated session**.
-  - **Zero bot detection, zero captchas.**
+### 5. 🤖 AI Career Agent (6-Agent Pipeline)
+A multi-agent cognitive system that reasons about each vacancy:
+- **JobAnalyst** — separates verified facts from hypotheses
+- **CompanyResearcher** — bounded web research with cache
+- **CandidateStrategist** — maps evidence to company pain points
+- **Writer** — generates tailored resume + cover letter + short DM
+- **Critic** — adversarial quality control, ATS scoring
+- **FactChecker** — anti-hallucination verification
+
+### 6. 🌐 Chrome Extension — Auto-Fill & Auto-Submit
+A Manifest V3 Chrome Extension running in your authenticated browser:
+- **4 Platform Adapters:** HH.ru, LinkedIn, Greenhouse/Lever/Ashby, Generic
+- **Auto-Fill:** React/Vue/Angular compatible field injection
+- **Auto-Submit:** CAPTCHA detection → form fill → submit with anti-detection
+- **Multi-Step Traversal:** Handles step wizards (LinkedIn Easy Apply, etc.)
+- **Anti-Detection:** Random delays, human-like typing, click simulation, domain rate limiting
+
+### 7. 🔖 Bookmarklet (Legacy)
+Smart JS bookmarklet for quick auto-fill without the extension.
 
 ---
 
@@ -170,14 +181,25 @@ All 20 unit tests verify scraper endpoints, database migrations, contact isolati
 - Генерация персонализированных **Short DM** (для прямого контакта с HR/CTO в Telegram и LinkedIn) и полных **Сопроводительных писем** без роботизированных штампов.
 - Интеграция с Google Gemini API (`gemini-2.5-flash` / `gemini-flash-latest`) с автоматическим фолбэком моделей.
 
-### 5. 🔖 Stealth автоотклик через Bookmarklet
-Забудь о борьбе с капчами и Cloudflare через падающие headless-браузеры:
-- CRM формирует **Умную JS-закладку (Bookmarklet)**, которую ты перетаскиваешь на панель закладок своего браузера.
-- На странице любой вакансии (HH.ru, LinkedIn и др.) ты просто кликаешь на закладку:
-  - Закладка подтягивает готовый отклик из локальной CRM (`http://localhost:8115/api/pitches`).
-  - Находит поле ввода сопроводительного письма.
-  - Вставляет текст и вызывает нативные события DOM внутри твоей **уже авторизованной сессии**.
-  - **Никаких капчей, никаких блокировок ботов.**
+### 5. 🤖 AI Карьерный Агент (6 агентов)
+Мульти-агентная когнитивная система, которая рассуждает о каждой вакансии:
+- **JobAnalyst** — разделяет проверенные факты и гипотезы
+- **CompanyResearcher** — ограниченное веб-исследование с кэшированием
+- **CandidateStrategist** — сопоставляет доказательства с проблемами компании
+- **Writer** — генерирует резюме + сопроводительное + короткий DM
+- **Critic** — адвокатский контроль качества, ATS-скоринг
+- **FactChecker** — анти-галлюцинационная верификация
+
+### 6. 🌐 Chrome Расширение — Авто-заполнение и авто-отправка
+Manifest V3 расширение, работающее в твоём авторизованном браузере:
+- **4 платформенных адаптера:** HH.ru, LinkedIn, Greenhouse/Lever/Ashby, Generic
+- **Авто-заполнение:** совместимо с React/Vue/Angular
+- **Авто-отправка:** CAPTCHA detect → заполнение → отправка с anti-detection
+- **Многошаговые формы:** обход визардов (LinkedIn Easy Apply и т.д.)
+- **Anti-detection:** рандомные задержки, имитация печати, симуляция кликов, rate limiting
+
+### 7. 🔖 Bookmarklet (устаревший)
+Умная JS-закладка для быстрого заполнения без расширения.
 
 ---
 

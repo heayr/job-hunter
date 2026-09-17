@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "notifications"
   ],
   "optional_permissions": [
     "sidePanel"
@@ -36,7 +37,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content_script.js"],
+      "js": ["core.js", "platform-adapters.js", "autofill.js", "automation.js", "content_script.js"],
       "run_at": "document_idle"
     }
   ]
