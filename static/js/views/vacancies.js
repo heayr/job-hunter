@@ -353,6 +353,7 @@ function renderDetails() {
                 </button>
             </div>
         `;
+    }
 
     const cleanComp = cleanCompanyName(v.company, v.title, v.description);
     const cleanRole = (v.title || '').replace(/[\|\(\)\/].*$/, '').trim() || 'Frontend';

@@ -2,19 +2,19 @@ import re
 from typing import Tuple
 
 POSITIVE_ROLE_PATTERNS = [
-    r'frontend',
-    r'фронтенд',
+    r'front[- ]?end',
+    r'фронт[- ]?енд',
     r'react',
     r'next\.?js',
-    r'full-?stack',
-    r'фуллстек',
+    r'full[- ]?stack',
+    r'фулл[- ]?стек',
     r'product engineer',
-    r'ui (?:engineer|developer|разработчик)',
-    r'пользовательских интерфейсов',
+    r'ui(?:/ux)? (?:engineer|developer|разработчик)',
+    r'(?:пользовательских|веб[- ]?)интерфейсов',
     r'(?:javascript|typescript).*(?:developer|engineer|разработчик|программист|lead|архитектор)',
     r'(?:developer|engineer|разработчик|программист|lead).*(?:javascript|typescript)',
     r'web[- ]?developer',
-    r'веб-разработчик',
+    r'веб[- ]?разработчик',
     r'software engineer',
     r'product engineering'
 ]

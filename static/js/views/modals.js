@@ -61,7 +61,7 @@ async function saveConfig() {
     showToast('⚙️ Настройки сохранены');
 }
 
-let terminalVisible = false;
+let terminalVisible = true;
 function toggleTerminalLogs() {
     terminalVisible = !terminalVisible;
     const container = document.getElementById('terminal-container');
@@ -70,13 +70,13 @@ function toggleTerminalLogs() {
     if (container) {
         if (terminalVisible) {
             container.classList.remove('hidden');
-            if (text) text.innerText = 'Скрыть лог терминала';
+            if (text) text.innerText = 'Лог терминала в реальном времени';
             if (arrow) arrow.innerText = '▲';
             const logs = document.getElementById('harvest-logs');
             if (logs) logs.scrollTop = logs.scrollHeight;
         } else {
             container.classList.add('hidden');
-            if (text) text.innerText = 'Показать подробный лог терминала';
+            if (text) text.innerText = 'Развернуть лог терминала';
             if (arrow) arrow.innerText = '▼';
         }
     }
@@ -88,6 +88,10 @@ async function startHarvest() {
     const pBar = document.getElementById('harvest-progress-bar');
     const pText = document.getElementById('harvest-percent');
     const pStep = document.getElementById('harvest-current-step');
+    const metricScrapers = document.getElementById('harvest-metric-scrapers');
+    const metricSaved = document.getElementById('harvest-metric-saved');
+    const metricFiltered = document.getElementById('harvest-metric-filtered');
+    const metricDups = document.getElementById('harvest-metric-dups');
 
     // Reset modal UI
     if (logs) {
@@ -96,18 +100,22 @@ async function startHarvest() {
     }
     if (btn) btn.classList.add('hidden');
     if (pBar) {
-        pBar.style.width = '5%';
-        pBar.className = 'bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full transition-all duration-700 animate-pulse';
+        pBar.style.width = '3%';
+        pBar.className = 'bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full transition-all duration-300 animate-pulse';
     }
     if (pText) pText.innerText = '0%';
     if (pStep) pStep.innerText = 'Подключение к источникам...';
+    if (metricScrapers) metricScrapers.innerText = '0 / 11';
+    if (metricSaved) metricSaved.innerText = '0';
+    if (metricFiltered) metricFiltered.innerText = '0';
+    if (metricDups) metricDups.innerText = '0';
 
     toggleModal('harvest-modal');
 
     try {
         await api.startHarvest();
         
-        // Start polling
+        // Start live polling (every 800ms for responsive streaming)
         const progressInterval = setInterval(async () => {
             try {
                 const statusData = await api.getHarvestStatus();
@@ -116,36 +124,67 @@ async function startHarvest() {
                     logs.scrollTop = logs.scrollHeight;
                 }
                 
-                // Parse logs to guess progress
-                const logText = statusData.logs || '';
-                let currentProg = 5;
-                if (logText.includes('Anti-BS filter')) currentProg = 30;
-                if (logText.includes('Writing pitch')) currentProg = 60;
-                if (logText.includes('Gemini API')) currentProg = 75;
-                if (logText.includes('Finished')) currentProg = 95;
-                
+                const metrics = statusData.metrics || {};
+                const step = metrics.step || 0;
+                const total = metrics.total || 11;
+                const saved = metrics.saved || 0;
+                const filtered = metrics.filtered || 0;
+                const dups = metrics.dups || 0;
+                const scName = metrics.name || '';
+
+                if (metricScrapers) metricScrapers.innerText = `${step} / ${total}`;
+                if (metricSaved) metricSaved.innerText = saved;
+                if (metricFiltered) metricFiltered.innerText = filtered;
+                if (metricDups) metricDups.innerText = dups;
+
+                // Accurate math-based percentage
+                let currentProg = 3;
+                if (total > 0 && step > 0) {
+                    currentProg = Math.min(96, Math.round((step / total) * 90));
+                }
+
+                if (scName) {
+                    if (scName === 'saving') {
+                        if (pStep) pStep.innerHTML = `<span class="text-indigo-300">💾 Сохранение и оценка скоринга... (${saved} сохр.)</span>`;
+                        currentProg = Math.max(currentProg, 92);
+                    } else if (scName === 'completed') {
+                        currentProg = 100;
+                    } else {
+                        if (pStep) pStep.innerHTML = `Сканирование: <span class="text-sky-300 font-bold">${scName}</span> [${step}/${total}]`;
+                    }
+                }
+
                 if (pBar) pBar.style.width = currentProg + '%';
                 if (pText) pText.innerText = currentProg + '%';
                 
-                if (!statusData.is_running && logText) {
+                if (!statusData.is_running && statusData.logs) {
                     clearInterval(progressInterval);
                     if (pBar) {
                         pBar.style.width = '100%';
                         pBar.classList.remove('animate-pulse');
                     }
                     if (pText) pText.innerText = '100%';
-                    if (pStep) pStep.innerHTML = '<span class="text-emerald-400 font-bold">✨ Сбор завершен!</span>';
+                    if (pStep) pStep.innerHTML = `<span class="text-emerald-400 font-bold">✨ Сбор завершен! Сохранено: ${saved} новых вакансий</span>`;
                     
                     if (btn) {
                         btn.classList.remove('hidden');
                         btn.classList.add('animate-bounce');
                         setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
                     }
+
+                    // Automatically refresh Inbox in background so user immediately sees fresh vacancies
+                    try {
+                        if (typeof loadPitches === 'function') {
+                            await loadPitches();
+                        }
+                    } catch (loadErr) {
+                        console.error("Auto reload pitches error:", loadErr);
+                    }
                 }
             } catch (pollErr) {
                 console.error("Poll error:", pollErr);
             }
-        }, 1500);
+        }, 800);
 
     } catch (e) {
         if (pStep) pStep.innerHTML = '<span class="text-rose-400 font-bold">❌ Ошибка запуска</span>';

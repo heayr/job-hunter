@@ -237,10 +237,40 @@ class CRMHandler(BaseHTTPRequestHandler):
             global harvest_process, harvest_log_file
             is_running = harvest_process is not None and harvest_process.poll() is None
             logs = ""
+            metrics = {
+                "step": 0,
+                "total": 11,
+                "name": "",
+                "status": "idle",
+                "saved": 0,
+                "filtered": 0,
+                "dups": 0
+            }
             if os.path.exists(harvest_log_file):
                 with open(harvest_log_file, 'r', encoding='utf-8') as f:
                     logs = f.read()
-            _send_json(self, {"is_running": is_running, "logs": logs})
+
+                # Extract latest PROGRESS marker if present
+                prog_matches = re.findall(r'PROGRESS:([^\n]+)', logs)
+                if prog_matches:
+                    last_match = prog_matches[-1]
+                    parts = dict(part.split('=', 1) for part in last_match.split(':') if '=' in part)
+                    try:
+                        metrics["step"] = int(parts.get("step", 0))
+                        metrics["total"] = int(parts.get("total", 11))
+                        metrics["name"] = parts.get("name", "")
+                        metrics["status"] = parts.get("status", "")
+                        metrics["saved"] = int(parts.get("saved", 0))
+                        metrics["filtered"] = int(parts.get("filtered", 0))
+                        metrics["dups"] = int(parts.get("dups", 0))
+                    except Exception:
+                        pass
+
+            _send_json(self, {
+                "is_running": is_running,
+                "logs": logs,
+                "metrics": metrics
+            })
 
         elif self.path.startswith('/api/vacancies/') and self.path.endswith('/thesis'):
             from tracker.db import get_application_thesis
@@ -585,14 +615,18 @@ class CRMHandler(BaseHTTPRequestHandler):
                 _send_json(self, {"status": "running", "message": "Already running"})
                 return
             
-            with open(harvest_log_file, 'w') as f:
+            with open(harvest_log_file, 'w', encoding='utf-8') as f:
                 f.write("🚀 Запуск сбора вакансий...\n")
                 
             script_path = os.path.join(os.path.dirname(__file__), 'harvest.py')
+            sub_env = dict(os.environ)
+            sub_env["PYTHONUNBUFFERED"] = "1"
+
             harvest_process = subprocess.Popen(
-                [sys.executable, script_path],
-                stdout=open(harvest_log_file, 'a'),
+                [sys.executable, "-u", script_path],
+                stdout=open(harvest_log_file, 'a', encoding='utf-8'),
                 stderr=subprocess.STDOUT,
+                env=sub_env,
                 cwd=os.path.dirname(__file__)
             )
             _send_json(self, {"status": "started"})

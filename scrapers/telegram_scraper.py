@@ -107,6 +107,10 @@ class TelegramScraper(BaseScraper):
                     found_skills = [sk for sk in skill_keywords if re.search(rf'\b{re.escape(sk)}\b', text, re.I)]
                     skills_str = ", ".join(found_skills) if found_skills else "React, TypeScript, Frontend"
 
+                    # Extract post timestamp if present
+                    time_match = re.search(r'<time[^>]*datetime="([^"]+)"', block_html)
+                    published_at = time_match.group(1).replace('T', ' ').split('+')[0] if time_match else None
+
                     vacancies.append({
                         "id": f"tg:{post_id.replace('/', '_')}",
                         "source": f"tg_{channel}",
@@ -121,7 +125,8 @@ class TelegramScraper(BaseScraper):
                         "language": "ru",
                         "contact_name": contacts.get("contact_name") or "",
                         "contact_handle": contacts.get("primary_handle") or post_url,
-                        "contact_type": contacts.get("primary_type") or "telegram"
+                        "contact_type": contacts.get("primary_type") or "telegram",
+                        "published_at": published_at
                     })
 
             except Exception as e:

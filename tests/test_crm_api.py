@@ -82,5 +82,19 @@ class TestCRMEndpoints(unittest.TestCase):
         except urllib.error.URLError:
             self.skipTest("CRM server is not running on test port")
 
+    def test_get_harvest_status_structure(self):
+        try:
+            status_res = urllib.request.urlopen(f"{self.base_url}/api/harvest/status", timeout=3)
+            status_data = json.loads(status_res.read().decode('utf-8'))
+            self.assertIn("is_running", status_data)
+            self.assertIn("logs", status_data)
+            self.assertIn("metrics", status_data)
+            metrics = status_data["metrics"]
+            self.assertIn("step", metrics)
+            self.assertIn("total", metrics)
+            self.assertIn("saved", metrics)
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
 if __name__ == "__main__":
     unittest.main()

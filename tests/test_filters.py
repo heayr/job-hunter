@@ -73,5 +73,16 @@ class TestFilters(unittest.TestCase):
         self.assertTrue(ok, f"Real vacancy with candidate requirements should be accepted, but got: {reason}")
 
 
+    def test_is_qualified_vacancy_accepts_hyphenated_frontend_and_fullstack(self):
+        ok1, reason1 = is_qualified_vacancy("Senior Front-end Developer (Research & Development)", "React", "", "TechCorp")
+        self.assertTrue(ok1, f"Should accept Front-end with hyphen: {reason1}")
+
+        ok2, reason2 = is_qualified_vacancy("Full Stack Engineer", "React, TypeScript, Node.js", "", "GlobalStartup")
+        self.assertTrue(ok2, f"Should accept Full Stack with space: {reason2}")
+
+        ok3, reason3 = is_qualified_vacancy("Ведущий разработчик веб-интерфейсов", "React", "", "МТС")
+        self.assertTrue(ok3, f"Should accept веб-интерфейсов: {reason3}")
+
+
 if __name__ == "__main__":
     unittest.main()

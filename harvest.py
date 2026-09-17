@@ -40,17 +40,19 @@ def run():
         RabotaRuScraper()
     ]
 
+    total_scrapers = len(scrapers)
     all_vacs = []
-    for s in scrapers:
-        print(f"\n▶ Running scraper: {s.name}")
+    for idx, s in enumerate(scrapers, 1):
+        print(f"\n▶ [{idx}/{total_scrapers}] Running scraper: {s.name}")
+        print(f"PROGRESS:step={idx}:total={total_scrapers}:name={s.name}:status=running", flush=True)
         try:
             vacs = s.scrape()
-            print(f"  ✓ [{s.name}] Got {len(vacs)} raw vacancies")
+            print(f"  ✓ [{s.name}] Got {len(vacs)} raw vacancies", flush=True)
             all_vacs.extend(vacs)
         except Exception as e:
-            print(f"  ✗ Scraper {s.name} failed: {e}")
+            print(f"  ✗ Scraper {s.name} failed: {e}", flush=True)
 
-    print(f"\n📊 Total raw vacancies collected: {len(all_vacs)}")
+    print(f"\n📊 Total raw vacancies collected: {len(all_vacs)}", flush=True)
 
     db_path = os.path.join(os.path.dirname(__file__), "jobs.db")
     conn = sqlite3.connect(db_path)
@@ -71,7 +73,8 @@ def run():
     skipped_duplicate = 0
 
     try:
-        for v in all_vacs:
+        total_items = len(all_vacs)
+        for i, v in enumerate(all_vacs, 1):
             # ── Ensure required fields exist ──
             if not v.get('id'):
                 src = v.get('source', 'job')
@@ -86,7 +89,6 @@ def run():
                 company=v.get('company', ''),
             )
             if not qualified:
-                print(f"  SKIP (filter: {reason}): {v.get('title')}")
                 skipped_filter += 1
                 continue
 
@@ -121,22 +123,27 @@ def run():
                 conn.commit()
 
                 saved += 1
-                print(f"  ✓ Saved: [{v.get('source')}] [{grade}] {v.get('title')} @ {v.get('company')} (Score: {score})")
+                print(f"  ✓ Saved: [{v.get('source')}] [{grade}] {v.get('title')} @ {v.get('company')} (Score: {score})", flush=True)
             except Exception as e:
                 conn.rollback()
-                print(f"  ✗ Error saving {v.get('title')}: {e}")
+                print(f"  ✗ Error saving {v.get('title')}: {e}", flush=True)
+
+            if i % 25 == 0 or i == total_items:
+                print(f"PROGRESS:step={total_scrapers}:total={total_scrapers}:name=saving:saved={saved}:filtered={skipped_filter}:dups={skipped_duplicate}", flush=True)
 
     finally:
         conn.close()
 
-    print(f"\n✅ Sourcing Finished: Saved: {saved} | Filtered: {skipped_filter} | Duplicates: {skipped_duplicate}")
+    print(f"\n✅ Sourcing Finished: Saved: {saved} | Filtered: {skipped_filter} | Duplicates: {skipped_duplicate}", flush=True)
+    print(f"PROGRESS:step={total_scrapers}:total={total_scrapers}:name=completed:saved={saved}:filtered={skipped_filter}:dups={skipped_duplicate}", flush=True)
 
-    # Automatically purge any closed vacancies from the feed
-    try:
-        from tracker.cleanup_closed import archive_closed_vacancies
-        archive_closed_vacancies()
-    except Exception as e:
-        print(f"Warning: Closed vacancies cleanup error: {e}")
+    # Optional archive check (only with explicit argument, not wiping out active vacancies during normal harvest)
+    if '--check-archive' in sys.argv:
+        try:
+            from tracker.cleanup_closed import archive_closed_vacancies
+            archive_closed_vacancies()
+        except Exception as e:
+            print(f"Warning: Closed vacancies cleanup error: {e}", flush=True)
 
 
 if __name__ == "__main__":
