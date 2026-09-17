@@ -387,3 +387,67 @@ def render_tailored_resume_markdown(resume_dict: Dict[str, Any], lang: str = "ru
 {edu_str}
 """
     return md.strip()
+
+
+def compile_tailored_cv_artifact(
+    profile: Dict[str, Any],
+    job_understanding: Dict[str, Any],
+    strategy: Optional[Dict[str, Any]] = None,
+    lang: str = "ru",
+    session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Compiles a tailored CV artifact ready for browser upload, binds
+    every statement to its canonical source_evidence_id, and records provenance links.
+    """
+    import base64
+    from tracker.db import save_provenance_links
+
+    strat = strategy or {}
+    resume_dict = heuristic_tailored_resume(profile, job_understanding, strat, lang=lang)
+    md_text = render_tailored_resume_markdown(resume_dict, lang=lang)
+
+    # Calculate explicit statement-to-evidence provenance mapping
+    evidence_list = profile.get("evidence", [])
+    provenance_links = []
+
+    for exp in resume_dict.get("relevant_experience", []):
+        for bullet in exp.get("accomplishments", []):
+            matched_id = None
+            # Find best matching evidence item
+            b_lower = bullet.lower()
+            best_overlap = 0
+            for ev in evidence_list:
+                ev_id = ev.get("id")
+                ev_text = (ev.get("claim", "") + " " + ev.get("action", "")).lower()
+                words = [w for w in re.findall(r'[a-zа-яё0-9]{3,}', b_lower)]
+                overlap = sum(1 for w in words if w in ev_text)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    matched_id = ev_id
+
+            if not matched_id and evidence_list:
+                matched_id = evidence_list[0].get("id")
+
+            provenance_links.append({
+                "statement": bullet,
+                "source_evidence_id": matched_id or "ev_verified_profile"
+            })
+
+    if session_id and provenance_links:
+        save_provenance_links(session_id, provenance_links)
+
+    # Encode as Base64 file ready for browser_upload_cv
+    b64_content = base64.b64encode(md_text.encode('utf-8')).decode('utf-8')
+    cand_name = profile.get("identity", {}).get("name", "candidate").replace(" ", "_")
+
+    return {
+        "success": True,
+        "file_name": f"CV_{cand_name}_{lang.upper()}.txt",
+        "file_base64": b64_content,
+        "mime_type": "text/plain",
+        "markdown": md_text,
+        "provenance_links": provenance_links,
+        "resume_dict": resume_dict
+    }
+

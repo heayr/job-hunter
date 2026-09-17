@@ -9,6 +9,30 @@ class FactType:
     VERIFIED_FACT = "VERIFIED_FACT"
     AI_INTERPRETATION = "AI_INTERPRETATION"
 
+DEFAULT_SCREENING_FACTS = {
+    "salary": {
+        "min_rub": 350000,
+        "target_rub": 450000,
+        "min_usd": 4000,
+        "target_usd": 5500,
+        "currency": "RUB/USD"
+    },
+    "notice_period": "2 недели / 2 weeks",
+    "notice_period_days": 14,
+    "work_authorization": "Гражданство РФ, самозанятость, ИП, B2B контракт через Армению/Грузию (Global Remote)",
+    "work_authorization_en": "Authorized for remote B2B contracts globally (IE / Contractor). Eligible for Russian entities.",
+    "years_of_experience": "6+ лет / 6+ years",
+    "years_of_experience_num": 6,
+    "english_level": "C1 — Advanced / Fluent Technical & Business English",
+    "languages": {
+        "ru": "Родной (Native)",
+        "en": "C1 (Advanced / Fluent)"
+    },
+    "relocation": "Готов к релокации (Yerevan, Dubai, Belgrade, EU) или Full Remote",
+    "location": "Москва / Ереван / Remote",
+    "start_date": "Через 2 недели после оффера / 2 weeks from offer"
+}
+
 def validate_canonical_profile(profile: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """
     Validates that a profile complies with Canonical Candidate Profile requirements.
@@ -165,6 +189,7 @@ def upgrade_legacy_profile(legacy: Dict[str, Any]) -> Dict[str, Any]:
         "education": legacy.get("education") or [],
         "languages": legacy.get("languages") or [],
         "evidence": evidence,
+        "screening_facts": legacy.get("screening_facts") or dict(DEFAULT_SCREENING_FACTS),
 
         # ── Backward compatibility fields for legacy UI & Bookmarklet ──
         "name": name,

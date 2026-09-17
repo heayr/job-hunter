@@ -5,19 +5,66 @@ import os
 import re
 from typing import Dict, Any, Optional
 
-GEMINI_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"]
+GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"]
 
-def get_api_key() -> str:
+def get_llm_config() -> Dict[str, Any]:
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
+    cfg = {
+        "provider": "gemini", # "gemini" | "lm_studio"
+        "gemini_api_key": os.environ.get("GEMINI_API_KEY", "").strip(),
+        "lm_studio_url": "http://127.0.0.1:1234/v1"
+    }
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
-                key = json.load(f).get('gemini_api_key', '')
-                if key and key.strip():
-                    return key.strip()
+                data = json.load(f)
+                if data.get("llm_provider"):
+                    cfg["provider"] = data["llm_provider"]
+                if data.get("gemini_api_key"):
+                    cfg["gemini_api_key"] = data["gemini_api_key"].strip()
+                if data.get("lm_studio_url"):
+                    cfg["lm_studio_url"] = data["lm_studio_url"].strip()
         except Exception:
             pass
-    return os.environ.get("GEMINI_API_KEY", "").strip()
+    return cfg
+
+def get_api_key() -> str:
+    return get_llm_config().get("gemini_api_key", "")
+
+def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True, timeout: float = 35.0) -> Optional[str]:
+    """Calls local LM Studio instance via OpenAI-compatible endpoint."""
+    cfg = get_llm_config()
+    base_url = cfg.get("lm_studio_url", "http://127.0.0.1:1234/v1").rstrip("/")
+    url = f"{base_url}/chat/completions"
+
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "messages": messages,
+        "temperature": 0.2
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+
+    data_bytes = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data_bytes,
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            choices = data.get("choices", [])
+            if choices:
+                return choices[0].get("message", {}).get("content", "").strip()
+    except Exception as e:
+        return None
+    return None
 
 
 def generate_ai_pitch(
@@ -26,9 +73,12 @@ def generate_ai_pitch(
     warnings: str = "",
     lang: str = "ru"
 ) -> Dict[str, Any]:
-    api_key = get_api_key()
-    if not api_key:
-        return {"success": False, "error": "Gemini API ключ не указан в Настройках ИИ"}
+    cfg = get_llm_config()
+    provider = cfg.get("provider", "gemini")
+    api_key = cfg.get("gemini_api_key", "")
+    if provider == "gemini" and not api_key:
+        # Check if LM Studio is reachable as alternative
+        pass
 
     title = vacancy.get("title", "Frontend Engineer")
     company = vacancy.get("company", "Company")
@@ -129,6 +179,46 @@ Respond ONLY with valid JSON in this exact structure:
 }}
 """
 
+    # 1. If LM Studio is selected as the primary provider, call it directly
+    if provider == "lm_studio":
+        lm_resp = call_lm_studio(prompt, json_mode=True)
+        if lm_resp:
+            try:
+                cleaned = re.sub(r'^```(?:json)?\s*', '', lm_resp.strip())
+                cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+                parsed = json.loads(cleaned)
+                return {
+                    "success": True,
+                    "short_dm": parsed.get("short_dm", "").strip(),
+                    "cover_letter": parsed.get("cover_letter", "").strip(),
+                    "score": int(parsed.get("score", 80))
+                }
+            except Exception:
+                pass
+        return {
+            "success": False,
+            "error": "Не удалось получить ответ от локального LM Studio. Убедитесь, что LM Studio запущен на " + cfg.get("lm_studio_url", "http://127.0.0.1:1234/v1")
+        }
+
+    # 2. Otherwise try Gemini API
+    if not api_key:
+        # Check if LM Studio fallback is running
+        lm_resp = call_lm_studio(prompt, json_mode=True)
+        if lm_resp:
+            try:
+                cleaned = re.sub(r'^```(?:json)?\s*', '', lm_resp.strip())
+                cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+                parsed = json.loads(cleaned)
+                return {
+                    "success": True,
+                    "short_dm": parsed.get("short_dm", "").strip(),
+                    "cover_letter": parsed.get("cover_letter", "").strip(),
+                    "score": int(parsed.get("score", 80))
+                }
+            except Exception:
+                pass
+        return {"success": False, "error": "Gemini API ключ не указан в Настройках ИИ"}
+
     models_to_try = GEMINI_MODELS[:]
 
     payload = {
@@ -196,7 +286,23 @@ Respond ONLY with valid JSON in this exact structure:
                 last_error = f"Ошибка генерации: {str(e)}"
             continue
 
+    # 3. If Gemini models failed (e.g. rate limit 429 or 503), try LM Studio fallback
+    lm_resp = call_lm_studio(prompt, json_mode=True)
+    if lm_resp:
+        try:
+            cleaned = re.sub(r'^```(?:json)?\s*', '', lm_resp.strip())
+            cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+            parsed = json.loads(cleaned)
+            return {
+                "success": True,
+                "short_dm": parsed.get("short_dm", "").strip(),
+                "cover_letter": parsed.get("cover_letter", "").strip(),
+                "score": int(parsed.get("score", 80))
+            }
+        except Exception:
+            pass
+
     return {
         "success": False,
-        "error": last_error or "Не удалось получить ответ от Gemini API (проверьте VPN)"
+        "error": last_error or "Не удалось получить ответ от Gemini API (проверьте VPN) или LM Studio"
     }

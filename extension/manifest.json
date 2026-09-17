@@ -37,7 +37,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["core.js", "platform-adapters.js", "autofill.js", "automation.js", "content_script.js"],
+      "js": ["core.js", "semantic_dom.js", "platform-adapters.js", "autofill.js", "automation.js", "content_script.js"],
       "run_at": "document_idle"
     }
   ]

@@ -80,17 +80,25 @@ class TestBrowserExtension(unittest.TestCase):
         self.assertIn("EXTRACT_PAGE_DATA", js)
 
     def test_content_script_selectors_and_handlers(self):
-        cs_path = os.path.join(self.ext_dir, "content_script.js")
-        with open(cs_path, "r", encoding="utf-8") as f:
-            code = f.read()
+        manifest_path = os.path.join(self.ext_dir, "manifest.json")
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
 
-        self.assertIn("hh.ru", code)
-        self.assertIn("linkedin.com", code)
-        self.assertIn("greenhouse.io", code)
-        self.assertIn("HTMLInputElement.prototype", code)
-        self.assertIn("HTMLTextAreaElement.prototype", code)
-        self.assertIn("EXTRACT_PAGE_DATA", code)
-        self.assertIn("AUTOFILL_PAGE", code)
+        cs_files = manifest.get("content_scripts", [{}])[0].get("js", ["content_script.js"])
+        all_code = ""
+        for cs_file in cs_files:
+            p = os.path.join(self.ext_dir, cs_file)
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    all_code += f.read() + "\n"
+
+        self.assertIn("hh.ru", all_code)
+        self.assertIn("linkedin.com", all_code)
+        self.assertIn("greenhouse.io", all_code)
+        self.assertIn("HTMLInputElement.prototype", all_code)
+        self.assertIn("HTMLTextAreaElement.prototype", all_code)
+        self.assertIn("EXTRACT_PAGE_DATA", all_code)
+        self.assertIn("AUTOFILL_PAGE", all_code)
 
     def test_crm_cors_options_preflight(self):
         port_file = os.path.join(os.path.dirname(__file__), "..", ".current_port")
@@ -118,8 +126,8 @@ class TestBrowserExtension(unittest.TestCase):
             self.skipTest("CRM server not reachable on test port")
 
     def test_platform_adapters_architecture(self):
-        cs_path = os.path.join(self.ext_dir, "content_script.js")
-        with open(cs_path, "r", encoding="utf-8") as f:
+        pa_path = os.path.join(self.ext_dir, "platform-adapters.js")
+        with open(pa_path, "r", encoding="utf-8") as f:
             code = f.read()
 
         self.assertIn("BasePlatformAdapter", code)

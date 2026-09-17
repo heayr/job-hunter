@@ -278,3 +278,105 @@ JH.showResultOverlay = function(result) {
     }
   }, 12000);
 };
+
+// ── Synthetic File Upload (DataTransfer API) ───────
+
+JH.injectFile = function(el, base64Data, fileName = "resume.pdf", mimeType = "application/pdf") {
+  if (!el || el.tagName !== 'INPUT' || el.type !== 'file') {
+    return { success: false, error: "Target element is not an input[type=file]" };
+  }
+
+  try {
+    const rawB64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+    const byteChars = atob(rawB64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteNumbers[i] = byteChars.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: mimeType });
+    const file = new File([blob], fileName, { type: mimeType, lastModified: Date.now() });
+
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    el.files = dt.files;
+
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+
+    // Visual feedback
+    const container = el.closest('div') || el;
+    container.style.transition = 'all 0.3s ease';
+    container.style.outline = '3px solid #10b981';
+    container.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+
+    return {
+      success: true,
+      file_name: fileName,
+      file_size: file.size,
+      mime_type: mimeType
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+// ── Select Option Helper ──────────────────────────
+
+JH.selectOption = function(el, valueOrText) {
+  if (!el || el.tagName !== 'SELECT') {
+    return { success: false, error: "Target element is not a <select>" };
+  }
+
+  const target = String(valueOrText).toLowerCase().trim();
+  let matchedIndex = -1;
+
+  for (let i = 0; i < el.options.length; i++) {
+    const opt = el.options[i];
+    if (opt.value.toLowerCase().trim() === target || opt.text.toLowerCase().trim().includes(target)) {
+      matchedIndex = i;
+      break;
+    }
+  }
+
+  if (matchedIndex === -1 && el.options.length > 0) {
+    // If no exact match, try matching numbers if target is numeric
+    const targetNum = target.match(/\d+/);
+    if (targetNum) {
+      for (let i = 0; i < el.options.length; i++) {
+        if (el.options[i].text.includes(targetNum[0])) {
+          matchedIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (matchedIndex !== -1) {
+    el.selectedIndex = matchedIndex;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    return {
+      success: true,
+      selected_value: el.options[matchedIndex].value,
+      selected_text: el.options[matchedIndex].text
+    };
+  }
+
+  return { success: false, error: `Option matching '${valueOrText}' not found in select` };
+};
+
+// ── Scroll Page Helper ────────────────────────────
+
+JH.scrollPage = function(direction = 'down', pixels = 400) {
+  const dy = direction === 'up' ? -pixels : pixels;
+  window.scrollBy({ top: dy, left: 0, behavior: 'smooth' });
+  return {
+    success: true,
+    direction,
+    scroll_x: window.scrollX,
+    scroll_y: window.scrollY
+  };
+};

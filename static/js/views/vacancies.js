@@ -345,10 +345,30 @@ function renderDetails() {
     let contactInfo = '';
     let actionBtnHtml = '';
 
-    if (v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me'))) {
-        const tgHandle = v.contact_handle.replace('https://t.me/', '').replace('@', '');
-        contactInfo = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || '')}" class="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium bg-sky-900/30 px-3 py-1 rounded-lg text-xs border border-sky-800/50"><span>✈️</span> Telegram HR (Link)</a>`;
-        actionBtnHtml = `<button onclick="applyTg('${v.id}')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5 shadow-md ring-1 ring-sky-400/30">🤖 Отправить через Userbot</button>`;
+    const isTg = Boolean(
+        (v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me'))) ||
+        (v.url && (v.url.includes('t.me/') || v.url.includes('telegram.me/'))) ||
+        (v.source && v.source.toLowerCase().includes('telegram'))
+    );
+
+    let tgHandle = (v.contact_handle || '').replace('https://t.me/', '').replace('@', '').replace('/', '').trim();
+    if (!tgHandle && v.url && (v.url.includes('t.me/') || v.url.includes('telegram.me/'))) {
+        const parts = v.url.split(/t\.me\/|telegram\.me\//)[1];
+        if (parts) tgHandle = parts.split('/')[0].split('?')[0];
+    }
+
+    if (isTg && tgHandle) {
+        contactInfo = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || v.cover_letter || '')}" class="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium bg-sky-900/30 px-3 py-1 rounded-lg text-xs border border-sky-800/50"><span>✈️</span> Telegram HR (@${tgHandle})</a>`;
+        actionBtnHtml = `
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="applyTg1Click('${v.id}', '${tgHandle}')" class="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all shadow-md flex items-center gap-1.5 ring-2 ring-sky-400/30">
+                    <span>✈️</span> Откликнуться в Telegram (1-Click)
+                </button>
+                <button onclick="applyTg('${v.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1">
+                    <span>🤖</span> Через Userbot
+                </button>
+            </div>
+        `;
     } else {
         actionBtnHtml = `
             <div class="flex items-center gap-2 flex-wrap">
@@ -559,107 +579,252 @@ function openVacancyWithAutoApply(vacId) {
     window.open(targetUrl, '_blank');
 }
 
-async function triggerAgentAutoApply(vacId) {
-    const v = vacancies.find(x => String(x.id) === String(vacId));
-    if (!v) return;
+let currentCrmAgentEventSource = null;
+let currentCrmSessionId = null;
+let currentCrmApprovalToken = null;
 
-    const btn = document.getElementById(`btn-agent-apply-${vacId}`);
-    const origHtml = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Агент открывает вакансию...';
-        btn.className = btn.className.replace('from-indigo-600', 'from-amber-600').replace('to-indigo-600', 'to-amber-600');
+function appendCrmAgentLog(icon, htmlText) {
+    const term = document.getElementById('agent-modal-terminal');
+    if (!term) return;
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-2';
+    row.innerHTML = `<span class="text-slate-500 shrink-0 font-mono text-[10px]">${time}</span> <span>${icon}</span> <div class="text-slate-200 flex-1">${htmlText}</div>`;
+    term.appendChild(row);
+    term.scrollTop = term.scrollHeight;
+}
+
+function closeAgentLiveModal() {
+    if (currentCrmAgentEventSource) {
+        currentCrmAgentEventSource.close();
+        currentCrmAgentEventSource = null;
+    }
+    toggleModal('agent-live-modal');
+}
+
+function stopAgentFromCRM() {
+    if (currentCrmAgentEventSource) {
+        currentCrmAgentEventSource.close();
+        currentCrmAgentEventSource = null;
+    }
+    appendCrmAgentLog('⏹', '<span class="text-rose-400 font-bold">Выполнение агента остановлено пользователем.</span>');
+    const badge = document.getElementById('agent-modal-badge');
+    if (badge) {
+        badge.textContent = 'STOPPED';
+        badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700/60 font-bold uppercase';
+    }
+}
+
+async function approveAgentSessionFromCRM() {
+    const approveBtn = document.getElementById('agent-modal-approve-btn');
+    if (approveBtn) {
+        approveBtn.disabled = true;
+        approveBtn.innerHTML = '<span class="animate-spin">⏳</span> Отправка...';
     }
 
-    showToast('🚀 Задача передана агенту! Открываю вкладку в браузере...');
-
     try {
-        const res = await fetch('/api/agent/queue-task', {
+        const res = await fetch('/api/agent/approve-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                vacancy_id: v.id,
-                url: formatVacancyUrl(v.url),
-                company: v.company || 'Unknown',
-                role_title: v.title || 'Engineer',
-                portal: v.source || 'web',
-                cover_letter: v.cover_letter || v.short_dm || ''
+                session_id: currentCrmSessionId,
+                approval_token: currentCrmApprovalToken
             })
         });
         const data = await res.json();
         if (data.success) {
-            if (btn) {
-                btn.innerHTML = '<span class="inline-block animate-pulse">📝</span> Заполняю форму...';
+            document.getElementById('agent-modal-approval-box')?.classList.add('hidden');
+            document.getElementById('agent-modal-complete-box')?.classList.remove('hidden');
+            appendCrmAgentLog('🚀', '<span class="text-emerald-300 font-bold">Подтверждение принято! Заявка успешно отправлена в браузере и зафиксирована в CRM.</span>');
+            if (currentVac) {
+                await updateStatus(currentVac.id, 'sent');
             }
-
-            // Poll for task completion with resilient error handling
-            let pollCount = 0;
-            const maxPolls = 20; // 60 seconds max
-            const pollInterval = setInterval(async () => {
-                pollCount++;
-                try {
-                    const statusRes = await fetch(`/api/vacancies/${vacId}/runtime_state`);
-                    const stateData = await statusRes.json();
-                    if (stateData.fsm_state === 'SUBMITTED') {
-                        clearInterval(pollInterval);
-                        if (btn) {
-                            btn.innerHTML = '<span>✅</span> Отклик заполнен!';
-                            btn.className = btn.className.replace('from-amber-600', 'from-emerald-600').replace('to-amber-600', 'to-emerald-600');
-                            setTimeout(() => {
-                                btn.disabled = false;
-                                btn.innerHTML = origHtml;
-                                btn.className = btn.className.replace('from-emerald-600', 'from-indigo-600').replace('to-emerald-600', 'to-indigo-600');
-                            }, 4000);
-                        }
-                        showToast('🎉 Агент заполнил форму! Проверьте вкладку в браузере.');
-                        await updateStatus(vacId, 'sent');
-                    } else if (stateData.fsm_state === 'FAILED') {
-                        clearInterval(pollInterval);
-                        if (btn) {
-                            btn.innerHTML = '<span>❌</span> Ошибка';
-                            btn.className = btn.className.replace('from-amber-600', 'from-rose-600').replace('to-amber-600', 'to-rose-600');
-                            setTimeout(() => {
-                                btn.disabled = false;
-                                btn.innerHTML = origHtml;
-                                btn.className = btn.className.replace('from-rose-600', 'from-indigo-600').replace('to-rose-600', 'to-indigo-600');
-                            }, 4000);
-                        }
-                        showToast('❌ Агент не смог заполнить форму. Откройте вакансию вручную.');
-                    } else if (pollCount >= maxPolls) {
-                        clearInterval(pollInterval);
-                        if (btn) {
-                            btn.innerHTML = '<span>⏱</span> Таймаут — проверьте вкладку';
-                            btn.className = btn.className.replace('from-amber-600', 'from-slate-600').replace('to-amber-600', 'to-slate-600');
-                            setTimeout(() => {
-                                btn.disabled = false;
-                                btn.innerHTML = origHtml;
-                                btn.className = btn.className.replace('from-slate-600', 'from-indigo-600').replace('to-slate-600', 'to-indigo-600');
-                            }, 4000);
-                        }
-                    } else {
-                        // Update button with progress
-                        if (btn && pollCount % 2 === 0) {
-                            const dots = '.'.repeat((pollCount % 4) + 1);
-                            btn.innerHTML = `<span class="inline-block animate-pulse">📝</span> Заполняю${dots}`;
-                        }
-                    }
-                } catch (e) {
-                    // Transient network error — don't break polling, just retry
-                    console.debug('[Agent] Poll retry:', e.message);
-                }
-            }, 3000);
         } else {
-            alert('Ошибка постановки задачи агенту: ' + (data.error || 'Неизвестная ошибка'));
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = origHtml;
-            }
+            appendCrmAgentLog('❌', `<span class="text-rose-400 font-bold">Ошибка отправки: ${data.error}</span>`);
         }
     } catch (err) {
-        alert('Ошибка связи с сервером CRM: ' + err.message);
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = origHtml;
+        appendCrmAgentLog('❌', `<span class="text-rose-400">Ошибка сети: ${err.message}</span>`);
+    } finally {
+        if (approveBtn) approveBtn.disabled = false;
+    }
+}
+
+async function triggerAgentAutoApply(vacId) {
+    const v = vacancies.find(x => String(x.id) === String(vacId));
+    if (!v) return;
+
+    const isTg = Boolean(
+        (v.contact_handle && (v.contact_type === 'telegram' || v.contact_handle.startsWith('@') || v.contact_handle.includes('t.me'))) ||
+        (v.url && (v.url.includes('t.me/') || v.url.includes('telegram.me/'))) ||
+        (v.source && v.source.toLowerCase().includes('telegram'))
+    );
+    let tgHandle = (v.contact_handle || '').replace('https://t.me/', '').replace('@', '').replace('/', '').trim();
+    if (!tgHandle && v.url && (v.url.includes('t.me/') || v.url.includes('telegram.me/'))) {
+        const parts = v.url.split(/t\.me\/|telegram\.me\//)[1];
+        if (parts) tgHandle = parts.split('/')[0].split('?')[0];
+    }
+    if (isTg && tgHandle) {
+        applyTg1Click(vacId, tgHandle);
+        return;
+    }
+
+    // 1. Reset and Open Modal
+    const titleEl = document.getElementById('agent-modal-title');
+    const badgeEl = document.getElementById('agent-modal-badge');
+    const term = document.getElementById('agent-modal-terminal');
+    const approvalBox = document.getElementById('agent-modal-approval-box');
+    const completeBox = document.getElementById('agent-modal-complete-box');
+    const policyStatus = document.getElementById('agent-policy-status');
+
+    if (titleEl) titleEl.textContent = `AI Career Agent — ${v.company || 'Company'} / ${v.title || 'Role'}`;
+    if (badgeEl) {
+        badgeEl.textContent = 'STARTING';
+        badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-700/60 font-bold uppercase';
+    }
+    if (term) term.innerHTML = '';
+    if (approvalBox) approvalBox.classList.add('hidden');
+    if (completeBox) completeBox.classList.add('hidden');
+
+    toggleModal('agent-live-modal');
+
+    // Pre-flight check: Verify Chrome Extension is online
+    try {
+        const extStatusRes = await fetch('/api/agent/browser/status');
+        const extStatus = await extStatusRes.json();
+        if (!extStatus.connected) {
+            appendCrmAgentLog('🔌', '<span class="text-amber-400 font-semibold">Внимание: Расширение Chrome в режиме ожидания/не опрашивает сервер. Откройте Google Chrome или кликните иконку расширения Job Hunter.</span>');
+        } else {
+            appendCrmAgentLog('🌐', '<span class="text-emerald-400 font-semibold">Chrome Extension подключено и готово к управлению браузером.</span>');
+        }
+    } catch(e) {}
+
+    // 2. Policy Check (Phase 7 Autonomous Policy Engine)
+    appendCrmAgentLog('🛡️', 'Проверяю политики безопасности и ограничения кандидата (Autonomous Policy Engine)...');
+    try {
+        const policyRes = await fetch('/api/agent/policy-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vacancy_id: v.id, vacancy: v })
+        });
+        const pData = await policyRes.json();
+        if (pData.success) {
+            if (!pData.can_apply) {
+                if (policyStatus) {
+                    policyStatus.textContent = 'REJECTED';
+                    policyStatus.className = 'text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-medium';
+                }
+                appendCrmAgentLog('🛑', `<span class="text-rose-400 font-bold">Нарушение политик кандидата:</span> ${pData.violations.join('; ')}`);
+                if (badgeEl) {
+                    badgeEl.textContent = 'BLOCKED BY POLICY';
+                    badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700/60 font-bold uppercase';
+                }
+                return;
+            } else {
+                if (policyStatus) {
+                    policyStatus.textContent = `OK (Сегодня: ${pData.daily_count}/${pData.daily_limit})`;
+                    policyStatus.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-medium';
+                }
+                appendCrmAgentLog('✅', `Политики соблюдены (Лимит откликов: ${pData.daily_count}/${pData.daily_limit}, Зарплата и локация соответствуют).`);
+            }
+        }
+    } catch (e) {
+        appendCrmAgentLog('⚠️', `Предупреждение проверки политик: ${e.message}`);
+    }
+
+    // 3. Start Agent Run
+    appendCrmAgentLog('🚀', `Инициализирую сессию агента для URL: <a href="${formatVacancyUrl(v.url)}" target="_blank" class="text-sky-400 underline font-mono">${formatVacancyUrl(v.url)}</a>...`);
+
+    try {
+        const res = await fetch('/api/agent/start-run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vacancy_id: v.id,
+                target_url: formatVacancyUrl(v.url),
+                mode: 'SUPERVISED'
+            })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            throw new Error(data.error || 'Не удалось запустить агента');
+        }
+
+        currentCrmSessionId = data.session_id;
+        appendCrmAgentLog('⚡', `Сессия агента запущена: <code class="text-purple-300 font-mono">${data.session_id.slice(0, 8)}...</code>`);
+
+        if (currentCrmAgentEventSource) {
+            currentCrmAgentEventSource.close();
+        }
+
+        // 4. Stream SSE Events
+        currentCrmAgentEventSource = new EventSource(`/api/agent/stream?session_id=${data.session_id}`);
+
+        currentCrmAgentEventSource.addEventListener('agent.started', (e) => {
+            if (badgeEl) badgeEl.textContent = 'OBSERVING';
+            appendCrmAgentLog('▶️', 'Агент открывает страницу в видимом Chrome и начинает наблюдение.');
+        });
+
+        currentCrmAgentEventSource.addEventListener('agent.thinking', (e) => {
+            const d = JSON.parse(e.data);
+            if (badgeEl) badgeEl.textContent = `STEP ${d.data?.step || ''} · THINKING`;
+            appendCrmAgentLog('🧠', `Шаг ${d.data?.step}: Рассуждаю над оптимальным следующим действием...`);
+        });
+
+        currentCrmAgentEventSource.addEventListener('agent.tool.started', (e) => {
+            const d = JSON.parse(e.data);
+            if (badgeEl) badgeEl.textContent = 'ACTING';
+            appendCrmAgentLog('🔧', `Вызов инструмента <b>${d.data?.tool}</b>...`);
+        });
+
+        currentCrmAgentEventSource.addEventListener('agent.tool.completed', (e) => {
+            const d = JSON.parse(e.data);
+            const ok = d.data?.success ? '✅' : '⚠️';
+            appendCrmAgentLog(ok, `Инструмент <b>${d.data?.tool}</b> завершен.`);
+        });
+
+        currentCrmAgentEventSource.addEventListener('approval.required', (e) => {
+            const d = JSON.parse(e.data);
+            currentCrmApprovalToken = d.data?.approval_token;
+            if (badgeEl) {
+                badgeEl.textContent = 'WAITING APPROVAL';
+                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700/60 font-bold uppercase';
+            }
+            appendCrmAgentLog('⏸', '<span class="text-amber-300 font-bold">Форма полностью заполнена и верифицирована! Ожидание подтверждения пользователя.</span>');
+            if (approvalBox) approvalBox.classList.remove('hidden');
+        });
+
+        currentCrmAgentEventSource.addEventListener('agent.completed', () => {
+            if (badgeEl) {
+                badgeEl.textContent = 'COMPLETED';
+                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-bold uppercase';
+            }
+            if (approvalBox) approvalBox.classList.add('hidden');
+            if (completeBox) completeBox.classList.remove('hidden');
+            appendCrmAgentLog('🎉', '<span class="text-emerald-300 font-bold">Миссия агента успешно завершена!</span>');
+            if (currentCrmAgentEventSource) {
+                currentCrmAgentEventSource.close();
+                currentCrmAgentEventSource = null;
+            }
+        });
+
+        currentCrmAgentEventSource.addEventListener('agent.error', (e) => {
+            const d = JSON.parse(e.data);
+            if (badgeEl) {
+                badgeEl.textContent = 'ERROR';
+                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700/60 font-bold uppercase';
+            }
+            appendCrmAgentLog('❌', `<span class="text-rose-400 font-bold">Ошибка агента: ${d.data?.error || 'Неизвестная ошибка'}</span>`);
+            if (currentCrmAgentEventSource) {
+                currentCrmAgentEventSource.close();
+                currentCrmAgentEventSource = null;
+            }
+        });
+
+    } catch (err) {
+        appendCrmAgentLog('❌', `<span class="text-rose-400 font-bold">Ошибка запуска агента: ${err.message}</span>`);
+        if (badgeEl) {
+            badgeEl.textContent = 'FAILED';
+            badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700/60 font-bold uppercase';
         }
     }
 }
@@ -701,6 +866,25 @@ async function rewriteAI(vac_id) {
         btn.disabled = false;
         btn.classList.remove('opacity-50');
     }
+}
+
+async function applyTg1Click(vacId, tgHandle) {
+    const v = vacancies.find(x => String(x.id) === String(vacId));
+    if (!v) return;
+    const text = v.short_dm || v.cover_letter || '';
+    if (text) {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch(e) {}
+    }
+    showToast('📋 Питч скопирован в буфер! Открываю Telegram...');
+    const tgUrl = `tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(text)}`;
+    window.location.href = tgUrl;
+    setTimeout(() => {
+        if (confirm('Отметили отклик в Telegram как отправленный?')) {
+            updateStatus(vacId, 'sent');
+        }
+    }, 1200);
 }
 
 async function applyTg(vacId) {

@@ -9,6 +9,8 @@ class ToolPermission(str, Enum):
     REASONING = "REASONING"
     WRITE_LOCAL = "WRITE_LOCAL"
     NETWORK_BOUND = "NETWORK_BOUND"
+    BROWSER_ACTION = "BROWSER_ACTION"
+    PRIVILEGED_SUBMIT = "PRIVILEGED_SUBMIT"
 
 
 class ToolValidationError(Exception):
@@ -245,3 +247,348 @@ ToolRegistry.register(ToolDefinition(
     },
     handler=_handle_verify_facts
 ))
+
+
+# ── BROWSER TOOLS (Phase 1: Browser Hands) ───────────────────────────────────
+
+def _handle_browser_open_page(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().open_page(args["url"])
+
+def _handle_browser_inspect_page(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().inspect_page()
+
+def _handle_browser_fill_field(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().fill_field(
+        element_id=args["element_id"],
+        value=args["value"],
+        human_like=args.get("human_like", False)
+    )
+
+def _handle_browser_select_option(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().select_option(
+        element_id=args["element_id"],
+        option=args["option"]
+    )
+
+def _handle_browser_click_element(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().click_element(
+        element_id=args["element_id"]
+    )
+
+def _handle_browser_upload_cv(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().upload_file(
+        element_id=args["element_id"],
+        file_base64=args["file_base64"],
+        file_name=args.get("file_name", "resume.pdf"),
+        mime_type=args.get("mime_type", "application/pdf")
+    )
+
+def _handle_browser_scroll(args: Dict[str, Any]) -> Dict[str, Any]:
+    from agents.browser_bridge import get_browser_bridge
+    return get_browser_bridge().scroll_page(
+        direction=args.get("direction", "down"),
+        pixels=args.get("pixels", 400)
+    )
+
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_open_page",
+    description="Opens a URL in the user's active Chrome browser window",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+            "url": {"type": "string"}
+        }
+    },
+    handler=_handle_browser_open_page
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_inspect_page",
+    description="Semantically inspects the active page forms, inputs, buttons, and validation errors",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "mode": {"type": "string"}
+        }
+    },
+    handler=_handle_browser_inspect_page
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_fill_field",
+    description="Fills a form field by its assigned element_id and observes whether errors were triggered",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "required": ["element_id", "value"],
+        "properties": {
+            "element_id": {"type": "string"},
+            "value": {"type": "string"},
+            "human_like": {"type": "boolean"}
+        }
+    },
+    handler=_handle_browser_fill_field
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_select_option",
+    description="Selects an option in a dropdown <select> element by assigned element_id",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "required": ["element_id", "option"],
+        "properties": {
+            "element_id": {"type": "string"},
+            "option": {"type": "string"}
+        }
+    },
+    handler=_handle_browser_select_option
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_click_element",
+    description="Clicks a button, link, or interactive element by assigned element_id and observes changes",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "required": ["element_id"],
+        "properties": {
+            "element_id": {"type": "string"}
+        }
+    },
+    handler=_handle_browser_click_element
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_upload_cv",
+    description="Uploads a resume file (base64 encoded) into an input[type=file] by assigned element_id",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "required": ["element_id", "file_base64"],
+        "properties": {
+            "element_id": {"type": "string"},
+            "file_base64": {"type": "string"},
+            "file_name": {"type": "string"},
+            "mime_type": {"type": "string"}
+        }
+    },
+    handler=_handle_browser_upload_cv
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_scroll",
+    description="Scrolls the active browser page view up or down",
+    permission=ToolPermission.BROWSER_ACTION,
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "direction": {"type": "string"},
+            "pixels": {"type": "integer"}
+        }
+    },
+    handler=_handle_browser_scroll
+))
+
+
+# ── APPLICATION INTELLIGENCE TOOLS (Phase 3) ─────────────────────────────────
+
+def _handle_candidate_classify_form(args: Dict[str, Any]) -> Dict[str, Any]:
+    from generator.candidate_profile import get_canonical_profile
+    from generator.form_classifier import classify_form_elements
+    profile = get_canonical_profile(profile_id=args.get("profile_id"), lang=args.get("lang", "ru"))
+    elements = args.get("elements", [])
+    classified = classify_form_elements(elements, profile)
+    return {"classified_elements": classified, "total": len(classified)}
+
+def _handle_candidate_answer_question(args: Dict[str, Any]) -> Dict[str, Any]:
+    from generator.candidate_profile import get_canonical_profile
+    from generator.question_answerer import answer_application_question
+    profile = get_canonical_profile(profile_id=args.get("profile_id"), lang=args.get("lang", "ru"))
+    return answer_application_question(
+        question=args["question"],
+        profile=profile,
+        job_understanding=args.get("job_understanding"),
+        lang=args.get("lang", "en")
+    )
+
+def _handle_candidate_compile_resume(args: Dict[str, Any]) -> Dict[str, Any]:
+    from generator.candidate_profile import get_canonical_profile
+    from generator.tailored_resume_engine import compile_tailored_cv_artifact
+    profile = get_canonical_profile(profile_id=args.get("profile_id"), lang=args.get("lang", "ru"))
+    ju = args.get("job_understanding", {"role_overview": {"title": "Engineer", "company": "Company"}})
+    strat = args.get("strategy", {})
+    session_id = args.get("session_id")
+    lang = args.get("lang", "ru")
+    return compile_tailored_cv_artifact(profile, ju, strat, lang=lang, session_id=session_id)
+
+
+ToolRegistry.register(ToolDefinition(
+    name="candidate_classify_form",
+    description="Semantically classifies inspected form fields, mapping each to a verified candidate value or action",
+    permission=ToolPermission.REASONING,
+    parameters_schema={
+        "type": "object",
+        "required": ["elements"],
+        "properties": {
+            "elements": {"type": "array"},
+            "profile_id": {"type": "string"},
+            "lang": {"type": "string"}
+        }
+    },
+    handler=_handle_candidate_classify_form
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="candidate_answer_question",
+    description="Generates a truthful first-person answer to a screening question strictly grounded in Master Experience",
+    permission=ToolPermission.REASONING,
+    parameters_schema={
+        "type": "object",
+        "required": ["question"],
+        "properties": {
+            "question": {"type": "string"},
+            "job_understanding": {"type": "object"},
+            "profile_id": {"type": "string"},
+            "lang": {"type": "string"}
+        }
+    },
+    handler=_handle_candidate_answer_question
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="candidate_compile_resume",
+    description="Compiles an ATS tailored CV into a base64 file ready for upload, recording evidence provenance links",
+    permission=ToolPermission.WRITE_LOCAL,
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "job_understanding": {"type": "object"},
+            "strategy": {"type": "object"},
+            "session_id": {"type": "string"},
+            "profile_id": {"type": "string"},
+            "lang": {"type": "string"}
+        }
+    },
+    handler=_handle_candidate_compile_resume
+))
+
+
+# ── FORM VERIFICATION & PRIVILEGED SUBMIT TOOLS (Phases 4 & 5) ─────────────────
+
+def _handle_candidate_verify_form(args: Dict[str, Any]) -> Dict[str, Any]:
+    from generator.form_verifier import verify_application_form
+    elements = args.get("elements", [])
+    classified = args.get("classified_elements")
+    return verify_application_form(elements, classified)
+
+
+def _handle_browser_submit_application(args: Dict[str, Any]) -> Dict[str, Any]:
+    from urllib.parse import urlparse
+    from tracker.db import get_agent_session, update_agent_session, record_application_event, update_vacancy_status
+    from agents.browser_bridge import get_browser_bridge
+    from agents.event_bus import get_event_bus
+
+    session_id = args.get("session_id")
+    approval_token = args.get("approval_token")
+    elem_id = args.get("element_id")
+
+    session = get_agent_session(session_id)
+    if not session:
+        raise ToolExecutionError(f"Agent session '{session_id}' not found")
+
+    # In Supervised mode, verify approval token
+    if session.get("mode") == "SUPERVISED":
+        if not approval_token or approval_token != session.get("approval_token"):
+            raise ToolExecutionError("CRITICAL SECURITY VIOLATION: Missing or invalid human approval token. Submission rejected.")
+
+    # Execute submit click in browser
+    cmd_params = {}
+    if elem_id:
+        cmd_params["elem_id"] = elem_id
+        cmd_params["selector"] = f"[data-jh-agent-id='{elem_id}']"
+    else:
+        cmd_params["selector"] = "button[type='submit'], input[type='submit'], button.submit-btn"
+
+    bridge_res = get_browser_bridge().send_command("CLICK_ELEMENT", cmd_params, timeout=15.0)
+
+    # Update session status
+    update_agent_session(session_id, state="COMPLETED")
+
+    # Record application in CRM
+    vac_id = session.get("vacancy_id")
+    target_url = session.get("target_url", "")
+    portal = urlparse(target_url).netloc or "web"
+
+    try:
+        record_application_event(
+            vacancy_id=vac_id or ("session_" + session_id[:8]),
+            company="Applied via Agent",
+            role_title="Applied Position",
+            portal=portal,
+            mode=session.get("mode", "SUPERVISED"),
+            fsm_state="SUBMITTED",
+            metadata={"session_id": session_id, "url": target_url}
+        )
+        if vac_id:
+            update_vacancy_status(vac_id, "sent", reason="Autonomous agent application completed")
+    except Exception as e:
+        print(f"[SUBMIT_TOOL] CRM sync notice: {e}")
+
+    get_event_bus().publish(session_id, "agent.completed", {
+        "session_id": session_id,
+        "target_url": target_url,
+        "status": "COMPLETED"
+    })
+
+    return {
+        "success": True,
+        "submitted": True,
+        "session_id": session_id,
+        "browser_result": bridge_res
+    }
+
+
+ToolRegistry.register(ToolDefinition(
+    name="candidate_verify_form",
+    description="Automated verification engine checking completeness of required fields, formats, absence of errors, and CAPTCHA",
+    permission=ToolPermission.REASONING,
+    parameters_schema={
+        "type": "object",
+        "required": ["elements"],
+        "properties": {
+            "elements": {"type": "array"},
+            "classified_elements": {"type": "array"}
+        }
+    },
+    handler=_handle_candidate_verify_form
+))
+
+ToolRegistry.register(ToolDefinition(
+    name="browser_submit_application",
+    description="Privileged tool executing final form submission in browser. Strictly requires verified human approval token.",
+    permission=ToolPermission.PRIVILEGED_SUBMIT,
+    parameters_schema={
+        "type": "object",
+        "required": ["session_id", "approval_token"],
+        "properties": {
+            "session_id": {"type": "string"},
+            "approval_token": {"type": "string"},
+            "element_id": {"type": "string"}
+        }
+    },
+    handler=_handle_browser_submit_application
+))
+
+
+

@@ -316,14 +316,37 @@
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal fixed inset-0 z-50 items-center justify-center">
         <div class="glass-panel p-5 rounded-xl w-[420px] border border-slate-700 shadow-2xl">
-            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ
-                (Gemini)</h2>
+            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ (Движок Агента)</h2>
+
+            <!-- LLM Provider Selector -->
             <div class="mb-3">
+                <label class="block text-xs font-medium text-slate-400 mb-1.5">Провайдер интеллекта (LLM)</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="setLlmProvider('gemini')" id="provider-btn-gemini" class="p-2 rounded-lg border border-sky-500 bg-sky-950/40 text-left transition-colors">
+                        <div class="text-xs font-bold text-sky-300 flex items-center gap-1.5"><span>☁️</span> Google Gemini</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">Облачный ИИ (Flash)</div>
+                    </button>
+                    <button type="button" onclick="setLlmProvider('lm_studio')" id="provider-btn-lm_studio" class="p-2 rounded-lg border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors">
+                        <div class="text-xs font-bold text-slate-300 flex items-center gap-1.5"><span>💻</span> LM Studio</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">Локально (0 Rate Limits)</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gemini Key Block -->
+            <div id="llm-block-gemini" class="mb-3">
                 <label class="block text-xs font-medium text-slate-400 mb-1">Gemini API Key</label>
                 <input type="password" id="gemini-key" placeholder="AIzaSy..."
                     class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
-                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с
-                    <code>AIzaSy...</code></p>
+                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с <code>AIzaSy...</code></p>
+            </div>
+
+            <!-- LM Studio URL Block -->
+            <div id="llm-block-lm_studio" class="hidden mb-3">
+                <label class="block text-xs font-medium text-slate-400 mb-1">LM Studio Local Server URL</label>
+                <input type="text" id="lm-studio-url" placeholder="http://127.0.0.1:1234/v1" value="http://127.0.0.1:1234/v1"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                <p class="text-[11px] text-slate-500 mt-1">Запустите сервер в LM Studio на порту 1234 (например, Qwen 2.5 7B или Llama 3.1 8B).</p>
             </div>
 
             <div class="mb-3 pt-2 border-t border-slate-800/80 space-y-2.5 text-xs">
@@ -342,6 +365,40 @@
                         <div class="text-[10px] text-slate-400">Фокусирует резюме на клиентском перформансе (Core Web Vitals 100/100), блокируя непроверенные обещания распределенного бэкенда.</div>
                     </div>
                 </label>
+            </div>
+
+            <!-- Autonomous Policy Engine Guardrails (Phase 7) -->
+            <div class="mb-3 pt-2 border-t border-slate-800/80 space-y-2.5 text-xs">
+                <div class="text-[11px] font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🛡️</span> Политики Автономного Агента
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата (₽)</label>
+                        <input type="number" id="setting-min-salary-rub" placeholder="80000"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата ($)</label>
+                        <input type="number" id="setting-min-salary-usd" placeholder="2000"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 items-center pt-1">
+                    <div>
+                        <label class="block text-[10px] font-medium text-slate-400 mb-1">Лимит откликов в день</label>
+                        <input type="number" id="setting-daily-limit" placeholder="25"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                    </div>
+                    <div class="pt-3">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="setting-remote-only" class="rounded border-slate-700 text-purple-500 focus:ring-purple-500 bg-slate-900">
+                            <span class="text-slate-200 text-xs font-medium">Только Remote</span>
+                        </label>
+                    </div>
+                </div>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button onclick="toggleModal('settings-modal')"
@@ -637,6 +694,69 @@
                 <button onclick="confirmBlacklist()" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-md flex items-center gap-1.5">
                     <span>💩</span> Забанить и внести в Доску позора
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Career Agent Live Modal (Phases 2, 5, 7 ReAct Runtime) -->
+    <div id="agent-live-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-2xl w-[700px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative flex flex-col max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+                        🤖
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-white" id="agent-modal-title">AI Career Agent (ReAct Loop)</h2>
+                            <span id="agent-modal-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-700/60 font-bold uppercase">IDLE</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400" id="agent-modal-subtitle">Автономное наблюдение, подготовка резюме и отклик в вашем Chrome</p>
+                    </div>
+                </div>
+                <button onclick="closeAgentLiveModal()" class="text-slate-400 hover:text-white text-base p-1">✕</button>
+            </div>
+
+            <!-- Policy Guardrail Banner -->
+            <div id="agent-modal-policy-banner" class="mb-3 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span id="agent-policy-icon">🛡️</span>
+                    <span id="agent-policy-text" class="text-slate-300">Политики безопасности: Remote / Зарплатная вилка / Лимиты</span>
+                </div>
+                <span id="agent-policy-status" class="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-medium">VERIFIED</span>
+            </div>
+
+            <!-- Terminal Live Feed -->
+            <div class="flex-1 bg-slate-950/90 rounded-xl border border-slate-800 p-3 overflow-y-auto font-mono text-[11px] leading-relaxed space-y-1.5 min-h-[220px] max-h-[340px]" id="agent-modal-terminal">
+                <div class="text-slate-500">⚡ Ожидание запуска автономного цикла...</div>
+            </div>
+
+            <!-- Human Approval Card -->
+            <div id="agent-modal-approval-box" class="hidden mt-3 p-4 rounded-xl bg-indigo-950/40 border-2 border-indigo-500/60 shadow-lg">
+                <div class="flex items-start gap-3">
+                    <span class="text-2xl">⏸</span>
+                    <div class="flex-1">
+                        <div class="font-bold text-sm text-indigo-300 mb-0.5">Форма заполнена и проверена валидатором!</div>
+                        <p class="text-xs text-slate-300 mb-3" id="agent-modal-approval-desc">Все обязательные поля, файл резюме и ответы заполнены в вашем Chrome. Проверьте страницу и санкционируйте отправку:</p>
+                        <div class="flex items-center gap-2">
+                            <button id="agent-modal-approve-btn" onclick="approveAgentSessionFromCRM()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 ring-2 ring-emerald-500/40">
+                                <span>🚀</span> Подтвердить и отправить (Submit)
+                            </button>
+                            <button onclick="stopAgentFromCRM()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-xl border border-slate-700">
+                                ⏹ Остановить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Completion Banner -->
+            <div id="agent-modal-complete-box" class="hidden mt-3 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-700/60 text-xs text-emerald-300 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🎉</span>
+                    <span class="font-bold">Отклик успешно подан! Статус вакансии обновлен в CRM.</span>
+                </div>
+                <button onclick="closeAgentLiveModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-1.5 rounded-lg">Готово</button>
             </div>
         </div>
     </div>

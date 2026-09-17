@@ -148,6 +148,47 @@ def init_db():
         FOREIGN KEY (vacancy_id) REFERENCES vacancies (id) ON DELETE CASCADE
     );
     """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agent_sessions (
+        id TEXT PRIMARY KEY,
+        vacancy_id TEXT,
+        mode TEXT NOT NULL DEFAULT 'SUPERVISED',
+        state TEXT NOT NULL DEFAULT 'IDLE',
+        target_url TEXT NOT NULL,
+        cv_artifact_id TEXT,
+        approval_token TEXT,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        finished_at TIMESTAMP,
+        error_message TEXT
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agent_session_steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        step_number INTEGER NOT NULL,
+        thought TEXT,
+        tool_name TEXT NOT NULL,
+        arguments_json TEXT NOT NULL,
+        observation_json TEXT,
+        status TEXT NOT NULL DEFAULT 'SUCCESS',
+        duration_ms INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES agent_sessions(id) ON DELETE CASCADE
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS evidence_provenance_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        statement_text TEXT NOT NULL,
+        source_evidence_id TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
     conn.commit()
     conn.close()
 
@@ -186,6 +227,27 @@ def save_vacancy(vacancy: Dict[str, Any]) -> bool:
         return inserted
     finally:
         conn.close()
+
+
+def update_vacancy_status(vac_id: str, status: str, reason: Optional[str] = None) -> bool:
+    """Updates the status of a vacancy in SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if status == 'blacklist':
+            cursor.execute("""
+                UPDATE vacancies 
+                SET status = ?, blacklist_reason = ?, blacklisted_at = ?
+                WHERE id = ?
+            """, (status, reason or 'Токсичные условия / Нарушение ТК РФ', now, vac_id))
+        else:
+            cursor.execute("UPDATE vacancies SET status = ? WHERE id = ?", (status, vac_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
 
 def save_pitch(vacancy_id: str, pitch_type: str, language: str, content: str) -> int:
     conn = get_db_connection()
@@ -570,6 +632,153 @@ def update_agent_task_status(task_id: int, status: str, result_message: str = ""
         WHERE id = ?
         """, (status, result_message, task_id))
         conn.commit()
+    finally:
+        conn.close()
+
+# ── Agent Cognitive Session Tracking (Phase 2: Real Agent Loop) ──────────────
+
+def create_agent_session(session_id: str, vacancy_id: Optional[str], target_url: str, mode: str = "SUPERVISED") -> str:
+    """Creates a new cognitive agent execution session."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        INSERT INTO agent_sessions (id, vacancy_id, target_url, mode, state)
+        VALUES (?, ?, ?, ?, 'IDLE')
+        """, (session_id, vacancy_id, target_url, mode))
+        conn.commit()
+        return session_id
+    finally:
+        conn.close()
+
+def update_agent_session(session_id: str, state: Optional[str] = None, error_message: Optional[str] = None, approval_token: Optional[str] = None) -> None:
+    """Updates state or completion details of an agent session."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        updates = []
+        params = []
+        if state is not None:
+            updates.append("state = ?")
+            params.append(state)
+            if state in ('COMPLETED', 'FAILED', 'STOPPED'):
+                updates.append("finished_at = CURRENT_TIMESTAMP")
+        if error_message is not None:
+            updates.append("error_message = ?")
+            params.append(error_message)
+        if approval_token is not None:
+            updates.append("approval_token = ?")
+            params.append(approval_token)
+        
+        if updates:
+            params.append(session_id)
+            cursor.execute(f"UPDATE agent_sessions SET {', '.join(updates)} WHERE id = ?", params)
+            conn.commit()
+    finally:
+        conn.close()
+
+def get_agent_session(session_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves session status and metadata."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM agent_sessions WHERE id = ?", (session_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+def record_session_step(
+    session_id: str,
+    step_number: int,
+    thought: str,
+    tool_name: str,
+    arguments: Dict[str, Any],
+    observation: Optional[Dict[str, Any]] = None,
+    status: str = "SUCCESS",
+    duration_ms: int = 0
+) -> int:
+    """Records an atomic ReAct step in the session scratchpad."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        INSERT INTO agent_session_steps (
+            session_id, step_number, thought, tool_name,
+            arguments_json, observation_json, status, duration_ms
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            session_id,
+            step_number,
+            thought,
+            tool_name,
+            json.dumps(arguments, ensure_ascii=False),
+            json.dumps(observation, ensure_ascii=False) if observation else None,
+            status,
+            duration_ms
+        ))
+        step_id = cursor.lastrowid
+        conn.commit()
+        return step_id
+    finally:
+        conn.close()
+
+def get_session_trace(session_id: str) -> List[Dict[str, Any]]:
+    """Retrieves the full chronological step trace of an agent session."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        SELECT * FROM agent_session_steps
+        WHERE session_id = ?
+        ORDER BY step_number ASC
+        """, (session_id,))
+        steps = []
+        for r in cursor.fetchall():
+            d = dict(r)
+            try:
+                d["arguments"] = json.loads(d.get("arguments_json") or "{}")
+            except Exception:
+                d["arguments"] = {}
+            try:
+                d["observation"] = json.loads(d.get("observation_json") or "{}")
+            except Exception:
+                d["observation"] = {}
+            steps.append(d)
+        return steps
+    finally:
+        conn.close()
+
+def save_provenance_links(session_id: str, links: List[Dict[str, str]]) -> int:
+    """Saves statement-to-evidence provenance links in SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        count = 0
+        for l in links:
+            stmt = l.get("statement", "")
+            ev_id = l.get("source_evidence_id", "")
+            if stmt and ev_id:
+                cursor.execute("""
+                INSERT INTO evidence_provenance_links (session_id, statement_text, source_evidence_id)
+                VALUES (?, ?, ?)
+                """, (session_id, stmt, ev_id))
+                count += 1
+        conn.commit()
+        return count
+    finally:
+        conn.close()
+
+def get_provenance_links(session_id: str) -> List[Dict[str, Any]]:
+    """Retrieves statement-to-evidence links for a session."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        SELECT * FROM evidence_provenance_links WHERE session_id = ? ORDER BY id ASC
+        """, (session_id,))
+        return [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
 

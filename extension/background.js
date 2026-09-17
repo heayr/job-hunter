@@ -12,6 +12,28 @@ if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
     .catch((error) => console.error("[JobHunter BG] Error setting panel behavior:", error));
 }
 
+// Keep-Alive Alarm to prevent Manifest V3 Service Worker suspension
+if (chrome.alarms) {
+  chrome.alarms.create("jh-agent-heartbeat", { periodInMinutes: 0.3 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "jh-agent-heartbeat") {
+      pollBrowserCommand();
+    }
+  });
+}
+
+// Immediately trigger polling when user navigates or switches tabs
+if (chrome.tabs) {
+  chrome.tabs.onActivated.addListener(() => {
+    pollBrowserCommand();
+  });
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === "complete") {
+      pollBrowserCommand();
+    }
+  });
+}
+
 // ── Anti-detection utilities ───────────────────────
 
 function bgRandomDelay(minMs, maxMs) {
@@ -272,3 +294,88 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
 // ── Start Polling ──────────────────────────────────
 setInterval(checkPendingTasks, 3500);
+
+// ── Atomic Browser Command Bridge (Phase 1: Browser Hands) ────
+
+let isExecutingBrowserCmd = false;
+let lastTargetTabId = null;
+
+async function pollBrowserCommand() {
+  if (isExecutingBrowserCmd) return;
+
+  try {
+    const res = await fetch(`${CRM_URL}/api/agent/browser/poll-command`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (!data || !data.has_command || !data.command) return;
+
+    isExecutingBrowserCmd = true;
+    const cmd = data.command;
+    console.log("[JobHunter BG] Received browser command:", cmd.action, cmd.command_id);
+
+    let result = { success: false, error: "Unknown action" };
+
+    if (cmd.action === "OPEN_PAGE") {
+      try {
+        const tab = await chrome.tabs.create({ url: cmd.params.url, active: true });
+        const loaded = await waitForTabComplete(tab.id, 20000);
+        lastTargetTabId = tab.id;
+        result = {
+          success: true,
+          tab_id: tab.id,
+          url: tab.url,
+          loaded: loaded
+        };
+      } catch (err) {
+        result = { success: false, error: err.message };
+      }
+
+    } else {
+      // Direct DOM action in target or active tab
+      let targetTabId = cmd.params ? cmd.params.tab_id : null;
+      if (!targetTabId) {
+        targetTabId = lastTargetTabId;
+      }
+      if (!targetTabId) {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        targetTabId = activeTab ? activeTab.id : null;
+      }
+
+      if (!targetTabId) {
+        result = { success: false, error: "No active browser tab found" };
+      } else {
+        result = await new Promise((resolve) => {
+          chrome.tabs.sendMessage(targetTabId, {
+            type: cmd.action,
+            ...cmd.params
+          }, (resp) => {
+            if (chrome.runtime.lastError) {
+              resolve({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              resolve(resp || { success: false, error: "No response from page content script" });
+            }
+          });
+        });
+      }
+    }
+
+    // Report command result back to CRM
+    await fetch(`${CRM_URL}/api/agent/browser/command-result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        command_id: cmd.command_id,
+        result: result
+      })
+    });
+
+  } catch (err) {
+    // Network error or CRM offline
+  } finally {
+    isExecutingBrowserCmd = false;
+  }
+}
+
+// Fast poll interval for atomic browser actions (every 600ms)
+setInterval(pollBrowserCommand, 600);

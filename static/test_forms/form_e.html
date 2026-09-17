@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Form E — Custom Questions & Traps</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111827; color: #f9fafb; padding: 40px; max-width: 600px; margin: auto; }
+    .card { background: #1f2937; border: 1px solid #374151; padding: 24px; border-radius: 10px; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #e5e7eb; }
+    input, textarea { width: 100%; box-sizing: border-box; background: #111827; border: 1px solid #4b5563; color: #fff; padding: 10px; border-radius: 6px; }
+    .error-msg { color: #f87171; font-size: 12px; margin-top: 4px; display: none; }
+    button { background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Specialist Engineering Assessment</h2>
+    <p style="font-size: 13px; color: #9ca3af; margin-bottom: 20px;">Contains non-standard screening questions.</p>
+
+    <div class="field">
+      <label for="f-email">Candidate Email *</label>
+      <input type="email" id="f-email" required placeholder="name@domain.com">
+    </div>
+
+    <div class="field">
+      <label for="f-salary">Expected Monthly Salary (USD) *</label>
+      <input type="number" id="f-salary" min="1000" max="25000" required placeholder="e.g. 5000">
+      <div id="err-salary" class="error-msg">Salary must be between $1,000 and $25,000.</div>
+    </div>
+
+    <div class="field">
+      <label for="f-q1">Describe your most difficult production outage and how you resolved it *</label>
+      <textarea id="f-q1" rows="4" required placeholder="Provide technical details..."></textarea>
+    </div>
+
+    <div class="field">
+      <label for="f-q2">Do you have prior experience with custom WebRTC video pipelines? *</label>
+      <textarea id="f-q2" rows="3" required placeholder="Explain specific protocols used..."></textarea>
+    </div>
+
+    <button type="button" id="btn-submit-e" onclick="validateE()">Submit Responses</button>
+    <div id="status-e" style="display: none; margin-top: 15px; color: #34d399; font-weight: 600; text-align: center;">Responses Recorded!</div>
+  </div>
+
+  <script>
+    function validateE() {
+      const sal = parseInt(document.getElementById('f-salary').value, 10);
+      const salErr = document.getElementById('err-salary');
+      if (isNaN(sal) || sal < 1000 || sal > 25000) {
+        salErr.style.display = 'block';
+        return;
+      }
+      salErr.style.display = 'none';
+      document.getElementById('status-e').style.display = 'block';
+    }
+  </script>
+</body>
+</html>

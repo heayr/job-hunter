@@ -27,17 +27,57 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+let currentLlmProvider = 'gemini';
+
+function setLlmProvider(provider) {
+    currentLlmProvider = provider;
+    const btnGemini = document.getElementById('provider-btn-gemini');
+    const btnLm = document.getElementById('provider-btn-lm_studio');
+    const blockGemini = document.getElementById('llm-block-gemini');
+    const blockLm = document.getElementById('llm-block-lm_studio');
+
+    if (provider === 'lm_studio') {
+        btnLm.className = 'p-2 rounded-lg border border-purple-500 bg-purple-950/40 text-left transition-colors';
+        btnGemini.className = 'p-2 rounded-lg border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors';
+        blockLm.classList.remove('hidden');
+        blockGemini.classList.add('hidden');
+    } else {
+        btnGemini.className = 'p-2 rounded-lg border border-sky-500 bg-sky-950/40 text-left transition-colors';
+        btnLm.className = 'p-2 rounded-lg border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors';
+        blockGemini.classList.remove('hidden');
+        blockLm.classList.add('hidden');
+    }
+}
+
 async function loadConfig() {
     try {
         const data = await api.getConfig();
         const keyInput = document.getElementById('gemini-key');
         if (keyInput) keyInput.value = data.gemini_api_key || '';
+
+        const lmUrlInput = document.getElementById('lm-studio-url');
+        if (lmUrlInput) lmUrlInput.value = data.lm_studio_url || 'http://127.0.0.1:1234/v1';
+
+        setLlmProvider(data.llm_provider || 'gemini');
         
         const senCheck = document.getElementById('setting-seniority-alignment');
         if (senCheck) senCheck.checked = data.seniority_alignment !== false;
 
         const hlCheck = document.getElementById('setting-highload-guardrail');
         if (hlCheck) hlCheck.checked = data.highload_guardrail !== false;
+
+        // Policy settings
+        const salRub = document.getElementById('setting-min-salary-rub');
+        if (salRub) salRub.value = data.policy_min_salary_rub !== undefined ? data.policy_min_salary_rub : 80000;
+
+        const salUsd = document.getElementById('setting-min-salary-usd');
+        if (salUsd) salUsd.value = data.policy_min_salary_usd !== undefined ? data.policy_min_salary_usd : 2000;
+
+        const dailyLim = document.getElementById('setting-daily-limit');
+        if (dailyLim) dailyLim.value = data.policy_daily_limit !== undefined ? data.policy_daily_limit : 25;
+
+        const remOnly = document.getElementById('setting-remote-only');
+        if (remOnly) remOnly.checked = data.policy_remote_only === true;
 
         activeProfileId = data.active_profile_id || null;
         renderActiveProfileDropdown();
@@ -48,17 +88,29 @@ async function loadConfig() {
 
 async function saveConfig() {
     const key = document.getElementById('gemini-key')?.value.trim() || '';
+    const lmUrl = document.getElementById('lm-studio-url')?.value.trim() || 'http://127.0.0.1:1234/v1';
     const seniorityAlignment = document.getElementById('setting-seniority-alignment')?.checked ?? true;
     const highloadGuardrail = document.getElementById('setting-highload-guardrail')?.checked ?? true;
 
+    const salRub = parseInt(document.getElementById('setting-min-salary-rub')?.value || '80000', 10);
+    const salUsd = parseInt(document.getElementById('setting-min-salary-usd')?.value || '2000', 10);
+    const dailyLim = parseInt(document.getElementById('setting-daily-limit')?.value || '25', 10);
+    const remOnly = document.getElementById('setting-remote-only')?.checked ?? false;
+
     await api.saveConfig({
+        llm_provider: currentLlmProvider,
         gemini_api_key: key,
+        lm_studio_url: lmUrl,
         active_profile_id: activeProfileId,
         seniority_alignment: seniorityAlignment,
-        highload_guardrail: highloadGuardrail
+        highload_guardrail: highloadGuardrail,
+        policy_min_salary_rub: salRub,
+        policy_min_salary_usd: salUsd,
+        policy_daily_limit: dailyLim,
+        policy_remote_only: remOnly
     });
     toggleModal('settings-modal');
-    showToast('⚙️ Настройки сохранены');
+    showToast('⚙️ Настройки и движок ИИ сохранены');
 }
 
 let terminalVisible = true;

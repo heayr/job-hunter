@@ -63,6 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Event Listeners
   document.getElementById("refresh-page-btn")?.addEventListener("click", refreshActiveTabData);
+  document.getElementById("start-agent-btn")?.addEventListener("click", startAutonomousAgentRun);
   document.getElementById("analyze-btn")?.addEventListener("click", runAiAnalysis);
   document.getElementById("autofill-btn")?.addEventListener("click", triggerPageAutofill);
 
@@ -299,3 +300,167 @@ function showCopyFeedback(buttonId) {
   btn.textContent = " Скопировано!";
   setTimeout(() => { btn.textContent = prev; }, 1500);
 }
+
+// ── Autonomous Agent ReAct Loop Runner (Phase 2: Real Agent Loop) ──
+
+let currentEventSource = null;
+let currentApprovalToken = null;
+let currentSessionId = null;
+
+async function startAutonomousAgentRun() {
+  const btn = document.getElementById("start-agent-btn");
+  const feedCard = document.getElementById("agent-feed-card");
+  const feedLog = document.getElementById("agent-feed-log");
+  const stateBadge = document.getElementById("agent-feed-state");
+  const approvalBox = document.getElementById("agent-approval-box");
+
+  if (!currentPageData || !currentPageData.url) {
+    await refreshActiveTabData();
+  }
+
+  feedCard.style.display = "block";
+  approvalBox.style.display = "none";
+  feedLog.innerHTML = "";
+  stateBadge.textContent = "STARTING";
+  stateBadge.style.color = "#818cf8";
+  btn.disabled = true;
+
+  function appendLog(icon, text) {
+    const time = new Date().toLocaleTimeString();
+    const line = document.createElement("div");
+    line.style.marginBottom = "4px";
+    line.innerHTML = `<span style="color: #64748b;">[${time}]</span> ${icon} ${text}`;
+    feedLog.appendChild(line);
+    feedLog.scrollTop = feedLog.scrollHeight;
+  }
+
+  appendLog("🚀", `Инициализация агента для ${currentPageData?.url || 'текущей страницы'}...`);
+
+  try {
+    const res = await fetch(`${CRM_BASE_URL}/api/agent/start-run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_url: currentPageData?.url || "",
+        mode: executionMode,
+        max_steps: 25
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Не удалось запустить агента");
+    }
+
+    const sessionId = data.session_id;
+    currentSessionId = sessionId;
+    appendLog("⚡️", `Сессия агента: <b>${sessionId.slice(0, 8)}...</b>`);
+
+    if (currentEventSource) {
+      currentEventSource.close();
+    }
+
+    const sseUrl = `${CRM_BASE_URL}/api/agent/stream?session_id=${sessionId}`;
+    currentEventSource = new EventSource(sseUrl);
+
+    currentEventSource.addEventListener("agent.started", () => {
+      stateBadge.textContent = "STARTED";
+      appendLog("▶️", "Агент запущен и наблюдает за окружением.");
+    });
+
+    currentEventSource.addEventListener("agent.thinking", (e) => {
+      const d = JSON.parse(e.data);
+      stateBadge.textContent = "THINKING";
+      appendLog("🧠", `Шаг ${d.data?.step}: Рассуждаю над следующим действием...`);
+    });
+
+    currentEventSource.addEventListener("agent.tool.started", (e) => {
+      const d = JSON.parse(e.data);
+      stateBadge.textContent = "ACTING";
+      appendLog("🔧", `Вызов инструмента <b>${d.data?.tool}</b>...`);
+    });
+
+    currentEventSource.addEventListener("agent.tool.completed", (e) => {
+      const d = JSON.parse(e.data);
+      const ok = d.data?.success ? "✅" : "⚠️";
+      appendLog(ok, `Инструмент <b>${d.data?.tool}</b> выполнен.`);
+    });
+
+    currentEventSource.addEventListener("approval.required", (e) => {
+      const d = JSON.parse(e.data);
+      stateBadge.textContent = "WAITING APPROVAL";
+      stateBadge.style.color = "#f59e0b";
+      currentApprovalToken = d.data?.approval_token;
+      appendLog("⏸", "<b>Форма заполнена и проверена!</b> Ожидаю подтверждения человека.");
+      approvalBox.style.display = "block";
+    });
+
+    currentEventSource.addEventListener("agent.completed", () => {
+      stateBadge.textContent = "COMPLETED";
+      stateBadge.style.color = "#34d399";
+      appendLog("🎉", "<b>Миссия агента успешно завершена!</b>");
+      currentEventSource.close();
+      btn.disabled = false;
+    });
+
+    currentEventSource.addEventListener("agent.error", (e) => {
+      const d = JSON.parse(e.data);
+      stateBadge.textContent = "ERROR";
+      stateBadge.style.color = "#f43f5e";
+      appendLog("❌", `Ошибка агента: ${d.data?.error || 'Неизвестная ошибка'}`);
+      currentEventSource.close();
+      btn.disabled = false;
+    });
+
+  } catch (err) {
+    appendLog("❌", `Ошибка запуска: ${err.message}`);
+    stateBadge.textContent = "FAILED";
+    btn.disabled = false;
+  }
+}
+
+// Approval and Stop Button Handlers
+document.getElementById("approve-submit-btn")?.addEventListener("click", async () => {
+  const approvalBox = document.getElementById("agent-approval-box");
+  const stateBadge = document.getElementById("agent-feed-state");
+  const feedLog = document.getElementById("agent-feed-log");
+
+  if (currentSessionId) {
+    try {
+      await fetch(`${CRM_BASE_URL}/api/agent/approve-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: currentSessionId,
+          approval_token: currentApprovalToken
+        })
+      });
+    } catch (err) {
+      console.warn("Backend approval call notice:", err);
+    }
+  }
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && tab.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: "CLICK_ELEMENT",
+        element_id: "elem_submit"
+      }, () => {});
+    }
+  } catch (e) {}
+
+  approvalBox.style.display = "none";
+  stateBadge.textContent = "SUBMITTED";
+  stateBadge.style.color = "#34d399";
+  const line = document.createElement("div");
+  line.innerHTML = `<span style="color: #34d399; font-weight: 700;">✅ Отклик подтвержден пользователем и отправлен!</span>`;
+  feedLog.appendChild(line);
+});
+
+document.getElementById("stop-agent-btn")?.addEventListener("click", () => {
+  if (currentEventSource) currentEventSource.close();
+  document.getElementById("agent-approval-box").style.display = "none";
+  document.getElementById("agent-feed-state").textContent = "STOPPED";
+  document.getElementById("start-agent-btn").disabled = false;
+});

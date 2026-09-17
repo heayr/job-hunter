@@ -382,6 +382,65 @@ class CRMHandler(BaseHTTPRequestHandler):
             tasks = get_pending_agent_tasks(limit=10)
             _send_json(self, {"success": True, "tasks": tasks})
 
+        # ── Browser Bridge (Phase 1: Browser Hands) ──
+        elif self.path == '/api/agent/browser/poll-command':
+            from agents.browser_bridge import get_browser_bridge
+            cmd = get_browser_bridge().get_next_pending_command()
+            if cmd:
+                _send_json(self, {"has_command": True, "command": cmd})
+            else:
+                _send_json(self, {"has_command": False})
+
+        elif self.path == '/api/agent/browser/status':
+            from agents.browser_bridge import get_browser_bridge
+            connected = get_browser_bridge().is_connected()
+            _send_json(self, {"success": True, "connected": connected})
+
+        # ── Real-Time Agent SSE Streaming (Phase 2: Real Agent Loop) ──
+        elif self.path.startswith('/api/agent/stream'):
+            import queue
+            from agents.event_bus import get_event_bus
+            query = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(query)
+            session_id = params.get('session_id', ['*'])[0]
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Connection', 'keep-alive')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            bus = get_event_bus()
+            q = bus.subscribe(session_id)
+            try:
+                self.wfile.write(b": ping\n\n")
+                self.wfile.flush()
+                while True:
+                    try:
+                        msg = q.get(timeout=10.0)
+                        self.wfile.write(msg.encode('utf-8'))
+                        self.wfile.flush()
+                    except queue.Empty:
+                        self.wfile.write(b": keepalive\n\n")
+                        self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                bus.unsubscribe(session_id, q)
+            return
+
+        elif self.path.startswith('/api/agent/sessions/'):
+            from tracker.db import get_agent_session, get_session_trace
+            session_id = urllib.parse.unquote(self.path.split('/')[4])
+            session_data = get_agent_session(session_id)
+            if not session_data:
+                self.send_response(404)
+                self.end_headers()
+                return
+            trace = get_session_trace(session_id)
+            _send_json(self, {"success": True, "session": session_data, "trace": trace})
+
         elif self.path.startswith('/cv/'):
             vac_id = urllib.parse.unquote(self.path[4:])
             md_cv = self.get_cv(vac_id)
@@ -630,6 +689,108 @@ class CRMHandler(BaseHTTPRequestHandler):
                 cwd=os.path.dirname(__file__)
             )
             _send_json(self, {"status": "started"})
+
+        # ── Browser Bridge (Phase 1: Browser Hands) ──
+        elif self.path == '/api/agent/browser/command-result':
+            from agents.browser_bridge import get_browser_bridge
+            body = json.loads(self._read_body().decode('utf-8'))
+            cmd_id = body.get('command_id')
+            result = body.get('result', {})
+            ok = get_browser_bridge().complete_command(cmd_id, result)
+            _send_json(self, {"success": ok})
+
+        elif self.path == '/api/agent/browser/exec':
+            from agents.browser_bridge import get_browser_bridge
+            body = json.loads(self._read_body().decode('utf-8'))
+            action = body.get('action')
+            params = body.get('params', {})
+            timeout = float(body.get('timeout', 15.0))
+            res = get_browser_bridge().send_command(action, params, timeout=timeout)
+            _send_json(self, res)
+
+        # ── Start Cognitive Agent Run (Phase 2: Real Agent Loop) ──
+        elif self.path == '/api/agent/start-run':
+            import threading
+            from agents.agent_brain import CareerAgentBrain
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id')
+            target_url = body.get('target_url') or body.get('url', '')
+            mode = body.get('mode', 'SUPERVISED')
+            max_steps = int(body.get('max_steps', 25))
+
+            brain = CareerAgentBrain(
+                vacancy_id=vac_id,
+                target_url=target_url,
+                mode=mode,
+                max_steps=max_steps
+            )
+
+            # Spawn autonomous execution in background thread
+            t = threading.Thread(target=brain.run, daemon=True)
+            t.start()
+
+            _send_json(self, {
+                "success": True,
+                "session_id": brain.session_id,
+                "stream_url": f"/api/agent/stream?session_id={brain.session_id}"
+            })
+
+        # ── Approve Agent Session & Execute Privileged Submission (Phase 5) ──
+        elif self.path == '/api/agent/approve-session':
+            from tracker.db import get_agent_session
+            from agents.tool_system import ToolRegistry
+            body = json.loads(self._read_body().decode('utf-8'))
+            session_id = body.get('session_id')
+            token = body.get('approval_token')
+            elem_id = body.get('element_id')
+
+            session = get_agent_session(session_id)
+            if not session:
+                _send_json(self, {"success": False, "error": "Session not found"}, status=404)
+                return
+
+            if not token:
+                token = session.get('approval_token')
+
+            try:
+                submit_res = ToolRegistry.execute_tool("browser_submit_application", {
+                    "session_id": session_id,
+                    "approval_token": token,
+                    "element_id": elem_id
+                })
+                _send_json(self, {"success": True, "result": submit_res})
+            except Exception as e:
+                _send_json(self, {"success": False, "error": str(e)}, status=400)
+
+        # ── Evaluate Vacancy Autonomous Policy (Phase 7) ──
+        elif self.path == '/api/agent/policy-check':
+            from generator.agent_policy import evaluate_vacancy_policy
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id')
+            vac = body.get('vacancy')
+            if not vac and vac_id:
+                from tracker.db import get_db_connection
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
+                row = cur.fetchone()
+                conn.close()
+                if row:
+                    vac = dict(row)
+            if not vac:
+                _send_json(self, {"success": False, "error": "Vacancy not found"}, status=404)
+                return
+
+            res = evaluate_vacancy_policy(vac)
+            _send_json(self, {
+                "success": True,
+                "can_apply": res.can_apply,
+                "requires_approval": res.requires_approval,
+                "violations": res.violations,
+                "warnings": res.warnings,
+                "daily_count": res.daily_count,
+                "daily_limit": res.daily_limit
+            })
 
         else:
             self.send_response(404)
