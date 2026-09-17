@@ -152,6 +152,47 @@
   JH.inspectPageSemantics = function(opts = {}) {
     resetElementMap();
 
+    const currentUrl = window.location.href;
+    const hostname = window.location.hostname;
+
+    // ── Platform-Specific Pre-Actions & Auth Detection ──
+    let authRequired = false;
+    let authReason = null;
+
+    // 1. HeadHunter (hh.ru)
+    if (hostname.includes('hh.ru')) {
+      if (currentUrl.includes('/account/login') || document.querySelector('[data-qa="account-login-input"], [data-qa="login-submit-form"]')) {
+        authRequired = true;
+        authReason = "Требуется вход в аккаунт на HH.ru";
+      }
+
+      // If response modal is open on hh.ru, auto-click letter toggle to reveal cover letter textarea!
+      const letterToggle = document.querySelector('[data-qa="vacancy-response-letter-toggle"], [data-qa="vacancy-response-popup-letter-toggle"]');
+      if (letterToggle && isVisible(letterToggle)) {
+        try {
+          letterToggle.click();
+        } catch(e) {}
+      }
+    }
+
+    // 2. Habr Career (career.habr.com)
+    if (hostname.includes('habr.com')) {
+      if (currentUrl.includes('account.habr.com/login') || document.querySelector('.user-info__login, form[action*="/login"]')) {
+        if (!document.querySelector('textarea, form.new_vacancy_response')) {
+          authRequired = true;
+          authReason = "Требуется авторизация на Хабр Карьере";
+        }
+      }
+    }
+
+    // 3. SuperJob (superjob.ru)
+    if (hostname.includes('superjob.ru')) {
+      if (currentUrl.includes('/auth') || document.querySelector('form[action*="/auth/login"]')) {
+        authRequired = true;
+        authReason = "Требуется авторизация на SuperJob";
+      }
+    }
+
     const selector = 'input:not([type="hidden"]), textarea, select, button, a[role="button"], [role="button"], a[data-qa*="response"], a[data-qa*="apply"], a[href*="response"], a[href*="apply"], a[href*="#apply"], a.btn, a[class*="apply"], a[class*="response"]';
     const allElements = Array.from(document.querySelectorAll(selector));
 
@@ -231,6 +272,8 @@
     return {
       url: window.location.href,
       page_title: document.title,
+      auth_required: authRequired,
+      auth_reason: authReason,
       total_interactive_elements: elementsData.length,
       interactive_elements: elementsData,
       validation_errors: Array.from(new Set(errorsList)),

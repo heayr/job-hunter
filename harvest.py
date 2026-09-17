@@ -17,6 +17,8 @@ from scrapers.rabotaru_scraper import RabotaRuScraper
 from scrapers.ats_scraper import ATSScraper
 from scrapers.hackernews_scraper import HackerNewsScraper
 from scrapers.jobicy_scraper import JobicyScraper
+from scrapers.getmatch_scraper import GetMatchScraper
+from scrapers.setka_scraper import SetkaScraper
 from tracker.db import init_db, save_vacancy
 from generator.pitch_builder import generate_pitch
 from filter.profile_filter import is_qualified_vacancy, detect_vacancy_grade
@@ -28,10 +30,12 @@ def run():
 
     scrapers = [
         TelegramScraper(),
+        GetMatchScraper(),
+        SetkaScraper(),
+        HabrScraper(),
         ATSScraper(),
         HackerNewsScraper(),
         JobicyScraper(),
-        HabrScraper(),
         WWRScraper(),
         CryptoScraper(),
         RemotiveScraper(),

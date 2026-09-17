@@ -219,6 +219,25 @@ class CareerAgentBrain:
                 "arguments": {}
             }
 
+        # Check if auth barrier was detected on page (e.g. HH.ru login or Habr login)
+        last_insp_obs = None
+        for s in reversed(self.scratchpad):
+            if s["tool_name"] == "browser_inspect_page" and s.get("observation"):
+                obs = s["observation"].get("observation", s["observation"])
+                if isinstance(obs, dict):
+                    last_insp_obs = obs
+                    break
+
+        if last_insp_obs and last_insp_obs.get("auth_required"):
+            portal_reason = last_insp_obs.get("auth_reason") or "Требуется авторизация на сайте вакансии"
+            return {
+                "thought": f"Auth barrier detected: {portal_reason}. Halting with clear instructions for user.",
+                "action": "fail_session_with_error",
+                "arguments": {
+                    "error": f"⚠️ {portal_reason}. Пожалуйста, войдите в свой аккаунт на открытой вкладке Chrome и запустите отклик повторно."
+                }
+            }
+
         # Step 3: Classify inspected elements if not classified yet or if newly loaded view after click
         last_insp_idx = -1
         last_class_idx = -1

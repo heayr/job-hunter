@@ -357,6 +357,14 @@ async function pollBrowserCommand() {
             }
           });
         });
+
+        // If CLICK_ELEMENT triggered page navigation (e.g. Habr Career /response or redirect)
+        if (cmd.action === "CLICK_ELEMENT" && result && result.success && result.url_changed) {
+          console.log("[JobHunter BG] CLICK_ELEMENT triggered URL change. Awaiting tab complete...");
+          await waitForTabComplete(targetTabId, 15000);
+          // Grace delay for content script re-injection and framework rendering
+          await new Promise(r => setTimeout(r, 800));
+        }
       }
     }
 

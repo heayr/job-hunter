@@ -183,6 +183,35 @@ class TestCareerAgentBrain(unittest.TestCase):
         self.assertIn("candidate_verify_form", step_names)
         self.assertIn("request_human_approval", step_names)
 
+    @patch("agents.tool_system.ToolRegistry.execute_tool")
+    def test_auth_barrier_detection_halts_cleanly(self, mock_tool):
+        # Test auth wall detection (e.g. HH.ru login or Habr login):
+        mock_tool.side_effect = [
+            {"success": True, "result": {"loaded": True}},
+            {"success": True, "result": {
+                "observation": {
+                    "auth_required": True,
+                    "auth_reason": "Требуется вход в аккаунт на HH.ru",
+                    "interactive_elements": []
+                }
+            }}
+        ]
+
+        session_id = str(uuid.uuid4())
+        brain = CareerAgentBrain(
+            session_id=session_id,
+            target_url="https://hh.ru/vacancy/999999",
+            mode="SUPERVISED",
+            max_steps=5
+        )
+
+        with patch.object(brain, '_call_llm_decision', side_effect=brain._heuristic_fallback_decision):
+            result = brain.run()
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["state"], "ERROR")
+        self.assertIn("Требуется вход в аккаунт на HH.ru", result["error"])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from scrapers.ats_scraper import ATSScraper
 from scrapers.hackernews_scraper import HackerNewsScraper
 from scrapers.jobicy_scraper import JobicyScraper
+from scrapers.getmatch_scraper import GetMatchScraper
+from scrapers.setka_scraper import SetkaScraper
 from enricher.ai_parser import heuristic_fallback_parse, ingest_vacancy_with_ai
 from tracker.db import DB_PATH
 
@@ -95,6 +97,17 @@ class TestScrapersAndAiParser(unittest.TestCase):
         self.assertIn("tailored_cv", pitch_types)
 
         conn.close()
+
+    def test_getmatch_scraper_instantiation(self):
+        scraper = GetMatchScraper()
+        self.assertEqual(scraper.name, "getmatch")
+        self.assertIn("Frontend", scraper.queries)
+        self.assertIn("React", scraper.queries)
+
+    def test_setka_scraper_instantiation(self):
+        scraper = SetkaScraper()
+        self.assertEqual(scraper.name, "setka")
+        self.assertGreater(len(scraper.feed_ids), 0)
 
 
 if __name__ == "__main__":
