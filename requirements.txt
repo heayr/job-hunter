@@ -1,4 +1,3 @@
 pypdf
 python-docx
-requests
 telethon

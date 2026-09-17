@@ -8,9 +8,8 @@ try:
     from telethon import TelegramClient
     from telethon.errors import SessionPasswordNeededError, PeerFloodError
 except ImportError:
-    os.system(f"{sys.executable} -m pip install telethon")
-    from telethon import TelegramClient
-    from telethon.errors import SessionPasswordNeededError, PeerFloodError
+    print("ОШИБКА: telethon не установлен. Выполните: pip install telethon")
+    sys.exit(1)
 
 API_ID = int(os.getenv("TG_API_ID", "0"))
 API_HASH = os.getenv("TG_API_HASH", "")

@@ -32,6 +32,13 @@ async function loadConfig() {
         const data = await api.getConfig();
         const keyInput = document.getElementById('gemini-key');
         if (keyInput) keyInput.value = data.gemini_api_key || '';
+        
+        const senCheck = document.getElementById('setting-seniority-alignment');
+        if (senCheck) senCheck.checked = data.seniority_alignment !== false;
+
+        const hlCheck = document.getElementById('setting-highload-guardrail');
+        if (hlCheck) hlCheck.checked = data.highload_guardrail !== false;
+
         activeProfileId = data.active_profile_id || null;
         renderActiveProfileDropdown();
     } catch (e) {
@@ -41,7 +48,15 @@ async function loadConfig() {
 
 async function saveConfig() {
     const key = document.getElementById('gemini-key')?.value.trim() || '';
-    await api.saveConfig({ gemini_api_key: key, active_profile_id: activeProfileId });
+    const seniorityAlignment = document.getElementById('setting-seniority-alignment')?.checked ?? true;
+    const highloadGuardrail = document.getElementById('setting-highload-guardrail')?.checked ?? true;
+
+    await api.saveConfig({
+        gemini_api_key: key,
+        active_profile_id: activeProfileId,
+        seniority_alignment: seniorityAlignment,
+        highload_guardrail: highloadGuardrail
+    });
     toggleModal('settings-modal');
     showToast('⚙️ Настройки сохранены');
 }

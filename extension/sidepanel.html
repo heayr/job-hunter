@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Hunter — AI Career Agent</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #131b2e;
+      --card-border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --sky: #0ea5e9;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-family);
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 16px;
+      width: 380px;
+      max-height: 580px;
+      overflow-y: auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 14px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 15px;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .server-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+    .server-status.offline {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .detected-job-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .detected-job-company {
+      font-size: 12px;
+      color: #38bdf8;
+    }
+
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    .score-high { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; }
+    .score-mid { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #f59e0b; }
+    .score-low { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid #f43f5e; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: white;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #4f46e5, #4338ca); }
+    .btn-emerald {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      margin-top: 8px;
+    }
+    .btn-emerald:hover { background: linear-gradient(135deg, #059669, #047857); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    .btn-outline:hover {
+      border-color: #475569;
+      color: #fff;
+    }
+
+    .output-box {
+      background-color: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      user-select: all;
+    }
+
+    .copy-btn-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+
+    .alert {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+    .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; }
+    .alert-warn { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <span>⚡️</span> Job Hunter Agent
+    </div>
+    <div id="crm-status-badge" class="server-status">
+      ● CRM Online
+    </div>
+  </div>
+
+  <!-- Detected Vacancy Card -->
+  <div class="card">
+    <div class="card-title">
+      <span>📍 Текущая страница</span>
+      <button id="refresh-page-btn" class="btn-outline" style="width: auto;">Обновить</button>
+    </div>
+    <div id="detected-title" class="detected-job-title">Загрузка...</div>
+    <div id="detected-company" class="detected-job-company">—</div>
+    <div id="match-score-badge" class="score-badge score-mid" style="display: none;">
+      ⚡️ Мэтч: <span id="match-score-val">0%</span>
+    </div>
+  </div>
+
+  <!-- Action: Analyze with Career Agent -->
+  <div class="card">
+    <button id="analyze-btn" class="btn btn-primary">
+      <span>🪄</span> Анализировать и подготовить питч
+    </button>
+    <div id="analyze-msg" style="display: none;"></div>
+  </div>
+
+  <!-- Generated Short DM / Pitch -->
+  <div class="card" id="dm-card" style="display: none;">
+    <div class="card-title">
+      <span>💬 Короткий отклик (Short DM)</span>
+    </div>
+    <div id="dm-content" class="output-box"></div>
+    <div class="copy-btn-row">
+      <button id="copy-dm-btn" class="btn-outline" style="width: auto;">📋 Скопировать</button>
+    </div>
+  </div>
+
+  <!-- Generated Cover Letter -->
+  <div class="card" id="cl-card" style="display: none;">
+    <div class="card-title">
+      <span>📝 Сопроводительное письмо</span>
+    </div>
+    <div id="cl-content" class="output-box"></div>
+    <div class="copy-btn-row">
+      <button id="copy-cl-btn" class="btn-outline" style="width: auto;">📋 Скопировать</button>
+    </div>
+  </div>
+
+  <!-- Execution Mode & Auto-Apply Form Button (Phase 16) -->
+  <div class="card">
+    <div class="card-title">
+      <span>⚡️ Режим выполнения</span>
+      <span id="active-mode-badge" style="font-size: 10px; color: #38bdf8; font-weight: 700;">SEMI_AUTO</span>
+    </div>
+    <div style="display: flex; gap: 4px; margin-bottom: 10px;">
+      <button type="button" id="mode-assist-btn" class="btn-outline" style="flex: 1; padding: 5px; font-size: 10px;">ASSIST</button>
+      <button type="button" id="mode-semiauto-btn" class="btn-outline" style="flex: 1; padding: 5px; font-size: 10px; border-color: #6366f1; color: #fff; background: rgba(99,102,241,0.2);">SEMI-AUTO</button>
+      <button type="button" id="mode-auto-btn" class="btn-outline" style="flex: 1; padding: 5px; font-size: 10px;">AUTO</button>
+    </div>
+    <p id="mode-desc" style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+      <b>SEMI-AUTO:</b> Заполнение полей формы в 1 клик с ручной финальной проверкой перед отправкой.
+    </p>
+    <button id="autofill-btn" class="btn btn-emerald">
+      <span>🔖</span> Заполнить форму на странице
+    </button>
+    <div id="autofill-result" style="display: none;"></div>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

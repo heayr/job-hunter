@@ -343,9 +343,16 @@ function renderDetails() {
         contactInfo = `<a href="tg://resolve?domain=${tgHandle}&text=${encodeURIComponent(v.short_dm || '')}" class="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium bg-sky-900/30 px-3 py-1 rounded-lg text-xs border border-sky-800/50"><span>✈️</span> Telegram HR (Link)</a>`;
         actionBtnHtml = `<button onclick="applyTg('${v.id}')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1.5 shadow-md ring-1 ring-sky-400/30">🤖 Отправить через Userbot</button>`;
     } else {
-        contactInfo = `<span class="text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg text-xs">Контакты скрыты</span>`;
-        actionBtnHtml = `<button onclick="openVacancyWithAutoApply('${v.id}')" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-all shadow-md flex items-center gap-1.5 ring-1 ring-emerald-400/30">🚀 Откликнуться (Скопировать + Открыть)</button>`;
-    }
+        actionBtnHtml = `
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="triggerAgentAutoApply('${v.id}')" id="btn-agent-apply-${v.id}" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all shadow-lg flex items-center gap-2 ring-2 ring-indigo-500/40">
+                    <span>🤖</span> Авто-отклик агентом (1-Click)
+                </button>
+                <button onclick="openVacancyWithAutoApply('${v.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 transition-all flex items-center gap-1.5 shadow-sm">
+                    <span>↗</span> Открыть вручную
+                </button>
+            </div>
+        `;
 
     const cleanComp = cleanCompanyName(v.company, v.title, v.description);
     const cleanRole = (v.title || '').replace(/[\|\(\)\/].*$/, '').trim() || 'Frontend';
@@ -542,6 +549,70 @@ function openVacancyWithAutoApply(vacId) {
     const safePayload = encodeURIComponent(text);
     const targetUrl = rawUrl.includes('#') ? rawUrl : (rawUrl + '#jh_cover=' + safePayload);
     window.open(targetUrl, '_blank');
+}
+
+async function triggerAgentAutoApply(vacId) {
+    const v = vacancies.find(x => String(x.id) === String(vacId));
+    if (!v) return;
+
+    const btn = document.getElementById(`btn-agent-apply-${vacId}`);
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> Запуск агента...';
+    }
+
+    showToast('🚀 Задача передана браузерному агенту! Он открывает вакансию и заполняет отклик...');
+
+    try {
+        const res = await fetch('/api/agent/queue-task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vacancy_id: v.id,
+                url: formatVacancyUrl(v.url),
+                company: v.company || 'Unknown',
+                role_title: v.title || 'Engineer',
+                portal: v.source || 'web',
+                cover_letter: v.cover_letter || v.short_dm || ''
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ Агент приступил к выполнению задачи в фоновой вкладке браузера!');
+            if (btn) {
+                btn.innerHTML = '<span>⚡️</span> В работе у агента...';
+            }
+            // Poll for task completion to automatically move to Sent
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`/api/vacancies/${vacId}/runtime_state`);
+                    const stateData = await statusRes.json();
+                    if (stateData.fsm_state === 'SUBMITTED') {
+                        clearInterval(pollInterval);
+                        showToast('🎉 Агент успешно отправил отклик на вакансию!');
+                        await updateStatus(vacId, 'sent');
+                    }
+                } catch (e) {
+                    clearInterval(pollInterval);
+                }
+            }, 3000);
+            // Cancel polling after 60s
+            setTimeout(() => clearInterval(pollInterval), 60000);
+        } else {
+            alert('Ошибка постановки задачи агенту: ' + (data.error || 'Неизвестная ошибка'));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+    } catch (err) {
+        alert('Ошибка связи с сервером CRM: ' + err.message);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
 }
 
 async function rewriteAI(vac_id) {

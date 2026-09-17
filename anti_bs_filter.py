@@ -13,14 +13,14 @@ def analyze_vacancy_traps(description: str):
         warnings.append("🛠 В вакансии упоминается ТЕСТОВОЕ ЗАДАНИЕ.")
         
     # 3. Attention Check / Hidden Words Check
-    if re.search(r'(начн[и|ите]\s*(сопроводительное|письмо|отклик).*?со\s*слов[а|ас]\b)', description) or \
-       re.search(r'(кодово[е|й]\s*слов[о|а])', description) or \
-       re.search(r'(укаж[и|ите]\s*в\s*(отклике|сопроводительном).*?слов[о|а]\b)', description) or \
-       re.search(r'(если.*дочитал.*напиш[и|ите])', description):
+    if re.search(r'(начн(?:и|ите)\s*(сопроводительное|письмо|отклик).*?со\s*слов(?:а|ас)\b)', description) or \
+       re.search(r'(кодов(?:е|й)\s*слов(?:о|а))', description) or \
+       re.search(r'(укаж(?:и|ите)\s*в\s*(отклике|сопроводительном).*?слов(?:о|а)\b)', description) or \
+       re.search(r'(если.*дочитал.*напиш(?:и|ите))', description):
         warnings.append("🕵️ ПРОВЕРКА НА ВНИМАТЕЛЬНОСТЬ! В тексте просят кодовое слово.")
         
     # 4. Strict Github Check
-    if re.search(r'\b(github\s*профиль|ссылку\s*на\s*github|проверк[а|у]\s*через\s*github|покажите\s*код)\b', description):
+    if re.search(r'\b(github\s*профиль|ссылку\s*на\s*github|проверк(?:а|у)\s*через\s*github|покажите\s*код)\b', description):
         warnings.append("💻 Хотят видеть код/GitHub. Обязательно подсвети ссылку на репозиторий!")
         
     # 5. English level requirement

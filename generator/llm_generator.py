@@ -5,6 +5,8 @@ import os
 import re
 from typing import Dict, Any, Optional
 
+GEMINI_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"]
+
 def get_api_key() -> str:
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
     if os.path.exists(config_path):
@@ -127,12 +129,7 @@ Respond ONLY with valid JSON in this exact structure:
 }}
 """
 
-    models_to_try = [
-        "models/gemini-flash-lite-latest",
-        "models/gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-flash-latest"
-    ]
+    models_to_try = GEMINI_MODELS[:]
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -145,12 +142,15 @@ Respond ONLY with valid JSON in this exact structure:
     last_error = ""
 
     for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         try:
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
+                headers={
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': api_key
+                }
             )
             with urllib.request.urlopen(req, timeout=20) as response:
                 resp_text = response.read().decode('utf-8')

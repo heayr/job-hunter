@@ -325,6 +325,24 @@
                 <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с
                     <code>AIzaSy...</code></p>
             </div>
+
+            <div class="mb-3 pt-2 border-t border-slate-800/80 space-y-2.5 text-xs">
+                <div class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Калибровка стратегии и резюме</div>
+                <label class="flex items-start gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="setting-seniority-alignment" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
+                    <div>
+                        <div class="text-slate-200 font-medium">Калибровка грейда (Seniority Alignment)</div>
+                        <div class="text-[10px] text-slate-400">Смягчает роль «Лид» до «Frontend/Fullstack» при отклике на Middle/Junior вакансии, устраняя риск отказа за overqualified.</div>
+                    </div>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="setting-highload-guardrail" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
+                    <div>
+                        <div class="text-slate-200 font-medium">Барьер хайлоада (Highload Guardrail)</div>
+                        <div class="text-[10px] text-slate-400">Фокусирует резюме на клиентском перформансе (Core Web Vitals 100/100), блокируя непроверенные обещания распределенного бэкенда.</div>
+                    </div>
+                </label>
+            </div>
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button onclick="toggleModal('settings-modal')"
                     class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
@@ -534,6 +552,23 @@
                             📋 Копировать
                         </button>
                     </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-800/60 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <div class="font-semibold text-purple-300 flex items-center gap-1.5">
+                            <span>🧩</span> Способ 3: Chrome Extension (Side Panel & Agent)
+                        </div>
+                        <span class="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-bold">Рекомендуется</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 mb-2">
+                        Полноценная боковая панель в браузере с живым анализом вакансий и 1-click заполнением форм:
+                    </p>
+                    <ol class="text-[11px] text-slate-400 list-decimal list-inside space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                        <li>Откройте в Chrome: <code class="text-sky-300 font-mono">chrome://extensions</code> и включите <b>«Режим разработчика»</b> (вверху справа).</li>
+                        <li>Нажмите <b>«Загрузить распакованное расширение»</b> (Load unpacked).</li>
+                        <li>Выберите папку <code class="text-purple-300 font-mono">job_hunter/extension</code> в корне проекта.</li>
+                    </ol>
                 </div>
 
                 <div class="bg-indigo-950/40 border border-indigo-900/60 rounded-xl p-3.5 text-[11px] space-y-1.5 text-indigo-200">

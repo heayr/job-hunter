@@ -390,13 +390,16 @@ def extract_profile_with_ai(text: str) -> dict:
     Resume:
     {text[:4000]}
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.1}
     }
     try:
-        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
+        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={
+            'Content-Type': 'application/json',
+            'x-goog-api-key': api_key
+        })
         response = urllib.request.urlopen(req, timeout=8).read().decode('utf-8')
         resp_data = json.loads(response)
         out = resp_data['candidates'][0]['content']['parts'][0]['text']

@@ -75,7 +75,11 @@ class CRMHandler(BaseHTTPRequestHandler):
                 COALESCE(v.published_at, v.created_at) AS published_at,
                 v.created_at,
                 v.blacklist_reason,
-                v.blacklisted_at,
+                v.understanding_json,
+                v.application_thesis_json,
+                v.application_strategy_json,
+                v.ats_report_json,
+                COALESCE(v.fsm_state, 'DISCOVERED') AS fsm_state,
                 MAX(CASE WHEN p.pitch_type = 'short_dm'     THEN p.content END) AS short_dm,
                 MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.content END) AS cover_letter,
                 MAX(CASE WHEN p.pitch_type = 'tailored_cv'  THEN p.content END) AS tailored_cv
@@ -145,6 +149,14 @@ class CRMHandler(BaseHTTPRequestHandler):
     #  GET routes
     # ─────────────────────────────────────────────
 
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
     def do_GET(self):
         try:
             self._handle_get()
@@ -201,14 +213,8 @@ class CRMHandler(BaseHTTPRequestHandler):
             _send_json(self, data)
 
         elif self.path == '/api/profiles':
-            profiles_path = os.path.join(os.path.dirname(__file__), 'generator', 'profiles.json')
-            data = []
-            if os.path.exists(profiles_path):
-                with open(profiles_path, 'r', encoding='utf-8') as pf:
-                    try:
-                        data = json.load(pf)
-                    except Exception:
-                        data = []
+            from generator.candidate_profile import load_canonical_profiles
+            data = load_canonical_profiles()
             _send_json(self, data)
 
         elif self.path == '/api/config':
@@ -235,6 +241,116 @@ class CRMHandler(BaseHTTPRequestHandler):
                 with open(harvest_log_file, 'r', encoding='utf-8') as f:
                     logs = f.read()
             _send_json(self, {"is_running": is_running, "logs": logs})
+
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/thesis'):
+            from tracker.db import get_application_thesis
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            thesis = get_application_thesis(vac_id)
+            _send_json(self, {"success": True, "thesis": thesis})
+
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/strategy'):
+            from tracker.db import get_application_strategy
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            strategy = get_application_strategy(vac_id)
+            _send_json(self, {"success": True, "strategy": strategy})
+
+        elif self.path.startswith('/api/companies/') and self.path.endswith('/research'):
+            from generator.company_researcher import research_company_context
+            comp_name = urllib.parse.unquote(self.path.split('/')[3])
+            dossier = research_company_context(comp_name)
+            _send_json(self, {"success": True, "dossier": dossier})
+
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/tailored_cv'):
+            from generator.candidate_profile import get_canonical_profile
+            from generator.tailored_resume_engine import heuristic_tailored_resume, render_tailored_resume_markdown
+            from tracker.db import get_application_strategy, get_job_understanding
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            
+            # Fetch vacancy details
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
+            v_row = cur.fetchone()
+            conn.close()
+
+            if not v_row:
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            v_dict = dict(v_row)
+            lang = v_dict.get("language") or "ru"
+            profile = get_canonical_profile(lang=lang)
+            strategy = get_application_strategy(vac_id) or {}
+            ju = get_job_understanding(vac_id) or {"role_overview": {"title": v_dict.get("title", ""), "company": v_dict.get("company", "")}}
+
+            tailored_data = heuristic_tailored_resume(profile, ju, strategy, lang=lang)
+            md = render_tailored_resume_markdown(tailored_data, lang=lang)
+            _send_json(self, {"success": True, "resume": tailored_data, "markdown": md})
+
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/ats_report'):
+            from generator.candidate_profile import get_canonical_profile
+            from generator.tailored_resume_engine import heuristic_tailored_resume
+            from generator.ats_analyzer import analyze_resume_for_ats
+            from tracker.db import get_application_strategy, get_job_understanding, get_ats_report, save_ats_report
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+
+            cached_report = get_ats_report(vac_id)
+            if cached_report:
+                _send_json(self, {"success": True, "ats_report": cached_report})
+                return
+
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
+            v_row = cur.fetchone()
+            conn.close()
+
+            if not v_row:
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            v_dict = dict(v_row)
+            lang = v_dict.get("language") or "ru"
+            profile = get_canonical_profile(lang=lang)
+            strategy = get_application_strategy(vac_id) or {}
+            ju = get_job_understanding(vac_id) or {"role_overview": {"title": v_dict.get("title", ""), "company": v_dict.get("company", "")}}
+
+            tailored_data = heuristic_tailored_resume(profile, ju, strategy, lang=lang)
+            report = analyze_resume_for_ats(tailored_data, ju, lang=lang, use_ai=False)
+            save_ats_report(vac_id, report)
+
+            _send_json(self, {"success": True, "ats_report": report})
+
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/runtime_state'):
+            from tracker.db import get_vacancy_fsm_state
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            state = get_vacancy_fsm_state(vac_id)
+            _send_json(self, {"success": True, "vacancy_id": vac_id, "fsm_state": state})
+
+        elif self.path == '/api/agent/tools':
+            from agents.tool_system import ToolRegistry
+            tools = ToolRegistry.list_tools()
+            _send_json(self, {"success": True, "tools": tools})
+
+        elif self.path == '/api/applications/history':
+            from tracker.db import get_application_history
+            history = get_application_history(limit=100)
+            _send_json(self, {"success": True, "history": history})
+
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/timeline'):
+            from tracker.db import get_agent_run_timeline
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            timeline = get_agent_run_timeline(vac_id)
+            _send_json(self, {"success": True, "vacancy_id": vac_id, "timeline": timeline})
+
+        elif self.path == '/api/agent/pending-tasks':
+            from tracker.db import get_pending_agent_tasks
+            tasks = get_pending_agent_tasks(limit=10)
+            _send_json(self, {"success": True, "tasks": tasks})
 
         elif self.path.startswith('/cv/'):
             vac_id = urllib.parse.unquote(self.path[4:])
@@ -341,6 +457,69 @@ class CRMHandler(BaseHTTPRequestHandler):
             else:
                 _send_json(self, {"success": False, "error": result.stderr or result.stdout}, status=500)
 
+        # ── Record application audit event (Phase 17) ──
+        elif self.path == '/api/applications/record':
+            from tracker.db import record_application_event, update_vacancy_fsm_state
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id', '')
+            company = body.get('company', 'Unknown')
+            role_title = body.get('role_title', 'Engineer')
+            portal = body.get('portal', 'web')
+            mode = body.get('mode', 'SEMI_AUTO')
+            fsm_state = body.get('fsm_state', 'SUBMITTED')
+            meta = body.get('metadata', {})
+
+            event_id = record_application_event(
+                vacancy_id=vac_id,
+                company=company,
+                role_title=role_title,
+                portal=portal,
+                mode=mode,
+                fsm_state=fsm_state,
+                metadata=meta
+            )
+            if vac_id:
+                update_vacancy_fsm_state(vac_id, fsm_state)
+            _send_json(self, {"success": True, "event_id": event_id})
+
+        # ── Queue autonomous apply task (Phase 21 Auto-Agent) ──
+        elif self.path == '/api/agent/queue-task':
+            from tracker.db import create_agent_task, update_vacancy_fsm_state
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id', '')
+            url = body.get('url', '')
+            company = body.get('company', 'Unknown')
+            role_title = body.get('role_title', 'Engineer')
+            portal = body.get('portal', 'web')
+            cover_letter = body.get('cover_letter', '')
+
+            task_id = create_agent_task(
+                vacancy_id=vac_id,
+                url=url,
+                company=company,
+                role_title=role_title,
+                portal=portal,
+                cover_letter=cover_letter
+            )
+            if vac_id:
+                update_vacancy_fsm_state(vac_id, 'WAITING_APPROVAL')
+            _send_json(self, {"success": True, "task_id": task_id})
+
+        # ── Update agent task status (reported by extension) ──
+        elif self.path == '/api/agent/task-status':
+            from tracker.db import update_agent_task_status, update_vacancy_fsm_state
+            body = json.loads(self._read_body().decode('utf-8'))
+            task_id = body.get('task_id')
+            status = body.get('status', 'COMPLETED')
+            result_msg = body.get('result_message', '')
+            vac_id = body.get('vacancy_id')
+
+            update_agent_task_status(task_id, status, result_msg)
+            if vac_id:
+                new_fsm = 'SUBMITTED' if status == 'COMPLETED' else 'FAILED'
+                update_vacancy_fsm_state(vac_id, new_fsm)
+            _send_json(self, {"success": True})
+
         # ── Upload and parse resume ──
         elif self.path == '/api/upload_resume':
             import base64
@@ -379,10 +558,11 @@ class CRMHandler(BaseHTTPRequestHandler):
 
         # ── Save profiles ──
         elif self.path == '/api/profiles':
+            from generator.candidate_profile import save_canonical_profiles
             profiles = json.loads(self._read_body().decode('utf-8'))
-            profiles_path = os.path.join(os.path.dirname(__file__), 'generator', 'profiles.json')
-            with open(profiles_path, 'w', encoding='utf-8') as pf:
-                json.dump(profiles, pf, ensure_ascii=False, indent=2)
+            if not isinstance(profiles, list):
+                profiles = [profiles]
+            save_canonical_profiles(profiles)
             _send_json(self, {"success": True})
 
         # ── Universal AI Vacancy Parser ──

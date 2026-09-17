@@ -11,7 +11,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from generator.llm_generator import get_api_key
+from generator.llm_generator import get_api_key, GEMINI_MODELS
 from generator.pitch_builder import generate_pitch
 from filter.profile_filter import detect_vacancy_grade
 from tracker.db import get_db_connection, save_vacancy
@@ -129,12 +129,7 @@ Job Posting Text:
 \"\"\"{raw_text[:6500]}\"\"\"
 """
 
-    models_to_try = [
-        "models/gemini-flash-lite-latest",
-        "models/gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-flash-latest"
-    ]
+    models_to_try = GEMINI_MODELS[:]
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -146,12 +141,15 @@ Job Posting Text:
 
     for model in models_to_try:
         model_path = model if model.startswith("models/") else f"models/{model}"
-        url = f"https://generativelanguage.googleapis.com/v1beta/{model_path}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{model_path}:generateContent"
         try:
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
+                headers={
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': api_key
+                }
             )
             with urllib.request.urlopen(req, timeout=18) as response:
                 resp_text = response.read().decode('utf-8')
@@ -213,6 +211,10 @@ def ingest_vacancy_with_ai(
     # Parse with AI
     parsed = parse_with_gemini(clean_text, source_url)
 
+    # Perform Deep Job Understanding (Phase 2)
+    from generator.job_understanding import understand_job_posting
+    understanding = understand_job_posting(parsed["title"], clean_text, parsed["company"], source_url)
+
     # Generate unique ID
     key = source_url or f"{parsed['title']}:{parsed['company']}:{clean_text[:100]}"
     vac_hash = hashlib.md5(key.encode("utf-8")).hexdigest()[:12]
@@ -255,10 +257,49 @@ def ingest_vacancy_with_ai(
         else:
             save_vacancy(vacancy)
 
+        # Multi-Agent Specialized Cognitive Cycle (Phase 11)
+        from agents.multi_agent_roles import CareerOrchestrator
+        orchestrator = CareerOrchestrator()
+
+        agent_context = orchestrator.process_application({
+            "title": parsed["title"],
+            "description": clean_text,
+            "company": parsed["company"],
+            "url": source_url,
+            "profile_id": profile_id,
+            "lang": lang,
+            "use_ai": True
+        })
+
+        understanding = agent_context.get("job_understanding", understanding)
+        app_thesis = agent_context.get("application_thesis", {})
+        app_strategy = agent_context.get("application_strategy", {})
+        tailored_cv_text = agent_context.get("resume_markdown", pitch_data.get("tailored_cv", ""))
+        critic_cl = agent_context.get("critic_refined_cover_letter") or pitch_data.get("cover_letter", "")
+        short_dm_text = agent_context.get("short_dm") or pitch_data.get("short_dm", "")
+        ats_report = agent_context.get("ats_report", {})
+
+        # Save Deep Job Understanding (Phase 2), Application Thesis (Phase 4), Strategy (Phase 7), and ATS (Phase 9)
+        cur.execute("""
+        UPDATE vacancies 
+        SET understanding_json = ?, application_thesis_json = ?, application_strategy_json = ?, ats_report_json = ?
+        WHERE id = ?
+        """, (
+            json.dumps(understanding, ensure_ascii=False),
+            json.dumps(app_thesis, ensure_ascii=False),
+            json.dumps(app_strategy, ensure_ascii=False),
+            json.dumps(ats_report, ensure_ascii=False),
+            vac_id
+        ))
+
         # Clear old drafts and insert new pitches
         cur.execute("DELETE FROM pitches WHERE vacancy_id = ?", (vac_id,))
-        for p_type in ["short_dm", "cover_letter", "tailored_cv"]:
-            content = pitch_data.get(p_type, "")
+        pitch_map = {
+            "short_dm": short_dm_text,
+            "cover_letter": critic_cl,
+            "tailored_cv": tailored_cv_text
+        }
+        for p_type, content in pitch_map.items():
             cur.execute(
                 "INSERT INTO pitches (vacancy_id, pitch_type, language, content, status) VALUES (?, ?, ?, ?, 'DRAFT')",
                 (vac_id, p_type, lang, content)
@@ -270,16 +311,24 @@ def ingest_vacancy_with_ai(
         )
         conn.commit()
 
-        vacancy["score"] = score
-        vacancy["short_dm"] = pitch_data.get("short_dm", "")
-        vacancy["cover_letter"] = pitch_data.get("cover_letter", "")
-        vacancy["tailored_cv"] = pitch_data.get("tailored_cv", "")
+        # Persist Observability Execution Trace (Phase 18)
+        trace = agent_context.get("execution_trace", [])
+        from tracker.db import log_agent_run_step
+        for step in trace:
+            log_agent_run_step(
+                vacancy_id=vac_id,
+                step_name=step.get("agent", "Agent"),
+                status="SUCCESS" if not step.get("error") else "FAILED",
+                duration_ms=int(step.get("duration_ms", 0)),
+                details=step
+            )
 
         return {
             "success": True,
             "vacancy_id": vac_id,
             "score": score,
             "vacancy": vacancy,
+            "execution_trace": agent_context.get("execution_trace", []),
             "ai_generated": pitch_data.get("ai_generated", False)
         }
     except Exception as e:

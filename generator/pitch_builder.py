@@ -1,7 +1,7 @@
 import re
 import os
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from generator.llm_generator import generate_ai_pitch
 from anti_bs_filter import analyze_vacancy_traps
@@ -22,14 +22,8 @@ KNOWN_TECH_KEYWORDS = [
 # ─────────────────────────────────────────────
 
 def load_profiles() -> List[Dict]:
-    path = os.path.join(os.path.dirname(__file__), 'profiles.json')
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                return []
-    return []
+    from generator.candidate_profile import load_canonical_profiles
+    return load_canonical_profiles()
 
 
 def select_profile(lang: str = "ru", profile_id: Optional[str] = None) -> Dict:
@@ -102,6 +96,42 @@ def determine_language(vacancy: Dict[str, Any]) -> str:
 def build_tailored_cv(vacancy: Dict[str, Any], target_keywords: List[str], lang: str = "ru", profile: Optional[Dict] = None) -> str:
     if profile is None:
         profile = select_profile(lang)
+
+    # Use Phase 8 Tailored Resume Engine with fallback
+    try:
+        from generator.tailored_resume_engine import generate_tailored_resume, render_tailored_resume_markdown
+        from generator.job_understanding import heuristic_job_understanding
+        from generator.application_strategy import heuristic_application_strategy
+        from generator.company_researcher import heuristic_company_dossier
+        from generator.thesis_generator import heuristic_application_thesis
+        from generator.evidence_retriever import heuristic_evidence_retrieval
+
+        ju = vacancy.get("understanding_json")
+        if isinstance(ju, str):
+            try: ju = json.loads(ju)
+            except Exception: ju = None
+        if not ju:
+            ju = heuristic_job_understanding(
+                vacancy.get("title", ""),
+                vacancy.get("skills", ""),
+                vacancy.get("company", "")
+            )
+
+        strategy = vacancy.get("application_strategy_json")
+        if isinstance(strategy, str):
+            try: strategy = json.loads(strategy)
+            except Exception: strategy = None
+        if not strategy:
+            cd = heuristic_company_dossier(vacancy.get("company", ""), "", "")
+            retrieved = heuristic_evidence_retrieval(profile, ju, lang=lang)
+            thesis = heuristic_application_thesis(profile, ju, retrieved, lang=lang)
+            strategy = heuristic_application_strategy(profile, ju, cd, thesis, lang=lang)
+
+        tailored_data = generate_tailored_resume(profile, ju, strategy, lang=lang, use_ai=False)
+        return render_tailored_resume_markdown(tailored_data, lang=lang)
+    except Exception:
+        pass
+
     kw_str = ", ".join(target_keywords)
     title = vacancy.get("title", profile.get("role", "Frontend Engineer"))
     name = profile.get("name", "Имя Фамилия" if lang == "ru" else "Candidate Name")
@@ -237,8 +267,24 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, A
 #  Main pitch generator
 # ─────────────────────────────────────────────
 
-def select_dynamic_achievements(full_text: str, lang: str = "ru") -> List[str]:
+def select_dynamic_achievements(full_text: str, lang: str = "ru", profile: Optional[Dict] = None) -> List[str]:
     """Select the 2-3 most relevant real achievements from candidate's profile matching the job requirements."""
+    # If a profile is provided, run Phase 3 Evidence Reframing Engine
+    if profile:
+        try:
+            from generator.evidence_retriever import retrieve_and_reframe_evidence
+            job_dummy = {
+                "role_overview": {"title": full_text[:80], "company": ""},
+                "facts": {"explicit_requirements": [full_text[:500]]},
+                "reasoning": {"likely_team_problems": [full_text[:500]]}
+            }
+            reframed = retrieve_and_reframe_evidence(profile, job_dummy, lang=lang)
+            bullets = [m["aggressive_framing"] for m in reframed.get("matched_evidence", [])]
+            if bullets:
+                return bullets[:3]
+        except Exception:
+            pass
+
     bullets = []
     text_lower = full_text.lower()
 
@@ -319,55 +365,87 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Op
     warn_text = "\n".join(warnings) if warnings else ""
     warning_header = f"[{warn_text}]\n\n" if warnings else ""
 
-    # Select real matching achievements
-    achievements = select_dynamic_achievements(f"{title} {skills} {desc}", lang=lang)
+    # Select real matching achievements with Phase 3 reframing
+    achievements = select_dynamic_achievements(f"{title} {skills} {desc}", lang=lang, profile=profile)
     bullet_text = "\n".join(f"• {b}" for b in achievements)
 
-    if lang == "en":
-        greeting_dm = f"Hi {recipient}!" if recipient else "Hi!"
-        greeting_cl = f"Dear {company} Team," if company else "Hello Hiring Team,"
+    # Phase 10: Use Cover Letter Engine with cognitive loop
+    try:
+        from generator.cover_letter_engine import generate_cover_letter
+        from generator.job_understanding import heuristic_job_understanding
+        from generator.application_strategy import heuristic_application_strategy
+        from generator.company_researcher import heuristic_company_dossier
+        from generator.thesis_generator import heuristic_application_thesis
+        from generator.evidence_retriever import heuristic_evidence_retrieval
 
-        top_fact = achievements[0] if achievements else f"I build production web apps with {highlight_kw}."
+        ju = vacancy.get("understanding_json")
+        if isinstance(ju, str):
+            try: ju = json.loads(ju)
+            except Exception: ju = None
+        if not ju:
+            ju = heuristic_job_understanding(title, f"{skills} {desc}", company)
 
-        short_dm = (
-            warning_header +
-            f"{greeting_dm} Saw your {title} opening at {company}.\n\n"
-            f"My focus aligns directly with your stack ({highlight_kw}). {top_fact}\n\n"
-            f"{github} | {linkedin}\n\n"
-            f"Still interviewing for this role? Would love to connect!"
-        )
-        cover_letter = (
-            warning_header +
-            f"{greeting_cl}\n\n"
-            f"I'm applying for the {title} role at {company}.\n\n"
-            f"I build high-performance, maintainable web applications with React, Next.js, and TypeScript, with full technical ownership across the stack ({highlight_kw}).\n\n"
-            f"Relevant experience & outcomes:\n"
-            f"{bullet_text}\n\n"
-            f"Would be glad to discuss how my background can help your team ship fast and scale.\n\n"
-            f"Best regards,\n{name}\n{tg} | {email}\n{github} | {linkedin}"
-        )
-    else:
-        greeting_dm = f"Привет, {recipient}!" if recipient else "Привет!"
+        strategy = vacancy.get("application_strategy_json")
+        if isinstance(strategy, str):
+            try: strategy = json.loads(strategy)
+            except Exception: strategy = None
+        if not strategy:
+            cd = heuristic_company_dossier(company, "", "")
+            retrieved = heuristic_evidence_retrieval(profile, ju, lang=lang)
+            thesis = heuristic_application_thesis(profile, ju, retrieved, lang=lang)
+            strategy = heuristic_application_strategy(profile, ju, cd, thesis, lang=lang)
+        else:
+            thesis = {"thesis": strategy.get("strategic_thesis_refinement", "")}
 
-        top_fact = achievements[0] if achievements else f"Специализируюсь на продуктовой веб-разработке с фокусом на {highlight_kw}."
+        cl_pkg = generate_cover_letter(profile, ju, strategy, thesis, lang=lang, use_ai=False)
+        short_dm = warning_header + cl_pkg["short_dm"]
+        cover_letter = warning_header + cl_pkg["cover_letter"]
+    except Exception:
+        if lang == "en":
+            greeting_dm = f"Hi {recipient}!" if recipient else "Hi!"
+            greeting_cl = f"Dear {company} Team," if company else "Hello Hiring Team,"
 
-        short_dm = (
-            warning_header +
-            f"{greeting_dm} Увидел вакансию «{title}» в {company}.\n\n"
-            f"Мой стек и опыт напрямую пересекаются с вашими задачами ({highlight_kw}). {top_fact}\n\n"
-            f"{github} | {linkedin}\n\n"
-            f"Если позиция актуальна — буду рад пообщаться!"
-        )
-        cover_letter = (
-            warning_header +
-            f"Здравствуйте!\n\n"
-            f"Меня зовут {name}, откликаюсь на вакансию «{title}» в {company}.\n\n"
-            f"Специализируюсь на фронтенде и фуллстек-разработке (React, Next.js, TypeScript). Фокусируюсь на чистой архитектуре, высокой производительности и надежности в production ({highlight_kw}).\n\n"
-            f"Ключевой опыт под задачи позиции:\n"
-            f"{bullet_text}\n\n"
-            f"Буду рад обсудить задачи с командой!\n\n"
-            f"Контакты:\n{tg} | {email}\n{github} | {linkedin}"
-        )
+            top_fact = achievements[0] if achievements else f"I build production web apps with {highlight_kw}."
+
+            short_dm = (
+                warning_header +
+                f"{greeting_dm} Saw your {title} opening at {company}.\n\n"
+                f"My focus aligns directly with your stack ({highlight_kw}). {top_fact}\n\n"
+                f"{github} | {linkedin}\n\n"
+                f"Still interviewing for this role? Would love to connect!"
+            )
+            cover_letter = (
+                warning_header +
+                f"{greeting_cl}\n\n"
+                f"I'm applying for the {title} role at {company}.\n\n"
+                f"I build high-performance, maintainable web applications with React, Next.js, and TypeScript, with full technical ownership across the stack ({highlight_kw}).\n\n"
+                f"Relevant experience & outcomes:\n"
+                f"{bullet_text}\n\n"
+                f"Would be glad to discuss how my background can help your team ship fast and scale.\n\n"
+                f"Best regards,\n{name}\n{tg} | {email}\n{github} | {linkedin}"
+            )
+        else:
+            greeting_dm = f"Привет, {recipient}!" if recipient else "Привет!"
+
+            top_fact = achievements[0] if achievements else f"Специализируюсь на продуктовой веб-разработке с фокусом на {highlight_kw}."
+
+            short_dm = (
+                warning_header +
+                f"{greeting_dm} Увидел вакансию «{title}» в {company}.\n\n"
+                f"Мой стек и опыт напрямую пересекаются с вашими задачами ({highlight_kw}). {top_fact}\n\n"
+                f"{github} | {linkedin}\n\n"
+                f"Если позиция актуальна — буду рад пообщаться!"
+            )
+            cover_letter = (
+                warning_header +
+                f"Здравствуйте!\n\n"
+                f"Меня зовут {name}, откликаюсь на вакансию «{title}» в {company}.\n\n"
+                f"Специализируюсь на фронтенде и фуллстек-разработке (React, Next.js, TypeScript). Фокусируюсь на чистой архитектуре, высокой производительности и надежности в production ({highlight_kw}).\n\n"
+                f"Ключевой опыт под задачи позиции:\n"
+                f"{bullet_text}\n\n"
+                f"Буду рад обсудить задачи с командой!\n\n"
+                f"Контакты:\n{tg} | {email}\n{github} | {linkedin}"
+            )
 
     # Calculate baseline heuristic score
     score = calculate_match_score(vacancy, profile)

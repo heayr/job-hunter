@@ -43,5 +43,44 @@ class TestCRMEndpoints(unittest.TestCase):
         except urllib.error.URLError:
             self.skipTest("CRM server is not running on test port")
 
+    def test_get_tailored_cv(self):
+        try:
+            res = urllib.request.urlopen(f"{self.base_url}/api/pitches", timeout=3)
+            data = json.loads(res.read().decode('utf-8'))
+            if not data:
+                self.skipTest("No vacancies available in DB")
+            v_id = data[0]["id"]
+            cv_res = urllib.request.urlopen(f"{self.base_url}/api/vacancies/{v_id}/tailored_cv", timeout=3)
+            cv_data = json.loads(cv_res.read().decode('utf-8'))
+            self.assertTrue(cv_data.get("success"))
+            self.assertIn("resume", cv_data)
+            self.assertIn("markdown", cv_data)
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
+    def test_get_runtime_state(self):
+        try:
+            res = urllib.request.urlopen(f"{self.base_url}/api/pitches", timeout=3)
+            data = json.loads(res.read().decode('utf-8'))
+            if not data:
+                self.skipTest("No vacancies available in DB")
+            v_id = data[0]["id"]
+            state_res = urllib.request.urlopen(f"{self.base_url}/api/vacancies/{v_id}/runtime_state", timeout=3)
+            state_data = json.loads(state_res.read().decode('utf-8'))
+            self.assertTrue(state_data.get("success"))
+            self.assertIn("fsm_state", state_data)
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
+    def test_get_agent_tools(self):
+        try:
+            tools_res = urllib.request.urlopen(f"{self.base_url}/api/agent/tools", timeout=3)
+            tools_data = json.loads(tools_res.read().decode('utf-8'))
+            self.assertTrue(tools_data.get("success"))
+            self.assertIn("tools", tools_data)
+            self.assertGreaterEqual(len(tools_data["tools"]), 6)
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
 if __name__ == "__main__":
     unittest.main()
