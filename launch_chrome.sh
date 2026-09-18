@@ -14,12 +14,11 @@ fi
 echo "🚀 Запуск Google Chrome для агента (профиль: ${USER_DATA_DIR}, порт: ${CDP_PORT})..."
 mkdir -p "${USER_DATA_DIR}"
 
-nohup "${CHROME_BIN}" \
+open -n -a "Google Chrome" --args \
     --remote-debugging-port="${CDP_PORT}" \
     --user-data-dir="${USER_DATA_DIR}" \
     --no-first-run \
-    --no-default-browser-check \
-    > /dev/null 2>&1 &
+    --no-default-browser-check
 
 # Ожидание готовности порта
 for i in {1..20}; do

@@ -173,9 +173,127 @@ INVARIANTS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=3) as resp:
                 res_json = json.loads(resp.read().decode("utf-8"))
                 return res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except urllib.error.URLError:
+            break
         except Exception:
             continue
     return None
+
+
+def answer_choice_question(
+    question: str,
+    options: List[str],
+    profile: Dict[str, Any],
+    lang: str = "en"
+) -> str:
+    """
+    Selects the best matching option from a finite list of choices
+    (e.g. Yes/No, scale 0-5, country/residency) based on candidate profile.
+    """
+    if not options:
+        return ""
+    clean_opts = [o.strip() for o in options if o.strip()]
+    if len(clean_opts) == 1:
+        return clean_opts[0]
+
+    q_lower = question.lower()
+    screening = profile.get("screening_facts", {})
+    skills = [s.lower() for s in profile.get("skills", [])]
+    ident = profile.get("identity", {})
+
+    # 1. Binary Yes / No questions
+    has_yes = any(o.lower() in ("yes", "да") for o in clean_opts)
+    has_no = any(o.lower() in ("no", "нет") for o in clean_opts)
+
+    if has_yes and has_no:
+        yes_opt = next(o for o in clean_opts if o.lower() in ("yes", "да"))
+        no_opt = next(o for o in clean_opts if o.lower() in ("no", "нет"))
+
+        # Experience / Qualification questions (usually Yes for senior role)
+        if re.search(r'(?:experience|years|qualified|коммерческий опыт|стаж)', q_lower):
+            # Check years
+            m = re.search(r'(\d+)\s*(?:years|лет|года)', q_lower)
+            req_years = int(m.group(1)) if m else 3
+            cand_years = screening.get("years_of_experience_num", 5)
+            return yes_opt if cand_years >= req_years else no_opt
+
+        # Restrictions / Non-compete / Criminal / Sanctions (Honest No)
+        if re.search(r'(?:restriction|agreement|non-compete|ограничени|судимост)', q_lower):
+            return no_opt
+
+        # Visa sponsorship requirement
+        if re.search(r'(?:sponsorship|visa|спонсирование|виз)', q_lower):
+            need_visa = screening.get("requires_visa_sponsorship", False)
+            return yes_opt if need_visa else no_opt
+
+        # Previously worked at company
+        if re.search(r'(?:previously worked|consulted for|ранее работали)', q_lower):
+            return no_opt
+
+        # Location / US / Canada residence
+        if re.search(r'(?:currently live in|located in|проживаете в)\s*(?:this location|us|canada|сша)', q_lower):
+            return no_opt
+
+    # 2. Rating / Scale (0-5, 1-10)
+    digit_opts = [o for o in clean_opts if re.match(r'^\d+$', o)]
+    if len(digit_opts) >= 3:
+        # Check if question mentions candidate's verified skills
+        has_skill_match = any(skill in q_lower for skill in skills)
+        nums = sorted([int(x) for x in digit_opts])
+        max_num = nums[-1]
+        if max_num in (5, 10):
+            # Senior rating: 4/5 or 8/10 for core stack, 3/5 for adjacent
+            target_val = (4 if max_num == 5 else 8) if has_skill_match else (3 if max_num == 5 else 6)
+            closest = min(nums, key=lambda x: abs(x - target_val))
+            return str(closest)
+
+    # 3. Country / Residence
+    if re.search(r'(?:country|residence|гражданство|страна)', q_lower):
+        cand_loc = (ident.get("location") or screening.get("location", "")).lower()
+        for opt in clean_opts:
+            if opt.lower() in cand_loc or cand_loc in opt.lower():
+                return opt
+        # Common defaults
+        for opt in clean_opts:
+            if any(c in opt.lower() for c in ["russia", "georgia", "armenia", "россия"]):
+                return opt
+
+    # 4. LLM choice matching if API key available
+    api_key = get_api_key()
+    if api_key and len(clean_opts) <= 15:
+        prompt = f"""Given the candidate profile and screening question, select EXACTLY ONE option from the list.
+QUESTION: {question}
+CANDIDATE PROFILE:
+- Name: {ident.get('name')}
+- Skills: {', '.join(profile.get('skills', []))}
+- Experience: {profile.get('summary')}
+
+ALLOWED OPTIONS:
+{json.dumps(clean_opts, ensure_ascii=False)}
+
+Output ONLY the exact string from ALLOWED OPTIONS. Do not add any explanation or punctuation."""
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}
+        }
+        data_bytes = json.dumps(payload).encode("utf-8")
+        for model in GEMINI_MODELS:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=2) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    cand_ans = res_json["candidates"][0]["content"]["parts"][0]["text"].strip().strip('"\'')
+                    for opt in clean_opts:
+                        if opt.lower() == cand_ans.lower():
+                            return opt
+            except urllib.error.URLError:
+                break
+            except Exception:
+                continue
+
+    return clean_opts[0]
+

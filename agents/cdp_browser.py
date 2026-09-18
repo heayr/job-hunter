@@ -146,6 +146,8 @@ SEMANTIC_INSPECTION_JS = """() => {
 }"""
 
 
+from concurrent.futures import ThreadPoolExecutor
+
 class CDPBrowserDriver:
     """
     Direct Chrome DevTools Protocol (CDP) driver powered by Playwright.
@@ -155,10 +157,15 @@ class CDPBrowserDriver:
     _instance: Optional['CDPBrowserDriver'] = None
 
     def __init__(self):
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="CDPWorker")
         self._playwright: Optional[Playwright] = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._active_page: Optional[Page] = None
+
+    def execute(self, func, *args, **kwargs):
+        """Dispatches any function to the dedicated single-thread Playwright worker."""
+        return self._executor.submit(func, *args, **kwargs).result()
 
     @classmethod
     def get_instance(cls) -> 'CDPBrowserDriver':
@@ -198,7 +205,7 @@ class CDPBrowserDriver:
             os.makedirs(profile_dir, exist_ok=True)
             try:
                 subprocess.Popen([
-                    chrome_mac,
+                    "open", "-n", "-a", "Google Chrome", "--args",
                     f"--remote-debugging-port={CDP_PORT}",
                     f"--user-data-dir={profile_dir}",
                     "--no-first-run",
@@ -228,7 +235,7 @@ class CDPBrowserDriver:
                 self._playwright = sync_playwright().start()
 
             if self._browser is None or not self._browser.is_connected():
-                self._browser = self._playwright.chromium.connect_over_cdp(CDP_URL)
+                self._browser = self._playwright.chromium.connect_over_cdp(CDP_URL, no_defaults=True)
                 contexts = self._browser.contexts
                 self._context = contexts[0] if contexts else self._browser.new_context()
 
@@ -237,25 +244,41 @@ class CDPBrowserDriver:
             print(f"[CDP] Connection error: {e}")
             return False
 
-    def get_active_page(self) -> Page:
-        """Returns active or latest open page."""
+    def get_active_page(self, avoid_crm: bool = True) -> Page:
+        """Returns active or latest open page (excluding CRM dashboard if avoid_crm is True)."""
         if not self.connect():
             raise RuntimeError("Could not connect to Chrome over CDP on port 9222.")
 
         pages = self._context.pages if self._context else []
+        if avoid_crm:
+            # Protect CRM UI dashboard so agent never hijacks the control center
+            candidate_pages = [p for p in pages if ":8105" not in p.url and ":8115" not in p.url and "chrome://" not in p.url]
+            if candidate_pages:
+                self._active_page = candidate_pages[-1]
+                return self._active_page
+
         if pages:
             self._active_page = pages[-1]
         else:
             self._active_page = self._context.new_page()
+
+        try:
+            self._active_page.bring_to_front()
+        except Exception:
+            pass
+
         return self._active_page
 
     def open_page(self, url: str) -> Dict[str, Any]:
-        """Navigates to the given URL in the user's Chrome."""
-        page = self.get_active_page()
+        """Navigates to the given URL in the user's visible Chrome in a dedicated target tab."""
+        if not self.connect():
+            return {"success": False, "error": "Could not connect to Chrome over CDP on port 9222."}
+
+        page = self.get_active_page(avoid_crm=True)
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=30000)
             try:
-                page.wait_for_load_state("networkidle", timeout=5000)
+                page.bring_to_front()
             except Exception:
                 pass
             return {

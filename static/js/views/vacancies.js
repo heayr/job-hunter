@@ -372,11 +372,14 @@ function renderDetails() {
     } else {
         actionBtnHtml = `
             <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="triggerAgentAutoApply('${v.id}')" id="btn-agent-apply-${v.id}" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all shadow-lg flex items-center gap-2 ring-2 ring-indigo-500/40">
-                    <span>🤖</span> Авто-отклик агентом (1-Click)
+                <button onclick="triggerCdpExpressApply('${v.id}')" id="btn-cdp-apply-${v.id}" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all shadow-lg flex items-center gap-2 ring-2 ring-emerald-500/40 cursor-pointer">
+                    <span>⚡</span> Откликнуться через CDP (2 сек)
                 </button>
-                <button onclick="openVacancyWithAutoApply('${v.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 transition-all flex items-center gap-1.5 shadow-sm">
-                    <span>↗</span> Открыть вручную
+                <button onclick="triggerAgentAutoApply('${v.id}')" id="btn-agent-apply-${v.id}" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all shadow-md flex items-center gap-1.5 border border-indigo-500/50 cursor-pointer">
+                    <span>🤖</span> ReAct Агент (1-Click)
+                </button>
+                <button onclick="openVacancyWithAutoApply('${v.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span>↗</span> Открыть
                 </button>
             </div>
         `;
@@ -623,19 +626,32 @@ async function approveAgentSessionFromCRM() {
     }
 
     try {
-        const res = await fetch('/api/agent/approve-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: currentCrmSessionId,
-                approval_token: currentCrmApprovalToken
-            })
-        });
-        const data = await res.json();
+        let res, data;
+        if (currentCrmSessionId) {
+            res = await fetch('/api/agent/approve-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentCrmSessionId,
+                    approval_token: currentCrmApprovalToken
+                })
+            });
+            data = await res.json();
+        } else {
+            // CDP Express submission
+            res = await fetch('/api/agent/cdp/submit', { method: 'POST' });
+            data = await res.json();
+        }
+
         if (data.success) {
             document.getElementById('agent-modal-approval-box')?.classList.add('hidden');
             document.getElementById('agent-modal-complete-box')?.classList.remove('hidden');
             appendCrmAgentLog('🚀', '<span class="text-emerald-300 font-bold">Подтверждение принято! Заявка успешно отправлена в браузере и зафиксирована в CRM.</span>');
+            const badge = document.getElementById('agent-modal-badge');
+            if (badge) {
+                badge.textContent = 'SUBMITTED';
+                badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-bold uppercase';
+            }
             if (currentVac) {
                 await updateStatus(currentVac.id, 'sent');
             }
@@ -645,7 +661,117 @@ async function approveAgentSessionFromCRM() {
     } catch (err) {
         appendCrmAgentLog('❌', `<span class="text-rose-400">Ошибка сети: ${err.message}</span>`);
     } finally {
-        if (approveBtn) approveBtn.disabled = false;
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.innerHTML = '<span>🚀</span> Подтвердить и отправить (Submit)';
+        }
+    }
+}
+
+async function triggerCdpExpressApply(vacId) {
+    const v = vacancies.find(x => String(x.id) === String(vacId));
+    if (!v) return;
+
+    const titleEl = document.getElementById('agent-modal-title');
+    const badgeEl = document.getElementById('agent-modal-badge');
+    const term = document.getElementById('agent-modal-terminal');
+    const approvalBox = document.getElementById('agent-modal-approval-box');
+    const completeBox = document.getElementById('agent-modal-complete-box');
+
+    if (titleEl) titleEl.textContent = `CDP Express Agent — ${v.company || 'Company'} / ${v.title || 'Role'}`;
+    if (badgeEl) {
+        badgeEl.textContent = 'CONNECTING CDP';
+        badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-bold uppercase';
+    }
+    if (term) term.innerHTML = '';
+    if (approvalBox) approvalBox.classList.add('hidden');
+    if (completeBox) completeBox.classList.add('hidden');
+
+    toggleModal('agent-live-modal');
+
+    appendCrmAgentLog('🔌', 'Подключение к живому Google Chrome через CDP (порт 9222)...');
+    appendCrmAgentLog('🌐', `Целевой URL вакансии: <a href="${formatVacancyUrl(v.url)}" target="_blank" class="text-sky-400 underline font-mono">${formatVacancyUrl(v.url)}</a>`);
+
+    try {
+        const cdpRes = await fetch('/api/agent/cdp/status');
+        const cdpData = await cdpRes.json();
+        if (!cdpData.cdp_available) {
+            appendCrmAgentLog('🔌', '<span class="text-amber-400 font-semibold">Запускаю Google Chrome с портом 9222...</span>');
+            await fetch('/api/agent/cdp/launch', { method: 'POST' });
+        }
+        appendCrmAgentLog('✅', 'CDP-сессия активна. Запускаю детерминированный адаптер...');
+
+        const applyRes = await fetch('/api/agent/cdp/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vacancy_id: v.id,
+                url: formatVacancyUrl(v.url),
+                cover_letter: v.cover_letter || v.short_dm || ''
+            })
+        });
+        const data = await applyRes.json();
+
+        if (data.already_applied) {
+            if (badgeEl) {
+                badgeEl.textContent = 'ALREADY APPLIED';
+                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700/60 font-bold uppercase';
+            }
+            appendCrmAgentLog('ℹ️', `<span class="text-amber-300 font-bold">${data.message || 'Вы уже откликались на эту вакансию ранее.'}</span>`);
+            appendCrmAgentLog('💾', 'Синхронизировано: вакансия переведена в статус "Отправлен" в базе данных.');
+            v.status = 'applied';
+            renderList();
+            renderDetails();
+            return;
+        }
+
+        if (!data.success) {
+            if (badgeEl) {
+                badgeEl.textContent = 'ERROR';
+                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700/60 font-bold uppercase';
+            }
+            appendCrmAgentLog('❌', `<span class="text-rose-400 font-bold">Ошибка адаптера: ${data.error}</span>`);
+            return;
+        }
+
+        if (data.stage === 'READY_FOR_APPROVAL') {
+            if (badgeEl) {
+                badgeEl.textContent = 'WAITING APPROVAL';
+                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700/60 font-bold uppercase';
+            }
+            appendCrmAgentLog('✅', 'Страница открыта, модалка найдена, сопроводительное письмо введено!');
+            if (data.cover_letter_preview) {
+                appendCrmAgentLog('📝', `<b>Введенный текст:</b> <i>"${data.cover_letter_preview}"</i>`);
+            }
+            appendCrmAgentLog('⏸', '<span class="text-amber-300 font-bold">Ожидание подтверждения отправки (Human-in-the-Loop). Проверьте окно Chrome и нажмите кнопку ниже:</span>');
+
+            if (approvalBox) {
+                approvalBox.classList.remove('hidden');
+                const confBtn = approvalBox.querySelector('button');
+                if (confBtn) {
+                    confBtn.onclick = async () => {
+                        appendCrmAgentLog('⏳', 'Отправляю подтвержденный отклик...');
+                        const sRes = await fetch('/api/agent/cdp/submit', { method: 'POST' });
+                        const sData = await sRes.json();
+                        if (sData.success) {
+                            approvalBox.classList.add('hidden');
+                            if (badgeEl) {
+                                badgeEl.textContent = 'SUBMITTED';
+                                badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-bold uppercase';
+                            }
+                            appendCrmAgentLog('🎉', '<span class="text-emerald-400 font-bold">Отклик успешно отправлен!</span>');
+                            v.status = 'applied';
+                            renderList();
+                            renderDetails();
+                        } else {
+                            appendCrmAgentLog('❌', `Ошибка отправки: ${sData.error}`);
+                        }
+                    };
+                }
+            }
+        }
+    } catch (e) {
+        appendCrmAgentLog('❌', `Сетевой сбой: ${e.message}`);
     }
 }
 
@@ -687,16 +813,19 @@ async function triggerAgentAutoApply(vacId) {
 
     toggleModal('agent-live-modal');
 
-    // Pre-flight check: Verify Chrome Extension is online
+    // Pre-flight check: Verify Chrome CDP connection
     try {
-        const extStatusRes = await fetch('/api/agent/browser/status');
-        const extStatus = await extStatusRes.json();
-        if (!extStatus.connected) {
-            appendCrmAgentLog('🔌', '<span class="text-amber-400 font-semibold">Внимание: Расширение Chrome в режиме ожидания/не опрашивает сервер. Откройте Google Chrome или кликните иконку расширения Job Hunter.</span>');
+        const cdpRes = await fetch('/api/agent/cdp/status');
+        const cdpData = await cdpRes.json();
+        if (cdpData && cdpData.cdp_available) {
+            appendCrmAgentLog('🌐', '<span class="text-emerald-400 font-semibold">Google Chrome (CDP порт 9222) подключен и готов к управлению страницей.</span>');
         } else {
-            appendCrmAgentLog('🌐', '<span class="text-emerald-400 font-semibold">Chrome Extension подключено и готово к управлению браузером.</span>');
+            appendCrmAgentLog('🔌', '<span class="text-amber-400 font-semibold">Запускаю Google Chrome с портом отладки 9222...</span>');
+            await fetch('/api/agent/cdp/launch', { method: 'POST' });
         }
-    } catch(e) {}
+    } catch(e) {
+        appendCrmAgentLog('⚠️', `Предупреждение проверки браузера: ${e.message}`);
+    }
 
     // 2. Policy Check (Phase 7 Autonomous Policy Engine)
     appendCrmAgentLog('🛡️', 'Проверяю политики безопасности и ограничения кандидата (Autonomous Policy Engine)...');

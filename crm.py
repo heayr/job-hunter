@@ -1,5 +1,6 @@
 import json
 import os
+import secrets
 import sqlite3
 import sys
 import glob
@@ -404,6 +405,17 @@ class CRMHandler(BaseHTTPRequestHandler):
             connected = get_browser_bridge().is_connected()
             _send_json(self, {"success": True, "connected": connected})
 
+        elif self.path == '/api/agent/cdp/status':
+            from agents.cdp_browser import CDPBrowserDriver
+            driver = CDPBrowserDriver.get_instance()
+            _send_json(self, {"success": True, "cdp_available": driver.is_cdp_available(), "port": 9222})
+
+        elif self.path.startswith('/api/agent/cdp/logs'):
+            from agents.cdp_logger import CDPLogger
+            logger = CDPLogger.get_instance()
+            logs = logger.get_recent_logs(limit=100)
+            _send_json(self, {"success": True, "logs": logs})
+
         # ── Real-Time Agent SSE Streaming (Phase 2: Real Agent Loop) ──
         elif self.path.startswith('/api/agent/stream'):
             import queue
@@ -783,7 +795,6 @@ class CRMHandler(BaseHTTPRequestHandler):
             vac_id = body.get('vacancy_id')
             vac = body.get('vacancy')
             if not vac and vac_id:
-                from tracker.db import get_db_connection
                 conn = get_db_connection()
                 cur = conn.cursor()
                 cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
@@ -831,19 +842,139 @@ class CRMHandler(BaseHTTPRequestHandler):
                 _send_json(self, {"success": False, "error": "URL вакансии не указан"}, status=400)
                 return
 
-            if "hh.ru" in url:
-                from agents.adapters.hh_adapter import HeadHunterCDPAdapter
-                adapter = HeadHunterCDPAdapter()
-                res = adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
-                _send_json(self, res)
-            else:
-                _send_json(self, {"success": False, "error": f"Для домена {url} детерминированный адаптер еще не подключен."}, status=400)
+            from agents.cdp_browser import CDPBrowserDriver
+            driver = CDPBrowserDriver.get_instance()
+
+            def do_apply():
+                if "hh.ru" in url:
+                    from agents.adapters.hh_adapter import HeadHunterCDPAdapter
+                    adapter = HeadHunterCDPAdapter()
+                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
+                elif "career.habr.com" in url or "habr.com" in url:
+                    from agents.adapters.habr_adapter import HabrCDPAdapter
+                    adapter = HabrCDPAdapter()
+                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
+                elif "greenhouse.io" in url:
+                    from agents.adapters.greenhouse_adapter import GreenhouseCDPAdapter
+                    adapter = GreenhouseCDPAdapter()
+                    candidate_data = None
+                    resume_pdf_path = None
+                    try:
+                        conn = get_db_connection()
+                        cur = conn.cursor()
+                        cur.execute("SELECT data_json, lang FROM candidate_profiles WHERE is_active = 1 LIMIT 1")
+                        p_row = cur.fetchone()
+                        if p_row and p_row['data_json']:
+                            candidate_data = json.loads(p_row['data_json'])
+                            candidate_data['lang'] = p_row['lang']
+                        conn.close()
+                    except Exception:
+                        pass
+                    try:
+                        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+                        if os.path.exists(config_path):
+                            with open(config_path, 'r', encoding='utf-8') as cf:
+                                cfg = json.load(cf)
+                                lang = (candidate_data or {}).get('lang', 'en')
+                                key = 'resume_pdf_path_en' if lang == 'en' else 'resume_pdf_path_ru'
+                                resume_pdf_path = cfg.get(key) or cfg.get('resume_pdf_path')
+                    except Exception:
+                        pass
+                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit, candidate_data=candidate_data, resume_pdf_path=resume_pdf_path)
+                elif "superjob.ru" in url:
+                    from agents.adapters.superjob_adapter import SuperJobCDPAdapter
+                    adapter = SuperJobCDPAdapter()
+                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
+                elif "rabota.ru" in url:
+                    from agents.adapters.rabota_adapter import RabotaRuCDPAdapter
+                    adapter = RabotaRuCDPAdapter()
+                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
+                else:
+                    driver.open_page(url)
+                    page = driver.get_active_page()
+                    candidate_data = None
+                    resume_pdf_path = None
+                    try:
+                        conn = get_db_connection()
+                        cur = conn.cursor()
+                        cur.execute("SELECT data_json, lang FROM candidate_profiles WHERE is_active = 1 LIMIT 1")
+                        p_row = cur.fetchone()
+                        if p_row and p_row['data_json']:
+                            candidate_data = json.loads(p_row['data_json'])
+                            candidate_data['lang'] = p_row['lang']
+                        conn.close()
+                    except Exception:
+                        pass
+                    try:
+                        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+                        if os.path.exists(config_path):
+                            with open(config_path, 'r', encoding='utf-8') as cf:
+                                cfg = json.load(cf)
+                                lang = (candidate_data or {}).get('lang', 'en')
+                                key = 'resume_pdf_path_en' if lang == 'en' else 'resume_pdf_path_ru'
+                                resume_pdf_path = cfg.get(key) or cfg.get('resume_pdf_path')
+                    except Exception:
+                        pass
+
+                    from agents.universal_form_filler import UniversalFormFiller
+                    filler = UniversalFormFiller()
+                    fill_res = filler.fill_form(page, cover_letter=cover_letter or "", profile=candidate_data, resume_pdf_path=resume_pdf_path)
+                    screenshot_data = driver.take_screenshot()
+                    approval_token = secrets.token_hex(16)
+                    return {
+                        "success": True,
+                        "stage": "READY_FOR_APPROVAL",
+                        "platform": "universal_ats",
+                        "url": url,
+                        "cover_letter_preview": (cover_letter[:150] + "...") if cover_letter else "",
+                        "filled_count": fill_res.get("filled_count", 0),
+                        "missing_required": fill_res.get("missing_required", []),
+                        "screenshot_base64": screenshot_data.get("base64", ""),
+                        "approval_token": approval_token
+                    }
+
+            res = driver.execute(do_apply)
+            _send_json(self, res)
 
         elif self.path == '/api/agent/cdp/submit':
-            from agents.adapters.hh_adapter import HeadHunterCDPAdapter
-            adapter = HeadHunterCDPAdapter()
-            res = adapter.submit()
+            from agents.cdp_browser import CDPBrowserDriver
+            driver = CDPBrowserDriver.get_instance()
+
+            def do_submit():
+                page = driver.get_active_page() if driver.is_cdp_available() else None
+                active_url = page.url if page else ""
+                if "career.habr.com" in active_url or "habr.com" in active_url:
+                    from agents.adapters.habr_adapter import HabrCDPAdapter
+                    return HabrCDPAdapter().submit()
+                elif "hh.ru" in active_url:
+                    from agents.adapters.hh_adapter import HeadHunterCDPAdapter
+                    return HeadHunterCDPAdapter().submit()
+                elif "superjob.ru" in active_url:
+                    from agents.adapters.superjob_adapter import SuperJobCDPAdapter
+                    return SuperJobCDPAdapter().submit()
+                elif "rabota.ru" in active_url:
+                    from agents.adapters.rabota_adapter import RabotaRuCDPAdapter
+                    return RabotaRuCDPAdapter().submit()
+                elif "greenhouse.io" in active_url:
+                    from agents.adapters.greenhouse_adapter import GreenhouseCDPAdapter
+                    return GreenhouseCDPAdapter().submit()
+                else:
+                    # Submit for generic forms / local test forms
+                    submit_btn = page.locator('button[type="submit"], input[type="submit"]').first
+                    if submit_btn.count() > 0 and submit_btn.is_visible():
+                        submit_btn.click()
+                        page.wait_for_timeout(1000)
+                        return {"success": True, "submitted": True, "message": "Форма успешно отправлена!"}
+                    return {"success": True, "submitted": True, "message": "Отклик подтвержден пользователем."}
+
+            res = driver.execute(do_submit)
             _send_json(self, res)
+
+        elif self.path == '/api/agent/cdp/launch':
+            from agents.cdp_browser import CDPBrowserDriver
+            driver = CDPBrowserDriver.get_instance()
+            ok = driver.launch_chrome_if_needed()
+            _send_json(self, {"success": ok, "cdp_available": driver.is_cdp_available(), "port": 9222})
 
         else:
             self.send_response(404)

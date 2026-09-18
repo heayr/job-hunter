@@ -133,6 +133,12 @@
                         </select>
                     </div>
                     
+                    <!-- Chrome CDP Status Badge -->
+                    <button id="cdp-status-badge" onclick="launchChromeAgent()" title="Статус Chrome для автономного отклика (кликните для запуска)" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors shadow-sm cursor-pointer">
+                        <span id="cdp-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                        <span id="cdp-text">Chrome Offline</span>
+                    </button>
+
                     <div class="relative">
                         <button onclick="document.getElementById('nav-actions-menu').classList.toggle('hidden'); document.getElementById('nav-actions-overlay').classList.toggle('hidden');" 
                             class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
@@ -143,6 +149,7 @@
                         
                         <div id="nav-actions-menu" class="absolute right-0 top-full mt-2 hidden z-50 w-56">
                             <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden flex flex-col py-1">
+                                <button onclick="launchChromeAgent(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-amber-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🌐 Открыть Chrome Агента (9222)</button>
                                 <a href="#" onclick="event.preventDefault(); toggleModal('bookmarklet-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-emerald-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🔖 Auto-Apply (Bookmarklet)</a>
                                 <button onclick="toggleModal('ai-parser-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-purple-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🪄 Добавить через ИИ</button>
                                 <button onclick="startHarvest(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-sky-400 hover:bg-slate-700 transition-colors flex items-center gap-2 border-b border-slate-700/50">🔄 Собрать вакансии</button>

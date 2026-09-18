@@ -2,6 +2,7 @@ import time
 import secrets
 from typing import Dict, Any, Optional
 from agents.cdp_browser import CDPBrowserDriver
+from agents.cdp_logger import CDPLogger
 
 
 class HeadHunterCDPAdapter:
@@ -11,8 +12,9 @@ class HeadHunterCDPAdapter:
     Supports Human-in-the-Loop approval checkpoints before submitting.
     """
 
-    def __init__(self, driver: Optional[CDPBrowserDriver] = None):
+    def __init__(self, driver: Optional[CDPBrowserDriver] = None, logger: Optional[CDPLogger] = None):
         self.driver = driver or CDPBrowserDriver.get_instance()
+        self.logger = logger or CDPLogger.get_instance()
 
     def apply(self, vacancy_url: str, cover_letter: str, auto_submit: bool = False) -> Dict[str, Any]:
         """
@@ -25,20 +27,29 @@ class HeadHunterCDPAdapter:
         6. Captures screenshot for review.
         7. Returns approval token or executes submit if auto_submit=True.
         """
+        self.logger.log("INFO", "HH_ADAPTER", f"Starting apply flow for: {vacancy_url}")
         if not self.driver.connect():
+            err_msg = "Не удалось подключиться к Chrome через CDP на порту 9222. Запусти Chrome через ./launch_chrome.sh."
+            self.logger.log("ERROR", "HH_ADAPTER", err_msg)
             return {
                 "success": False,
-                "error": "Не удалось подключиться к Chrome через CDP на порту 9222. Запусти Chrome через ./launch_chrome.sh."
+                "error": err_msg
             }
 
         page = self.driver.get_active_page()
+        self.logger.attach_to_page(page)
 
         # Step 1: Open vacancy
         try:
-            page.goto(vacancy_url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(1000)
+            current_url = page.url
+            if vacancy_url.rstrip("/") not in current_url:
+                page.goto(vacancy_url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(1000)
+            page.bring_to_front()
         except Exception as e:
-            return {"success": False, "error": f"Ошибка открытия страницы {vacancy_url}: {e}"}
+            err_msg = f"Ошибка открытия страницы {vacancy_url}: {e}"
+            self.logger.log("ERROR", "HH_ADAPTER", err_msg)
+            return {"success": False, "error": err_msg}
 
         # Step 2: Check auth
         if self._is_auth_required(page):

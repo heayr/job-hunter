@@ -98,6 +98,20 @@ window.api = {
         });
         if (!res.ok) throw new Error(`AI parse failed: ${res.status}`);
         return await res.json();
+    },
+
+    async getCdpStatus() {
+        try {
+            const res = await fetch('/api/agent/cdp/status');
+            return await res.json();
+        } catch (e) {
+            return { success: false, cdp_available: false };
+        }
+    },
+
+    async launchCdp() {
+        const res = await fetch('/api/agent/cdp/launch', { method: 'POST' });
+        return await res.json();
     }
 };
 
