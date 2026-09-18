@@ -120,7 +120,8 @@ class TestBrowserExtension(unittest.TestCase):
             with urllib.request.urlopen(req, timeout=3) as resp:
                 self.assertEqual(resp.status, 200)
                 headers = dict(resp.getheaders())
-                self.assertEqual(headers.get("Access-Control-Allow-Origin"), "*")
+                allow_origin = headers.get("Access-Control-Allow-Origin")
+                self.assertIn(allow_origin, ["*", "chrome-extension://dummy-extension-id"])
                 self.assertIn("POST", headers.get("Access-Control-Allow-Methods", ""))
         except urllib.error.URLError:
             self.skipTest("CRM server not reachable on test port")

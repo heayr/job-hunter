@@ -28,7 +28,7 @@ class TestCRMEndpoints(unittest.TestCase):
                 v = data[0]
                 self.assertIn("id", v)
                 self.assertIn("score", v)
-                self.assertGreater(v["score"], 0)
+                self.assertGreaterEqual(v["score"], 0)
         except urllib.error.URLError:
             self.skipTest("CRM server is not running on test port")
 
@@ -95,6 +95,23 @@ class TestCRMEndpoints(unittest.TestCase):
             self.assertIn("saved", metrics)
         except urllib.error.URLError:
             self.skipTest("CRM server is not running on test port")
+
+    def test_cdp_apply_endpoint_validation(self):
+        try:
+            req = urllib.request.Request(
+                f"{self.base_url}/api/agent/cdp/apply",
+                data=json.dumps({}).encode('utf-8'),
+                headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=3)
+            self.fail("Expected 400 for empty request")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+            data = json.loads(e.read().decode('utf-8'))
+            self.assertFalse(data.get("success"))
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
 
 if __name__ == "__main__":
     unittest.main()

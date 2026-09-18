@@ -30,11 +30,12 @@ class BrowserBridge:
                 cls._instance._init_bridge()
             return cls._instance
 
-    def _init_bridge(self):
+    def _init_bridge(self, enable_cdp: bool = True):
         self._pending_commands: List[BrowserCommand] = []
         self._active_commands: Dict[str, BrowserCommand] = {}
         self._last_extension_poll: float = 0.0
         self._command_lock = threading.Lock()
+        self.enable_cdp = enable_cdp
 
     def mark_extension_alive(self):
         with self._command_lock:
@@ -42,7 +43,10 @@ class BrowserBridge:
 
     def is_connected(self, max_idle_sec: float = 3.5) -> bool:
         with self._command_lock:
-            return (time.time() - self._last_extension_poll) < max_idle_sec
+            ext_alive = (time.time() - self._last_extension_poll) < max_idle_sec
+        if ext_alive:
+            return True
+        return self._get_cdp() is not None
 
     def send_command(self, action: str, params: Optional[Dict[str, Any]] = None, timeout: float = 15.0) -> Dict[str, Any]:
         """
@@ -109,14 +113,34 @@ class BrowserBridge:
             cmd.event.set()
             return True
 
+    def _get_cdp(self):
+        if not getattr(self, 'enable_cdp', True):
+            return None
+        try:
+            from agents.cdp_browser import CDPBrowserDriver
+            driver = CDPBrowserDriver.get_instance()
+            if driver.is_cdp_available():
+                return driver
+        except Exception:
+            pass
+        return None
+
     # ── Convenience High-Level Methods for Tools ──────────────────────────
 
     def open_page(self, url: str, timeout: float = 25.0) -> Dict[str, Any]:
         """
         Opens a URL in the user's visible Chrome.
-        If extension is not connected or slow to respond, uses native OS command
-        to guarantee tab visibility in Google Chrome immediately.
+        Uses CDP driver when available; otherwise falls back to extension bridge.
         """
+        cdp = self._get_cdp()
+        if cdp:
+            try:
+                res = cdp.open_page(url)
+                if res.get("success"):
+                    return res
+            except Exception:
+                pass
+
         import subprocess
         import sys
         import webbrowser
@@ -127,17 +151,14 @@ class BrowserBridge:
                 subprocess.Popen(["open", "-a", "Google Chrome", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 webbrowser.open(url)
-        except Exception as e:
+        except Exception:
             pass
 
         # Also send OPEN_PAGE via extension bridge if extension is active
         res = self.send_command("OPEN_PAGE", {"url": url}, timeout=timeout)
-        # If extension reported success or tab loaded, return it
         if res.get("success"):
             return res
 
-        # If extension bridge timed out but native Chrome opened the tab,
-        # return a helpful message indicating tab was launched
         return {
             "success": True,
             "url": url,
@@ -146,9 +167,25 @@ class BrowserBridge:
         }
 
     def inspect_page(self, timeout: float = 15.0) -> Dict[str, Any]:
+        cdp = self._get_cdp()
+        if cdp:
+            try:
+                res = cdp.inspect_page()
+                if res.get("success"):
+                    return res
+            except Exception:
+                pass
         return self.send_command("INSPECT_PAGE", {}, timeout=timeout)
 
     def fill_field(self, element_id: str, value: str, human_like: bool = False, timeout: float = 12.0) -> Dict[str, Any]:
+        cdp = self._get_cdp()
+        if cdp:
+            try:
+                res = cdp.fill_field(element_id, value, human_like=human_like)
+                if res.get("success"):
+                    return res
+            except Exception:
+                pass
         return self.send_command("FILL_FIELD", {
             "element_id": element_id,
             "value": value,
@@ -156,17 +193,41 @@ class BrowserBridge:
         }, timeout=timeout)
 
     def select_option(self, element_id: str, option: str, timeout: float = 10.0) -> Dict[str, Any]:
+        cdp = self._get_cdp()
+        if cdp:
+            try:
+                res = cdp.select_option(element_id, option)
+                if res.get("success"):
+                    return res
+            except Exception:
+                pass
         return self.send_command("SELECT_OPTION", {
             "element_id": element_id,
             "option": option
         }, timeout=timeout)
 
     def click_element(self, element_id: str, timeout: float = 15.0) -> Dict[str, Any]:
+        cdp = self._get_cdp()
+        if cdp:
+            try:
+                res = cdp.click_element(element_id)
+                if res.get("success"):
+                    return res
+            except Exception:
+                pass
         return self.send_command("CLICK_ELEMENT", {
             "element_id": element_id
         }, timeout=timeout)
 
     def upload_file(self, element_id: str, file_base64: str, file_name: str = "resume.pdf", mime_type: str = "application/pdf", timeout: float = 15.0) -> Dict[str, Any]:
+        cdp = self._get_cdp()
+        if cdp:
+            try:
+                res = cdp.upload_file(element_id, file_base64, file_name)
+                if res.get("success"):
+                    return res
+            except Exception:
+                pass
         return self.send_command("UPLOAD_FILE", {
             "element_id": element_id,
             "file_base64": file_base64,

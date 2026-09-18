@@ -212,6 +212,31 @@ class TestCareerAgentBrain(unittest.TestCase):
         self.assertEqual(result["state"], "ERROR")
         self.assertIn("Требуется вход в аккаунт на HH.ru", result["error"])
 
+    def test_anti_stuck_watchdog_triggers_after_3_identical_actions(self):
+        session_id = str(uuid.uuid4())
+        brain = CareerAgentBrain(
+            session_id=session_id,
+            target_url="https://example.com/job",
+            mode="SUPERVISED",
+            max_steps=5
+        )
+
+        # Simulate model stuck in a loop calling the same action with same args
+        stuck_decision = {
+            "thought": "Repeating the same action",
+            "action": "browser_click_element",
+            "arguments": {"element_id": "elem_same"}
+        }
+
+        with patch.object(brain, '_call_llm_decision', return_value=stuck_decision), \
+             patch('agents.tool_system.ToolRegistry.execute_tool', return_value={"success": True, "result": {}}):
+            result = brain.run()
+
+        # The watchdog must intercept and request clarification rather than continuing to loop
+        clarify_steps = [s for s in brain.scratchpad if s["tool_name"] == "ask_user_clarification"]
+        self.assertGreaterEqual(len(clarify_steps), 1)
+        self.assertIn("watchdog", clarify_steps[0]["thought"].lower())
+
 
 if __name__ == '__main__':
     unittest.main()

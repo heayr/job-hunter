@@ -76,6 +76,9 @@ class CareerAgentBrain:
         self.scratchpad: List[Dict[str, Any]] = []
         self.step_counter = 0
         self.event_bus = get_event_bus()
+        self.plan_subgoals = ["DISCOVER_FORM", "FILL_FIELDS", "VERIFY_DATA", "REQUEST_APPROVAL"]
+        self.current_subgoal = "DISCOVER_FORM"
+        self._action_signatures: List[str] = []
 
     def _build_tools_description(self) -> str:
         tools = ToolRegistry.list_tools()
@@ -475,7 +478,22 @@ class CareerAgentBrain:
             self.step_counter += 1
             start_step_time = time.time()
 
-            # 1. Build prompt from scratchpad history
+            # 1. Update Planner subgoal based on execution state
+            has_inspected = any(s["tool_name"] == "browser_inspect_page" for s in self.scratchpad)
+            has_classified = any(s["tool_name"] == "candidate_classify_form" for s in self.scratchpad)
+            has_filled = any(s["tool_name"] in ("browser_fill_field", "browser_upload_cv") for s in self.scratchpad)
+            has_verified = any(s["tool_name"] == "candidate_verify_form" for s in self.scratchpad)
+
+            if not has_inspected or not has_classified:
+                self.current_subgoal = "DISCOVER_FORM"
+            elif not has_filled:
+                self.current_subgoal = "FILL_FIELDS"
+            elif not has_verified:
+                self.current_subgoal = "VERIFY_DATA"
+            else:
+                self.current_subgoal = "REQUEST_APPROVAL"
+
+            # 2. Build prompt from scratchpad history
             recent_steps = self.scratchpad[-5:]
             scratchpad_text = "\n".join([
                 f"Step {s['step']}: Thought: {s['thought']} | Action: {s['tool_name']}({json.dumps(s['arguments'])}) -> Result: {json.dumps(s.get('observation', {}))[:300]}"
@@ -485,18 +503,26 @@ class CareerAgentBrain:
             prompt = SYSTEM_PROMPT_TEMPLATE.format(
                 tools_schema=tools_desc,
                 **cand_ctx
-            ) + f"\n\nCURRENT GOAL: Prepare and fill application for {self.target_url}\nSTEP NUMBER: {self.step_counter} / {self.max_steps}\nRECENT SCRATCHPAD:\n{scratchpad_text}\n\nWhat is your next thought and action?"
+            ) + f"\n\nCURRENT GOAL: Prepare and fill application for {self.target_url}\nCURRENT SUBGOAL: {self.current_subgoal}\nSTEP NUMBER: {self.step_counter} / {self.max_steps}\nRECENT SCRATCHPAD:\n{scratchpad_text}\n\nWhat is your next thought and action?"
 
-            # 2. Think & Decide
+            # 3. Think & Decide
             update_agent_session(self.session_id, state="PLANNING")
-            self.event_bus.publish(self.session_id, "agent.thinking", {"step": self.step_counter})
+            self.event_bus.publish(self.session_id, "agent.thinking", {"step": self.step_counter, "subgoal": self.current_subgoal})
 
             decision = self._call_llm_decision(prompt)
             thought = decision.get("thought", "")
             action = decision.get("action", "")
             arguments = decision.get("arguments", {})
 
-            # 3. Check for special terminal / approval actions
+            # Anti-stuck watchdog: detect 3 consecutive identical actions
+            sig = f"{action}:{json.dumps(arguments, sort_keys=True)}"
+            self._action_signatures.append(sig)
+            if len(self._action_signatures) >= 3 and self._action_signatures[-1] == self._action_signatures[-2] == self._action_signatures[-3]:
+                action = "ask_user_clarification"
+                thought = "Anti-stuck watchdog: зафиксировано 3 одинаковых действия подряд. Запрашиваю помощь человека."
+                arguments = {"question": "Агент застрял на одном шаге 3 раза подряд. Пожалуйста, проверьте страницу в Chrome."}
+
+            # 4. Check for special terminal / approval actions
             if action == "request_human_approval":
                 approval_token = str(uuid.uuid4())
                 update_agent_session(self.session_id, state="WAITING_FOR_USER", approval_token=approval_token)
@@ -521,17 +547,31 @@ class CareerAgentBrain:
                 }
 
             if action == "ask_user_clarification":
+                q_text = arguments.get("question_to_user") or arguments.get("question", "")
+                self.scratchpad.append({
+                    "step": self.step_counter,
+                    "thought": thought,
+                    "tool_name": action,
+                    "arguments": arguments,
+                    "observation": {"question": q_text}
+                })
                 update_agent_session(self.session_id, state="WAITING_FOR_USER")
+                record_session_step(
+                    self.session_id, self.step_counter, thought, action, arguments,
+                    observation={"question": q_text},
+                    status="WAITING_CLARIFICATION",
+                    duration_ms=int((time.time() - start_step_time) * 1000)
+                )
                 self.event_bus.publish(self.session_id, "user.clarification_needed", {
                     "session_id": self.session_id,
-                    "question": arguments.get("question_to_user"),
+                    "question": q_text,
                     "context": arguments.get("field_context")
                 })
                 return {
                     "success": True,
                     "session_id": self.session_id,
                     "state": "WAITING_FOR_USER",
-                    "question": arguments.get("question_to_user")
+                    "question": q_text
                 }
 
             if action == "fail_session_with_error":

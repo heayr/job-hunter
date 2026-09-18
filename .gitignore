@@ -65,3 +65,12 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# ─────────────────────────────────────────────
+#  Agent Metadata & Local Screenshots
+# ─────────────────────────────────────────────
+.agents/
+.antigravity/
+.mimocode/
+crm_*.png
+*.png

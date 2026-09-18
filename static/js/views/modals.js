@@ -53,7 +53,15 @@ async function loadConfig() {
     try {
         const data = await api.getConfig();
         const keyInput = document.getElementById('gemini-key');
-        if (keyInput) keyInput.value = data.gemini_api_key || '';
+        if (keyInput) {
+            if (data.has_gemini_key) {
+                keyInput.placeholder = '●●●●●●●● (Ключ сохранен на сервере)';
+                keyInput.value = data.gemini_api_key || '';
+            } else {
+                keyInput.placeholder = 'AIzaSy...';
+                keyInput.value = '';
+            }
+        }
 
         const lmUrlInput = document.getElementById('lm-studio-url');
         if (lmUrlInput) lmUrlInput.value = data.lm_studio_url || 'http://127.0.0.1:1234/v1';
@@ -97,9 +105,8 @@ async function saveConfig() {
     const dailyLim = parseInt(document.getElementById('setting-daily-limit')?.value || '25', 10);
     const remOnly = document.getElementById('setting-remote-only')?.checked ?? false;
 
-    await api.saveConfig({
+    const payload = {
         llm_provider: currentLlmProvider,
-        gemini_api_key: key,
         lm_studio_url: lmUrl,
         active_profile_id: activeProfileId,
         seniority_alignment: seniorityAlignment,
@@ -108,7 +115,12 @@ async function saveConfig() {
         policy_min_salary_usd: salUsd,
         policy_daily_limit: dailyLim,
         policy_remote_only: remOnly
-    });
+    };
+    if (key && !key.includes('●')) {
+        payload.gemini_api_key = key;
+    }
+
+    await api.saveConfig(payload);
     toggleModal('settings-modal');
     showToast('⚙️ Настройки и движок ИИ сохранены');
 }

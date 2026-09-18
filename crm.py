@@ -36,14 +36,23 @@ def simple_markdown_to_html(md_text: str) -> str:
     return html
 
 
+from tracker.db import get_db_connection
+
 def _send_json(handler, data, status=200):
     body = json.dumps(data, ensure_ascii=False).encode('utf-8')
     handler.send_response(status)
     handler.send_header('Content-Type', 'application/json; charset=utf-8')
     handler.send_header('Content-Length', str(len(body)))
-    handler.send_header('Access-Control-Allow-Origin', '*')
+    origin = handler.headers.get('Origin', '')
+    if origin and (origin.startswith('http://localhost') or origin.startswith('http://127.0.0.1') or origin.startswith('chrome-extension://')):
+        handler.send_header('Access-Control-Allow-Origin', origin)
+        handler.send_header('Access-Control-Allow-Credentials', 'true')
+    elif not origin:
+        handler.send_header('Access-Control-Allow-Origin', 'http://127.0.0.1:8115')
+    else:
+        handler.send_header('Access-Control-Allow-Origin', 'null')
     handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    handler.send_header('Access-Control-Allow-Headers', 'Content-Type')
+    handler.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -63,8 +72,7 @@ class CRMHandler(BaseHTTPRequestHandler):
         Returns all vacancies with their pitches.
         LEFT JOIN ensures vacancies without pitches are still returned.
         """
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('''
             SELECT
@@ -93,8 +101,7 @@ class CRMHandler(BaseHTTPRequestHandler):
         return [dict(r) for r in rows]
 
     def get_cv(self, vac_id):
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT content FROM pitches WHERE vacancy_id = ? AND pitch_type = 'tailored_cv'", (vac_id,))
         row = cur.fetchone()
@@ -102,7 +109,7 @@ class CRMHandler(BaseHTTPRequestHandler):
         return row['content'] if row else None
 
     def update_vacancy_status(self, vac_id, status, reason=None):
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cur = conn.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if status == 'blacklist':
@@ -140,20 +147,16 @@ class CRMHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = self.headers.get('Origin', '')
+        if origin and (origin.startswith('http://localhost') or origin.startswith('http://127.0.0.1') or origin.startswith('chrome-extension://')):
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Access-Control-Allow-Credentials', 'true')
+        elif not origin:
+            self.send_header('Access-Control-Allow-Origin', 'http://127.0.0.1:8115')
+        else:
+            self.send_header('Access-Control-Allow-Origin', 'null')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-
-    # ─────────────────────────────────────────────
-    #  GET routes
-    # ─────────────────────────────────────────────
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
         self.send_header('Content-Length', '0')
         self.end_headers()
 
@@ -226,7 +229,14 @@ class CRMHandler(BaseHTTPRequestHandler):
                         config = json.load(cf)
                     except Exception:
                         pass
-            _send_json(self, config)
+            safe_config = dict(config)
+            raw_key = safe_config.get('gemini_api_key', '')
+            safe_config['has_gemini_key'] = bool(raw_key and raw_key.strip())
+            if raw_key and len(raw_key) > 8:
+                safe_config['gemini_api_key'] = raw_key[:4] + '●' * 8 + raw_key[-4:]
+            else:
+                safe_config['gemini_api_key'] = ''
+            _send_json(self, safe_config)
 
         elif self.path == '/api/shame_list':
             from tracker.shame_list import generate_shame_list_markdown
@@ -297,8 +307,7 @@ class CRMHandler(BaseHTTPRequestHandler):
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
             
             # Fetch vacancy details
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection()
             cur = conn.cursor()
             cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
             v_row = cur.fetchone()
@@ -331,8 +340,7 @@ class CRMHandler(BaseHTTPRequestHandler):
                 _send_json(self, {"success": True, "ats_report": cached_report})
                 return
 
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection()
             cur = conn.cursor()
             cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
             v_row = cur.fetchone()
@@ -491,8 +499,7 @@ class CRMHandler(BaseHTTPRequestHandler):
             from generator.pitch_builder import generate_pitch
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
 
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection()
             cur = conn.cursor()
             cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
             row = cur.fetchone()
@@ -640,6 +647,10 @@ class CRMHandler(BaseHTTPRequestHandler):
                         config = json.load(cf)
                     except Exception:
                         pass
+            if 'gemini_api_key' in body:
+                val = str(body['gemini_api_key'] or '').strip()
+                if not val or '●' in val:
+                    body.pop('gemini_api_key', None)
             config.update(body)
             with open(config_path, 'w', encoding='utf-8') as cf:
                 json.dump(config, cf, indent=2)
@@ -739,6 +750,7 @@ class CRMHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/agent/approve-session':
             from tracker.db import get_agent_session
             from agents.tool_system import ToolRegistry
+            import hmac
             body = json.loads(self._read_body().decode('utf-8'))
             session_id = body.get('session_id')
             token = body.get('approval_token')
@@ -749,8 +761,10 @@ class CRMHandler(BaseHTTPRequestHandler):
                 _send_json(self, {"success": False, "error": "Session not found"}, status=404)
                 return
 
-            if not token:
-                token = session.get('approval_token')
+            expected_token = session.get('approval_token')
+            if not token or not expected_token or not hmac.compare_digest(str(token), str(expected_token)):
+                _send_json(self, {"success": False, "error": "Invalid or missing human approval token"}, status=403)
+                return
 
             try:
                 submit_res = ToolRegistry.execute_tool("browser_submit_application", {
@@ -792,6 +806,45 @@ class CRMHandler(BaseHTTPRequestHandler):
                 "daily_limit": res.daily_limit
             })
 
+        # ── CDP Native Direct Apply (Phase 3) ──
+        elif self.path == '/api/agent/cdp/apply':
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id')
+            url = body.get('url')
+            cover_letter = body.get('cover_letter')
+            auto_submit = bool(body.get('auto_submit', False))
+
+            if vac_id and (not url or not cover_letter):
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT url FROM vacancies WHERE id = ?", (vac_id,))
+                v_row = cur.fetchone()
+                if v_row and not url:
+                    url = v_row['url']
+                cur.execute("SELECT content FROM pitches WHERE vacancy_id = ? AND pitch_type = 'cover_letter'", (vac_id,))
+                p_row = cur.fetchone()
+                if p_row and not cover_letter:
+                    cover_letter = p_row['content']
+                conn.close()
+
+            if not url:
+                _send_json(self, {"success": False, "error": "URL вакансии не указан"}, status=400)
+                return
+
+            if "hh.ru" in url:
+                from agents.adapters.hh_adapter import HeadHunterCDPAdapter
+                adapter = HeadHunterCDPAdapter()
+                res = adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
+                _send_json(self, res)
+            else:
+                _send_json(self, {"success": False, "error": f"Для домена {url} детерминированный адаптер еще не подключен."}, status=400)
+
+        elif self.path == '/api/agent/cdp/submit':
+            from agents.adapters.hh_adapter import HeadHunterCDPAdapter
+            adapter = HeadHunterCDPAdapter()
+            res = adapter.submit()
+            _send_json(self, res)
+
         else:
             self.send_response(404)
             self.end_headers()
@@ -826,7 +879,7 @@ def find_free_port(preferred_port=8115):
 def run_crm(port=None):
     if port is None:
         port = find_free_port(8115)
-    server_address = ('', port)
+    server_address = ('127.0.0.1', port)
     httpd = ThreadedHTTPServer(server_address, CRMHandler)
     with open(os.path.join(os.path.dirname(__file__), '.current_port'), 'w') as f:
         f.write(str(port))

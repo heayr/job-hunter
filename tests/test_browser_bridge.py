@@ -12,7 +12,7 @@ from agents.browser_bridge import BrowserBridge, get_browser_bridge
 class TestBrowserBridge(unittest.TestCase):
     def setUp(self):
         self.bridge = BrowserBridge()
-        self.bridge._init_bridge()
+        self.bridge._init_bridge(enable_cdp=False)
 
     def test_extension_liveness_detection(self):
         self.assertFalse(self.bridge.is_connected())
