@@ -16,8 +16,7 @@ async function autofillFormOnPage(candidateData, coverLetterText) {
   const isRu = /[а-яёА-ЯЁ]/.test(document.title + ' ' + (document.body ? document.body.innerText.slice(0, 400) : '')) || (document.documentElement.lang || '').startsWith('ru');
   const c_fn = isRu ? (candidateData.fn_ru || candidateData.first_name || 'Егор') : (candidateData.fn_en || candidateData.first_name || 'Egor');
   const c_ln = isRu ? (candidateData.ln_ru || candidateData.last_name || 'Мышинский') : (candidateData.ln_en || candidateData.last_name || 'Myshinsky');
-  const c_name = `${c_fn} ${c_ln}`;
-  const c_loc = isRu ? (candidateData.loc_ru || 'Ереван, Армения / Удаленно') : (candidateData.loc_en || 'Yerevan, Armenia / Remote');
+  const c_loc = isRu ? (candidateData.loc_ru || 'Москва, Россия / Удаленно') : (candidateData.loc_en || 'Moscow, Russia / Remote');
 
   const contacts = candidateData.contacts_structured || candidateData;
   const email = contacts.email || candidateData.email || 'egormyshinsky@gmail.com';

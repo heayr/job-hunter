@@ -198,25 +198,44 @@ class CDPBrowserDriver:
             except Exception as e:
                 print(f"[CDP] Failed to run launch_chrome.sh: {e}")
 
-        # Fallback to direct process launch on macOS
-        chrome_mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        if sys.platform == "darwin" and os.path.exists(chrome_mac):
-            profile_dir = os.path.expanduser("~/.jobhunter-chrome")
-            os.makedirs(profile_dir, exist_ok=True)
-            try:
-                subprocess.Popen([
+        # Fallback to direct process launch
+        profile_dir = os.path.expanduser("~/.jobhunter-chrome")
+        os.makedirs(profile_dir, exist_ok=True)
+        chrome_cmds = []
+
+        if sys.platform == "darwin":
+            chrome_mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            if os.path.exists(chrome_mac):
+                chrome_cmds.append([
                     "open", "-n", "-a", "Google Chrome", "--args",
                     f"--remote-debugging-port={CDP_PORT}",
                     f"--user-data-dir={profile_dir}",
                     "--no-first-run",
                     "--no-default-browser-check"
-                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                ])
+        elif sys.platform.startswith("linux"):
+            import shutil
+            for bin_name in ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]:
+                bin_path = shutil.which(bin_name)
+                if bin_path:
+                    chrome_cmds.append([
+                        bin_path,
+                        f"--remote-debugging-port={CDP_PORT}",
+                        f"--user-data-dir={profile_dir}",
+                        "--no-first-run",
+                        "--no-default-browser-check"
+                    ])
+                    break
+
+        for cmd in chrome_cmds:
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 for _ in range(20):
                     time.sleep(0.3)
                     if self.is_cdp_available():
                         return True
             except Exception as e:
-                print(f"[CDP] Failed to launch Google Chrome: {e}")
+                print(f"[CDP] Failed to launch Chrome: {e}")
 
         return False
 
@@ -244,18 +263,37 @@ class CDPBrowserDriver:
             print(f"[CDP] Connection error: {e}")
             return False
 
+    @staticmethod
+    def is_crm_page(p: Page) -> bool:
+        """Determines if a given page belongs to the Job Hunter CRM UI dashboard."""
+        try:
+            url = (p.url or "").lower()
+            if ":8105" in url or ":8115" in url:
+                return True
+            title = (p.title() or "").lower()
+            if "job hunter" in title or "crm" in title:
+                return True
+        except Exception:
+            pass
+        return False
+
     def get_active_page(self, avoid_crm: bool = True) -> Page:
-        """Returns active or latest open page (excluding CRM dashboard if avoid_crm is True)."""
+        """Returns active or latest open page (strictly excluding CRM dashboard if avoid_crm is True)."""
         if not self.connect():
             raise RuntimeError("Could not connect to Chrome over CDP on port 9222.")
 
         pages = self._context.pages if self._context else []
         if avoid_crm:
-            # Protect CRM UI dashboard so agent never hijacks the control center
-            candidate_pages = [p for p in pages if ":8105" not in p.url and ":8115" not in p.url and "chrome://" not in p.url]
+            # Protect CRM UI dashboard so agent NEVER hijacks or overwrites the control center
+            candidate_pages = [p for p in pages if not self.is_crm_page(p) and not (p.url or "").startswith("chrome://")]
             if candidate_pages:
                 self._active_page = candidate_pages[-1]
                 return self._active_page
+            # CRITICAL FIX: If all open pages are CRM or internal, NEVER fall back to CRM!
+            # Open a fresh new tab so the user's CRM dashboard is NEVER replaced or closed!
+            new_page = self._context.new_page()
+            self._active_page = new_page
+            return self._active_page
 
         if pages:
             self._active_page = pages[-1]
@@ -269,12 +307,50 @@ class CDPBrowserDriver:
 
         return self._active_page
 
+    def get_or_create_page(self, target_url: Optional[str] = None) -> Page:
+        """
+        Guarantees that CRM tabs (:8105, :8115, Job Hunter CRM) are NEVER hijacked or overwritten.
+        If target_url is provided and a tab with that URL already exists, focuses and returns it.
+        Otherwise finds an empty blank tab (non-CRM) or creates a brand new dedicated tab.
+        """
+        if not self.connect():
+            raise RuntimeError("Could not connect to Chrome over CDP on port 9222.")
+
+        if not self._context:
+            return self.get_active_page()
+
+        pages = self._context.pages if self._context else []
+        if target_url:
+            clean_target = target_url.rstrip("/")
+            for p in pages:
+                try:
+                    if clean_target in (p.url or "").rstrip("/"):
+                        p.bring_to_front()
+                        self._active_page = p
+                        return p
+                except Exception:
+                    continue
+
+        # Look for a blank non-CRM tab
+        for p in pages:
+            try:
+                if not self.is_crm_page(p) and (p.url in ("about:blank", "chrome://newtab/") or not p.url):
+                    self._active_page = p
+                    return p
+            except Exception:
+                continue
+
+        # Otherwise create a fresh new tab so CRM stays 100% untouched
+        new_page = self._context.new_page()
+        self._active_page = new_page
+        return new_page
+
     def open_page(self, url: str) -> Dict[str, Any]:
-        """Navigates to the given URL in the user's visible Chrome in a dedicated target tab."""
+        """Navigates to the given URL in the user's visible Chrome in a dedicated target tab, NEVER touching CRM."""
         if not self.connect():
             return {"success": False, "error": "Could not connect to Chrome over CDP on port 9222."}
 
-        page = self.get_active_page(avoid_crm=True)
+        page = self.get_or_create_page(url)
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=30000)
             try:

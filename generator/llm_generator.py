@@ -31,8 +31,45 @@ def get_llm_config() -> Dict[str, Any]:
 def get_api_key() -> str:
     return get_llm_config().get("gemini_api_key", "")
 
-def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True, timeout: float = 35.0) -> Optional[str]:
-    """Calls local LM Studio instance via OpenAI-compatible endpoint."""
+def get_lm_studio_active_model(base_url: str) -> str:
+    try:
+        req = urllib.request.Request(f"{base_url}/models")
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            models = data.get("data", [])
+            chat_models = [m["id"] for m in models if "embed" not in m.get("id", "").lower()]
+            if chat_models:
+                return chat_models[0]
+            if models:
+                return models[0].get("id", "")
+    except Exception:
+        pass
+    return "zai-org/glm-4.6v-flash"
+
+def extract_json_payload(text: str) -> Optional[Dict[str, Any]]:
+    if not text:
+        return None
+    try:
+        return json.loads(text.strip())
+    except Exception:
+        pass
+    match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
+    if match:
+        try:
+            return json.loads(match.group(1).strip())
+        except Exception:
+            pass
+    first = text.find('{')
+    last = text.rfind('}')
+    if first != -1 and last != -1 and last > first:
+        try:
+            return json.loads(text[first:last+1])
+        except Exception:
+            pass
+    return None
+
+def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True, timeout: float = 300.0) -> Optional[str]:
+    """Calls local LM Studio instance via OpenAI-compatible endpoint with ample token headroom."""
     cfg = get_llm_config()
     base_url = cfg.get("lm_studio_url", "http://127.0.0.1:1234/v1").rstrip("/")
     url = f"{base_url}/chat/completions"
@@ -42,12 +79,14 @@ def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True,
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    model = cfg.get("lm_studio_model") or get_lm_studio_active_model(base_url)
+
     payload = {
+        "model": model,
         "messages": messages,
-        "temperature": 0.2
+        "temperature": 0.2,
+        "max_tokens": 3500
     }
-    if json_mode:
-        payload["response_format"] = {"type": "json_object"}
 
     data_bytes = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -61,10 +100,40 @@ def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True,
             data = json.loads(resp.read().decode("utf-8"))
             choices = data.get("choices", [])
             if choices:
-                return choices[0].get("message", {}).get("content", "").strip()
+                msg = choices[0].get("message", {})
+                content = (msg.get("content") or "").strip()
+                if not content and msg.get("reasoning_content"):
+                    content = msg.get("reasoning_content", "").strip()
+                return content
     except Exception as e:
+        print(f"DEBUG: LM Studio request failed: {type(e).__name__}: {e}")
         return None
     return None
+
+
+def get_gold_standard_examples(lang: str = "ru", limit: int = 2) -> list:
+    """Retrieve user-approved gold standard pitches to serve as few-shot exemplars."""
+    try:
+        from tracker.db import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT p.pitch_type, p.content, v.title, v.company
+            FROM pitches p
+            JOIN vacancies v ON v.id = p.vacancy_id
+            WHERE (p.rating = 1 OR v.pitch_rating = 1)
+              AND p.pitch_type IN ('cover_letter', 'short_dm')
+              AND p.language = ?
+              AND length(p.content) > 50
+            ORDER BY p.id DESC
+            LIMIT ?
+        ''', (lang, limit * 2))
+        rows = cur.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[FEW_SHOT] Could not load gold standard examples: {e}")
+        return []
 
 
 def generate_ai_pitch(
@@ -109,9 +178,15 @@ def generate_ai_pitch(
 
     language_name = "Russian" if lang == "ru" else "English"
 
-    prompt = f"""
-You are {name}, an experienced engineer writing directly to an engineering lead, tech founder, or hiring manager.
-Write in the first person ("I" / "я").
+    gold_examples_text = ""
+    gold_list = get_gold_standard_examples(lang=lang, limit=2)
+    if gold_list:
+        gold_examples_text = "\nUSER-APPROVED GOLD STANDARD EXAMPLES (The candidate personally approved these generations — adopt this exact tone, cadence, formatting, and high-impact style):\n"
+        for ex in gold_list:
+            gold_examples_text += f"\n--- GOLD EXAMPLE FOR {ex.get('title')} AT {ex.get('company')} ({ex.get('pitch_type', '').upper()}):\n{ex.get('content')}\n"
+
+    prompt = f"""You are {name}, a Senior Frontend/Fullstack Engineer writing a job application.
+You are writing DIRECTLY to an engineering lead or hiring manager — peer to peer, not HR to applicant.
 
 JOB DETAILS:
 - Role: {title}
@@ -119,59 +194,72 @@ JOB DETAILS:
 - Requirements & Description:
 {desc}
 
-MY REAL PROFILE & BACKGROUND:
+MY REAL PROFILE:
 - Name: {name}
 - Role: {role}
-- Core Summary: {summary}
-- Real Projects & Track Record:
+- Summary: {summary}
+- Real Projects & Results:
 {exp}
 - Tech Stack: {keywords}
 - Contacts: Telegram: {tg} | Email: {email} | GitHub: {github} | LinkedIn: {linkedin}
 
-LANGUAGE: {language_name}
+WARNINGS: {warnings if warnings else "None"}
 
-POSITIONING STRATEGY (FRONTEND / PRODUCT ENGINEER WITH END-TO-END OWNERSHIP):
-1. T-SHAPED CORE:
-   - Deep expertise: React 19, TypeScript, Next.js 15/16 (App Router, Server/Client components, SSR/SSG, caching, bundle optimization, 100/100 PageSpeed, clean component architecture & state).
-   - Solid engineering breadth: API contracts, HTTP/status codes, auth/session cookies (httpOnly, SameSite), optimistic updates, robust error handling, Git, GitHub Actions CI/CD, multi-stage Docker builds, Traefik/Nginx, and root-cause debugging across the entire web stack.
-   - DO NOT sound like an unfocused "knows 25 random backends" junior. Sound like an autonomous engineer who takes a feature or product from Figma/requirements to live production.
-2. DYNAMICALLY MATCH THE CANDIDATE'S STRONGEST PROOF TO THE JOB'S PRIMARY NEED:
-   Do NOT mindlessly repeat the same metric for every vacancy. Look at what THIS company values most and pick the matching proof:
-   - UI/UX, Design Systems, Animations, Component Kits:
-     Highlight: Experience building reusable component libraries from Figma (Cloveri project for Mintsifry) and custom interactive animations (GSAP, Lottie, Embla Carousel, Tailwind CSS v4) without bloated third-party libraries.
-   - Dashboards, CMS, Role-Based Access, Web Apps:
-     Highlight: Developed end-to-end CMS platforms and admin dashboards (Radiotochka), implementing RBAC, secure session-cookies (httpOnly/SameSite), and eliminating SSR hydration mismatches.
-   - Execution Speed, Hackathons, Startups, MVPs:
-     Highlight: 1st place at Droog hackathon (shipped 3 role-based interfaces in 48 hours under strict deadline) and fast autonomous delivery without waiting for micromanagement.
-   - Fullstack Ownership, API Contracts, Integrations:
-     Highlight: End-to-end feature delivery: FastAPI/Node.js REST APIs, payment webhooks (ЮKassa/HMAC), background bots, multi-stage Docker builds with Traefik/Nginx, and Vitest unit testing.
-   - Core Performance (ONLY when the job specifically asks for speed/optimization):
-     Highlight: Bundle optimization, SSR/RSC rendering strategies, and zero-bloat delivery.
+CRITICAL LANGUAGE RULE — NO EXCEPTIONS:
+Write EVERYTHING in {language_name}.
+If the job description is in Russian, write in Russian. If in English, write in English.
+Mixing languages = automatic failure.
 
-3. STRICT NO FOUNDER / NO PET-PROJECT MARKERS:
-   - NEVER say or imply that you are the "founder", "creator", "owner", or running your "own startup" ("создатель", "владелец", "фаундер", "мой стартап", "мое детище", "свой проект").
-   - Employers see this as a red flag (risk of distraction or moonlighting).
-   - Frame your experience purely as a Senior Engineering role: "Lead Frontend / Product Engineer в продуктовом SaaS NoLogs", highlighting client-side architecture, React 19, TypeScript, and shipping production features.
+COVER LETTER RULES (follow exactly):
 
-4. NO AI CLICHES: Never use generic buzzwords ("thrilled to apply", "in today's fast-paced world", "I hope this finds you well", "as an enthusiast", "идеально подхожу").
+RULE 1 — OPENING HOOK (most important):
+BANNED openers: "Hello [Company] Team", "I am writing to apply", "I am excited/thrilled/passionate",
+"Dear Hiring Manager", "Здравствуйте команда", "Меня зовут", "Я хочу откликнуться на вакансию".
+REQUIRED: Start with ONE concrete observation about THIS specific company's technical challenge,
+product scale, or engineering problem visible in the job description.
+Examples:
+- "Running SSR on 100M+ monthly active users means bundle size is not a metric — it's a cost."
+- "Когда сервис принимает 50k запросов в секунду, гидратация React — это не деталь, это архитектура."
+- "A/B testing infrastructure at scale breaks when component state does not match server snapshots."
 
-5. SHORT DM (for Telegram/LinkedIn outreach):
-   - 2 to 3 sentences maximum.
-   - Sentence 1: Direct mention of their opening + your relevant technical focus.
-   - Sentence 2: 1 specific proof point tailored to THEIR specific requirement (from the proof points above).
-   - Sentence 3: Crisp, peer-to-peer call to action.
+RULE 2 — MATCH THEIR PROBLEM TO YOUR PROOF:
+Look at the TOP 2-3 requirements in the job description. For each one, connect it to a SPECIFIC result
+from MY projects with a real number or outcome:
+- UI/UX, Design Systems: Cloveri component library for Mintsifry govt project, GSAP/Lottie/Embla animations
+- Performance: SSR/RSC optimization, 100/100 PageSpeed scores, zero-bloat bundle strategies
+- Dashboards, CMS, RBAC: Radiotochka — httpOnly session cookies, hydration mismatch elimination
+- Startup speed, MVPs: Droog hackathon — 3 role-based interfaces shipped in 48h, 1st place
+- Fullstack ownership: FastAPI/Node APIs, payment webhooks (YuKassa/HMAC), Docker+Traefik CI/CD
+DO NOT use vague language. "I improved performance" is banned. Attach a concrete fact.
 
-6. COVER LETTER (for portal/email):
-   - Paragraph 1: Direct application for {title} at {company}. State core expertise addressing their exact technical need.
-   - Paragraph 2: 2-3 specific bullet points connecting your real engineering outcomes to their required tech stack and problems (vary the bullets: 1 UI/Frontend, 1 Architecture/Integration, 1 Product/Delivery).
-   - Paragraph 3: Wrap-up + clean contact signature.
-6. WARNINGS TO ACCOUNT FOR: {warnings if warnings else "None"} (If a specific code word or trap was flagged, address it naturally).
-7. MATCH SCORE (0 to 100):
-   - Evaluate real career fit for the candidate's TARGET role (Frontend / Fullstack / Product Web Engineer).
-   - PENALTY FOR NON-TARGET PROFESSIONS: If this vacancy is for QA / SDET / Тестировщик, DevOps / SRE / Sysadmin, Data Science / ML, Product / Project Manager, Designer, or HR — give it a LOW score (10 to 30) because the core profession does NOT match, even if common tools (Git, Docker, JS) are mentioned!
-   - High scores (75 to 98) are strictly for Frontend / Fullstack / Product Web Developer roles matching React, Next.js, and TypeScript.
+RULE 3 — NO AI SLOP:
+Never use: "deeply passionate", "fast-paced environment", "team player", "results-driven",
+"leverage synergies", "идеально подхожу", "горю желанием", "нацелен на результат".
+Every sentence must be falsifiable. If it could be copy-pasted to any resume, delete it.
 
-Respond ONLY with valid JSON in this exact structure:
+RULE 4 — NO FOUNDER FRAMING:
+Never say "my startup", "my project", "я фаундер". 
+Frame as: "Lead Frontend Engineer at NoLogs SaaS" or "продуктовый инженер в SaaS NoLogs".
+
+RULE 5 — LENGTH:
+Cover letter: 3 paragraphs maximum. No padding. End with contacts on the last line.
+Short DM: 2-3 sentences. Punchy. Direct. No "I hope this message finds you well."
+
+SHORT DM format:
+- Sentence 1: Their specific opening + your most relevant technical angle.
+- Sentence 2: One hard proof point matching their top requirement.
+- Sentence 3: Clear CTA (call/chat/portfolio link).
+{gold_examples_text}
+MATCH SCORE (0-100):
+- 80-98: Frontend/Fullstack/Product Web role matching React, Next.js, TypeScript core stack
+- 60-79: Partial match — some relevant tech but not the primary focus
+- 30-59: Weak match — different domain but transferable skills
+- 10-29: PENALTY — QA, DevOps, Data Science, PM, Designer, HR, non-engineering roles.
+  Even if they mention Git or JS, if the core role is not engineering, score 10-29.
+BS DETECTION: If job posting has 3+ red flags (no salary for remote, 10+ required tech, vague
+"competitive salary", requirements far above implied seniority, mandatory self-employment), reduce score by 10-15.
+
+Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
 {{
   "short_dm": "...",
   "cover_letter": "...",
@@ -183,18 +271,14 @@ Respond ONLY with valid JSON in this exact structure:
     if provider == "lm_studio":
         lm_resp = call_lm_studio(prompt, json_mode=True)
         if lm_resp:
-            try:
-                cleaned = re.sub(r'^```(?:json)?\s*', '', lm_resp.strip())
-                cleaned = re.sub(r'\s*```$', '', cleaned).strip()
-                parsed = json.loads(cleaned)
+            parsed = extract_json_payload(lm_resp)
+            if parsed:
                 return {
                     "success": True,
-                    "short_dm": parsed.get("short_dm", "").strip(),
-                    "cover_letter": parsed.get("cover_letter", "").strip(),
+                    "short_dm": (parsed.get("short_dm") or "").strip(),
+                    "cover_letter": (parsed.get("cover_letter") or "").strip(),
                     "score": int(parsed.get("score", 80))
                 }
-            except Exception:
-                pass
         return {
             "success": False,
             "error": "Не удалось получить ответ от локального LM Studio. Убедитесь, что LM Studio запущен на " + cfg.get("lm_studio_url", "http://127.0.0.1:1234/v1")
@@ -205,18 +289,14 @@ Respond ONLY with valid JSON in this exact structure:
         # Check if LM Studio fallback is running
         lm_resp = call_lm_studio(prompt, json_mode=True)
         if lm_resp:
-            try:
-                cleaned = re.sub(r'^```(?:json)?\s*', '', lm_resp.strip())
-                cleaned = re.sub(r'\s*```$', '', cleaned).strip()
-                parsed = json.loads(cleaned)
+            parsed = extract_json_payload(lm_resp)
+            if parsed:
                 return {
                     "success": True,
-                    "short_dm": parsed.get("short_dm", "").strip(),
-                    "cover_letter": parsed.get("cover_letter", "").strip(),
+                    "short_dm": (parsed.get("short_dm") or "").strip(),
+                    "cover_letter": (parsed.get("cover_letter") or "").strip(),
                     "score": int(parsed.get("score", 80))
                 }
-            except Exception:
-                pass
         return {"success": False, "error": "Gemini API ключ не указан в Настройках ИИ"}
 
     models_to_try = GEMINI_MODELS[:]
@@ -289,18 +369,14 @@ Respond ONLY with valid JSON in this exact structure:
     # 3. If Gemini models failed (e.g. rate limit 429 or 503), try LM Studio fallback
     lm_resp = call_lm_studio(prompt, json_mode=True)
     if lm_resp:
-        try:
-            cleaned = re.sub(r'^```(?:json)?\s*', '', lm_resp.strip())
-            cleaned = re.sub(r'\s*```$', '', cleaned).strip()
-            parsed = json.loads(cleaned)
+        parsed = extract_json_payload(lm_resp)
+        if parsed:
             return {
                 "success": True,
-                "short_dm": parsed.get("short_dm", "").strip(),
-                "cover_letter": parsed.get("cover_letter", "").strip(),
+                "short_dm": (parsed.get("short_dm") or "").strip(),
+                "cover_letter": (parsed.get("cover_letter") or "").strip(),
                 "score": int(parsed.get("score", 80))
             }
-        except Exception:
-            pass
 
     return {
         "success": False,

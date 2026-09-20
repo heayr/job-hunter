@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,804 +7,770 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-    <style>
-        body {
-            background-color: #0f172a;
-            color: #f8fafc;
-        }
-
-        .tab-btn {
-            transition: all 0.2s;
-            border-bottom: 2px solid transparent;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .tab-btn.active {
-            border-bottom-color: #38bdf8;
-            color: #38bdf8;
-            font-weight: 600;
-        }
-
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 50;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(4px);
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .terminal {
-            font-family: monospace;
-            background: #000;
-            color: #0f0;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            height: 220px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-size: 13px;
-        }
-
-        .market-btn {
-            transition: all 0.2s;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .market-btn:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .market-btn.active {
-            background: #38bdf8;
-            color: #0f172a;
-            font-weight: 700;
-            border-color: #38bdf8;
-            box-shadow: 0 1px 4px rgba(56, 189, 248, 0.3);
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/crm.css?v=8">
 </head>
-
 <body class="min-h-screen">
-    <!-- Navbar -->
-    <nav class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-40 backdrop-blur-md shadow-lg w-full">
-        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 w-full">
-            <div class="flex justify-between py-3 gap-4 items-center w-full min-w-0">
-                
-                <!-- Left: Logo & Tabs -->
-                <div class="flex items-center gap-4 sm:gap-6 min-w-0 flex-1">
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="text-xl">⚡️</span>
-                        <h1 class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent whitespace-nowrap">
+    <!-- Navbar Component -->
+    <!-- Navbar Component -->
+<nav class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-40 backdrop-blur-md shadow-md w-full">
+    <div class="max-w-[1600px] mx-auto px-4 lg:px-6 w-full">
+        <div class="flex justify-between py-2.5 gap-4 items-center w-full min-w-0">
+            
+            <!-- Left: Brand & Navigation Tabs -->
+            <div class="flex items-center gap-3 sm:gap-4 shrink-0">
+                <!-- Brand Mark -->
+                <div class="flex items-center gap-1.5 shrink-0 select-none cursor-pointer" onclick="setTab('inbox')">
+                    <span class="text-xl">⚡</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-sm sm:text-base font-bold bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent whitespace-nowrap">
                             Job Hunter
-                        </h1>
+                        </span>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">v3</span>
                     </div>
-                    
-                    <!-- Desktop Tabs -->
-                    <div class="hidden lg:flex gap-1 border-l border-slate-700 pl-4 items-center">
-                        <button onclick="setTab('inbox')" id="tab-inbox" class="tab-btn active px-3 py-1.5 text-slate-400 whitespace-nowrap">Inbox (<span id="count-inbox">0</span>)</button>
-                        <button onclick="setTab('sent')" id="tab-sent" class="tab-btn px-3 py-1.5 text-slate-400 whitespace-nowrap">Отправлено (<span id="count-sent">0</span>)</button>
-                        <button onclick="setTab('replied')" id="tab-replied" class="tab-btn px-3 py-1.5 text-slate-400 whitespace-nowrap">Ответили (<span id="count-replied">0</span>)</button>
-                        <button onclick="setTab('archive')" id="tab-archive" class="tab-btn px-3 py-1.5 text-slate-400 whitespace-nowrap">Архив (<span id="count-archive">0</span>)</button>
-                        <button onclick="setTab('blacklist')" id="tab-blacklist" class="tab-btn px-3 py-1.5 text-rose-400 hover:text-rose-300 whitespace-nowrap">💩 Черный список (<span id="count-blacklist">0</span>)</button>
-                        <button onclick="setTab('profiles')" id="tab-profiles" class="tab-btn px-3 py-1.5 text-purple-400 hover:text-purple-300 whitespace-nowrap">👤 Профили</button>
-                    </div>
+                </div>
+                
+                <!-- Primary Workflow Tabs (All 6 tabs permanently visible) -->
+                <div class="flex items-center gap-0.5 sm:gap-1 border-l border-slate-800 pl-2 sm:pl-3 shrink-0 py-0.5">
+                    <button onclick="setTab('inbox')" id="tab-inbox" class="tab-btn active px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>📥</span> <span>Inbox</span>
+                        <span id="count-inbox" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono">0</span>
+                    </button>
+                    <button onclick="setTab('sent')" id="tab-sent" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>📤</span> <span>Отправлено</span>
+                        <span id="count-sent" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono">0</span>
+                    </button>
+                    <button onclick="setTab('replied')" id="tab-replied" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>💬</span> <span>Ответили</span>
+                        <span id="count-replied" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono text-emerald-400">0</span>
+                    </button>
+                    <button onclick="setTab('archive')" id="tab-archive" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>📦</span> <span>Архив</span>
+                        <span id="count-archive" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono">0</span>
+                    </button>
+                    <button onclick="setTab('blacklist')" id="tab-blacklist" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg text-rose-400/80 hover:text-rose-300 whitespace-nowrap text-xs flex items-center gap-1" title="Чёрный список / Доска позора">
+                        <span>🛑</span> <span>ЧС</span>
+                        <span id="count-blacklist" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono text-rose-400">0</span>
+                    </button>
+                    <button onclick="setTab('profiles')" id="tab-profiles" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg text-purple-400/90 hover:text-purple-300 whitespace-nowrap text-xs font-semibold flex items-center gap-1">
+                        <span>👤</span> <span>Профили</span>
+                    </button>
+                </div>
+            </div>
 
-                    <!-- Mobile Burger Button -->
-                    <div class="lg:hidden">
-                        <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="text-slate-300 hover:text-white p-2">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            <!-- Right: Controls & Actions -->
+            <div class="flex items-center gap-2 shrink-0">
+                <!-- Quick Active Resume Selector (2xl screens only) -->
+                <div class="hidden 2xl:flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs shadow-sm">
+                    <span class="text-purple-400 font-semibold whitespace-nowrap">🎯</span>
+                    <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1 max-w-[130px] truncate">
+                        <option value="">Загрузка...</option>
+                    </select>
+                </div>
+                
+                <!-- Chrome CDP Status Badge -->
+                <button id="cdp-status-badge" onclick="launchChromeAgent()" title="Статус Chrome для автономного отклика (кликните для запуска)" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors shadow-sm cursor-pointer whitespace-nowrap">
+                    <span id="cdp-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                    <span id="cdp-text">Chrome</span>
+                </button>
+
+                <!-- Actions Dropdown -->
+                <div class="relative">
+                    <button id="nav-actions-btn" onclick="toggleNavActions()" 
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer whitespace-nowrap">
+                        <span>⚡</span> <span class="hidden sm:inline">Действия</span> ▾
+                    </button>
+                    
+                    <div id="nav-actions-overlay" onclick="closeNavActions()" class="fixed inset-0 z-40 hidden"></div>
+                    
+                    <div id="nav-actions-menu" class="absolute right-0 top-full mt-2 hidden z-50 w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden py-1 text-xs">
+                        <button onclick="launchChromeAgent(); closeNavActions();" class="w-full text-left px-4 py-2.5 text-amber-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>🌐</span> Открыть Chrome Агента (9222)
+                        </button>
+                        <a href="#" onclick="event.preventDefault(); toggleModal('bookmarklet-modal'); closeNavActions();" class="text-left px-4 py-2.5 text-emerald-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>🔖</span> Auto-Apply (Bookmarklet)
+                        </a>
+                        <button onclick="toggleModal('ai-parser-modal'); closeNavActions();" class="w-full text-left px-4 py-2.5 text-purple-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>🪄</span> Добавить через ИИ
+                        </button>
+                        <button onclick="startHarvest(); closeNavActions();" class="w-full text-left px-4 py-2.5 text-sky-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2 border-b border-slate-700/50">
+                            <span>🔄</span> Собрать вакансии
+                        </button>
+                        
+                        <button onclick="openShameListModal(); closeNavActions();" class="w-full text-left px-4 py-2.5 text-rose-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>💩</span> Доска позора
+                        </button>
+                        <button onclick="toggleModal('settings-modal'); closeNavActions();" class="w-full text-left px-4 py-2.5 text-slate-300 hover:bg-slate-700/80 transition-colors flex items-center gap-2 border-t border-slate-700/50">
+                            <span>⚙️</span> Настройки ИИ
                         </button>
                     </div>
                 </div>
+            </div>
+            
+        </div>
+    </div>
+</nav>
 
-                <!-- Mobile Menu Dropdown -->
-                <div id="mobile-menu" class="hidden lg:hidden w-full bg-slate-800 rounded-lg mt-2 p-2 flex flex-col gap-1 border border-slate-700 shadow-xl absolute top-full left-0 z-50">
-                    <button onclick="setTab('inbox'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-inbox-mob" class="tab-btn active px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Inbox (<span id="count-inbox-mob">0</span>)</button>
-                    <button onclick="setTab('sent'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-sent-mob" class="tab-btn px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Отправлено (<span id="count-sent-mob">0</span>)</button>
-                    <button onclick="setTab('replied'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-replied-mob" class="tab-btn px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Ответили (<span id="count-replied-mob">0</span>)</button>
-                    <button onclick="setTab('archive'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-archive-mob" class="tab-btn px-4 py-2 text-slate-400 text-left rounded hover:bg-slate-700 w-full">Архив (<span id="count-archive-mob">0</span>)</button>
-                    <button onclick="setTab('blacklist'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-blacklist-mob" class="tab-btn px-4 py-2 text-rose-400 hover:text-rose-300 text-left rounded hover:bg-slate-700 w-full">💩 Черный список (<span id="count-blacklist-mob">0</span>)</button>
-                    <button onclick="setTab('profiles'); document.getElementById('mobile-menu').classList.add('hidden')" id="tab-profiles-mob" class="tab-btn px-4 py-2 text-purple-400 hover:text-purple-300 text-left rounded hover:bg-slate-700 w-full">👤 Профили</button>
+
+    <!-- Vacancies Dashboard Component -->
+    <!-- Vacancies Dashboard View Component -->
+<div id="main-view" class="max-w-[1600px] mx-auto px-3 sm:px-6 py-3">
+    <!-- Analytics Strip -->
+    <!-- Analytics Status Strip Component -->
+<div class="glass-panel rounded-2xl px-4 py-2.5 mb-3 flex items-center justify-between text-xs flex-wrap gap-2 border border-slate-800 shadow-sm">
+    <div class="flex items-center gap-4 sm:gap-6 flex-wrap">
+        <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">Всего:</span>
+            <span class="font-bold text-white font-mono" id="stat-total">0</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">🇷🇺 RU:</span>
+            <span class="font-bold text-amber-400 font-mono" id="stat-ru">0</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">🌍 Remote:</span>
+            <span class="font-bold text-sky-400 font-mono" id="stat-en">0</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">Отправлено:</span>
+            <span class="font-bold text-indigo-400 font-mono" id="stat-sent">0</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">Ответили:</span>
+            <span class="font-bold text-emerald-400 font-mono" id="stat-replied">0</span>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <span class="text-slate-400">Конверсия (Win Rate):</span>
+        <span class="font-bold text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded-lg border border-purple-800/50 font-mono" id="stat-winrate">0%</span>
+    </div>
+</div>
+
+
+    <div class="flex flex-col lg:flex-row gap-4 items-start">
+        <!-- Sidebar: Market Filter + Filters + Vacancy List -->
+        <div class="w-full lg:w-[380px] xl:w-[420px] flex flex-col gap-2.5 shrink-0">
+            <!-- Market Segmented Control -->
+            <div class="glass-panel p-1 rounded-2xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
+                <button onclick="setMarket('all')" id="market-btn-all"
+                    class="market-btn active flex-1 py-1.5 px-2 rounded-xl font-medium text-center transition-all flex items-center justify-center gap-1">
+                    <span>🌐</span> Все (<span id="market-count-all">0</span>)
+                </button>
+                <button onclick="setMarket('ru')" id="market-btn-ru"
+                    class="market-btn flex-1 py-1.5 px-2 rounded-xl font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                    <span>🇷🇺</span> RU (<span id="market-count-ru">0</span>)
+                </button>
+                <button onclick="setMarket('en')" id="market-btn-en"
+                    class="market-btn flex-1 py-1.5 px-2 rounded-xl font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                    <span>🌍</span> Remote (<span id="market-count-en">0</span>)
+                </button>
+            </div>
+
+            <!-- Compact Search & Filter Controls -->
+            <div class="glass-panel p-3 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <!-- Search Input -->
+                <div class="relative">
+                    <input type="text" id="filter-search" oninput="onFilterChange()" placeholder="🔍 Поиск (React, Frontend, Remote, Сбер...)"
+                        class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+                
+                <!-- Quick Filter Chips (Grades & Match) -->
+                <div class="flex items-center justify-between gap-1 pt-0.5">
+                    <div class="flex flex-wrap gap-1 items-center" id="grade-chips">
+                        <span class="text-[10px] text-slate-500 font-medium mr-0.5">Грейд:</span>
+                        <button type="button" onclick="toggleGradeFilter('Junior')" id="grade-chip-Junior" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Jun</button>
+                        <button type="button" onclick="toggleGradeFilter('Middle')" id="grade-chip-Middle" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Mid</button>
+                        <button type="button" onclick="toggleGradeFilter('Senior')" id="grade-chip-Senior" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Sen</button>
+                        <button type="button" onclick="toggleGradeFilter('Lead')" id="grade-chip-Lead" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Lead</button>
+                    </div>
+                    <div class="flex gap-1 items-center" id="match-chips">
+                        <button type="button" onclick="toggleMatchFilter('80')" id="match-chip-80" class="match-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">🔥 80%+</button>
+                        <button type="button" onclick="toggleMatchFilter('60')" id="match-chip-60" class="match-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">⚡ 60%+</button>
+                    </div>
                 </div>
 
-                <!-- Right: Profile & Actions Dropdown -->
-                <div class="flex items-center gap-3 shrink-0 min-w-0">
-                    <div class="hidden sm:flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs shadow-sm">
-                        <span class="text-purple-400 font-semibold">🎯 Резюме:</span>
-                        <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1 w-24">
-                            <option value="">Загрузка...</option>
+                <!-- Source & Sort in 1 compact row -->
+                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+                    <div>
+                        <select id="filter-source" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                            <option value="all">🌐 Все площадки</option>
+                            <option value="tg">Telegram</option>
+                            <option value="hh">HeadHunter</option>
+                            <option value="habr">Хабр Карьера</option>
+                            <option value="superjob">SuperJob</option>
+                            <option value="rabota">Rabota.ru</option>
+                            <option value="crypto">Crypto / Web3</option>
+                            <option value="remote">WWR & Remote</option>
                         </select>
                     </div>
-                    
-                    <!-- Chrome CDP Status Badge -->
-                    <button id="cdp-status-badge" onclick="launchChromeAgent()" title="Статус Chrome для автономного отклика (кликните для запуска)" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors shadow-sm cursor-pointer">
-                        <span id="cdp-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-                        <span id="cdp-text">Chrome Offline</span>
-                    </button>
-
-                    <div class="relative">
-                        <button onclick="document.getElementById('nav-actions-menu').classList.toggle('hidden'); document.getElementById('nav-actions-overlay').classList.toggle('hidden');" 
-                            class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
-                            <span>🚀</span> <span class="hidden sm:inline">Действия</span> ▾
-                        </button>
-                        
-                        <div onclick="document.getElementById('nav-actions-menu').classList.add('hidden'); this.classList.add('hidden');" id="nav-actions-overlay" class="fixed inset-0 z-40 hidden"></div>
-                        
-                        <div id="nav-actions-menu" class="absolute right-0 top-full mt-2 hidden z-50 w-56">
-                            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden flex flex-col py-1">
-                                <button onclick="launchChromeAgent(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-amber-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🌐 Открыть Chrome Агента (9222)</button>
-                                <a href="#" onclick="event.preventDefault(); toggleModal('bookmarklet-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-emerald-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🔖 Auto-Apply (Bookmarklet)</a>
-                                <button onclick="toggleModal('ai-parser-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-purple-400 hover:bg-slate-700 transition-colors flex items-center gap-2">🪄 Добавить через ИИ</button>
-                                <button onclick="startHarvest(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-sky-400 hover:bg-slate-700 transition-colors flex items-center gap-2 border-b border-slate-700/50">🔄 Собрать вакансии</button>
-                                
-                                <button onclick="openShameListModal(); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-rose-400 hover:bg-slate-700 transition-colors flex items-center gap-2">💩 Доска позора</button>
-                                <button onclick="toggleModal('settings-modal'); document.getElementById('nav-actions-menu').classList.add('hidden'); document.getElementById('nav-actions-overlay').classList.add('hidden');" class="text-left px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2 border-t border-slate-700/50">⚙️ Настройки ИИ</button>
-                            </div>
-                        </div>
+                    <div>
+                        <select id="filter-sort" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                            <option value="newest">⚡ По свежести</option>
+                            <option value="score_desc">🔥 По мэтчу (%)</option>
+                            <option value="salary">💰 По зарплате</option>
+                        </select>
                     </div>
                 </div>
-                
             </div>
-        </div>
-    </nav>
 
-    <!-- Main View: Vacancies -->
-    <div id="main-view">
-        <!-- Analytics Dashboard -->
-        <div class="max-w-7xl mx-auto px-4 pt-5">
-            <div class="glass-panel rounded-xl p-3 flex justify-around items-center mb-1 shadow-sm flex-wrap gap-2">
-                <div class="text-center px-3">
-                    <div class="text-slate-400 text-xs font-medium">Всего вакансий</div>
-                    <div class="text-xl font-bold text-white mt-0.5" id="stat-total">0</div>
-                </div>
-                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
-                    <div class="text-slate-400 text-xs font-medium">🇷🇺 РФ и СНГ (RU)</div>
-                    <div class="text-xl font-bold text-amber-400 mt-0.5" id="stat-ru">0</div>
-                </div>
-                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
-                    <div class="text-slate-400 text-xs font-medium">🌍 Remote (EN)</div>
-                    <div class="text-xl font-bold text-sky-400 mt-0.5" id="stat-en">0</div>
-                </div>
-                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
-                    <div class="text-slate-400 text-xs font-medium">Отправлено (Sent)</div>
-                    <div class="text-xl font-bold text-indigo-400 mt-0.5" id="stat-sent">0</div>
-                </div>
-                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
-                    <div class="text-slate-400 text-xs font-medium">Ответили (Replied)</div>
-                    <div class="text-xl font-bold text-emerald-400 mt-0.5" id="stat-replied">0</div>
-                </div>
-                <div class="text-center border-l border-slate-700/60 pl-6 px-3">
-                    <div class="text-slate-400 text-xs font-medium">Win Rate</div>
-                    <div class="text-xl font-bold text-purple-400 mt-0.5" id="stat-winrate">0%</div>
-                </div>
+            <!-- Vacancy List (Maximally expanded vertical height) -->
+            <div class="flex flex-col gap-2 h-[calc(100vh-13.5rem)] overflow-y-auto pr-1" id="vacancy-list">
+                <div class="p-4 text-center text-slate-500 text-xs">Загрузка вакансий...</div>
             </div>
         </div>
 
-        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 flex flex-col lg:flex-row gap-6">
-            <!-- Sidebar: Market Filter + Vacancy List -->
-            <div class="w-full lg:w-1/3 flex flex-col gap-3 lg:max-w-md shrink-0">
-                <!-- Market Filter Segmented Control -->
-                <div
-                    class="glass-panel p-1 rounded-xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
-                    <button onclick="setMarket('all')" id="market-btn-all"
-                        class="market-btn active flex-1 py-1.5 px-2 rounded-lg font-medium text-center transition-all flex items-center justify-center gap-1">
-                        <span>🌐</span> Все (<span id="market-count-all">0</span>)
-                    </button>
-                    <button onclick="setMarket('ru')" id="market-btn-ru"
-                        class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
-                        <span>🇷🇺</span> RU (<span id="market-count-ru">0</span>)
-                    </button>
-                    <button onclick="setMarket('en')" id="market-btn-en"
-                        class="market-btn flex-1 py-1.5 px-2 rounded-lg font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
-                        <span>🌍</span> Remote (<span id="market-count-en">0</span>)
-                    </button>
-                </div>
-
-                <!-- Search & Filter Controls -->
-                <div class="glass-panel p-2.5 rounded-xl border border-slate-800 space-y-2 text-xs">
-                    <div class="relative">
-                        <input type="text" id="filter-search" oninput="onFilterChange()" placeholder="🔍 Поиск (React, Сбер, Remote...)"
-                            class="w-full bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
-                    </div>
-                    
-                    <!-- Multi-Select Grade Filter -->
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-[10px] text-slate-400 font-medium">Грейды (мультивыбор):</label>
-                            <button type="button" onclick="resetGradeFilters()" class="text-[9px] text-slate-500 hover:text-slate-300">Все</button>
-                        </div>
-                        <div class="flex flex-wrap gap-1" id="grade-chips">
-                            <button type="button" onclick="toggleGradeFilter('Intern')" id="grade-chip-Intern" class="grade-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Intern</button>
-                            <button type="button" onclick="toggleGradeFilter('Junior')" id="grade-chip-Junior" class="grade-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Junior</button>
-                            <button type="button" onclick="toggleGradeFilter('Middle')" id="grade-chip-Middle" class="grade-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Middle</button>
-                            <button type="button" onclick="toggleGradeFilter('Senior')" id="grade-chip-Senior" class="grade-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Senior</button>
-                            <button type="button" onclick="toggleGradeFilter('Lead')" id="grade-chip-Lead" class="grade-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Lead</button>
-                        </div>
-                    </div>
-
-                    <!-- Multi-Select Match Score Filter -->
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-[10px] text-slate-400 font-medium">Мэтч % (мультивыбор):</label>
-                            <button type="button" onclick="resetMatchFilters()" class="text-[9px] text-slate-500 hover:text-slate-300">Все</button>
-                        </div>
-                        <div class="flex flex-wrap gap-1" id="match-chips">
-                            <button type="button" onclick="toggleMatchFilter('80')" id="match-chip-80" class="match-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">🔥 80%+</button>
-                            <button type="button" onclick="toggleMatchFilter('60')" id="match-chip-60" class="match-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">⚡ 60-79%</button>
-                            <button type="button" onclick="toggleMatchFilter('mixed')" id="match-chip-mixed" class="match-chip px-2 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">❄️ &lt;60%</button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-1.5">
-                        <div>
-                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Источник:</label>
-                            <select id="filter-source" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
-                                <option value="all">Все источники</option>
-                                <option value="tg">Telegram</option>
-                                <option value="hh">HeadHunter</option>
-                                <option value="habr">Хабр Карьера</option>
-                                <option value="superjob">SuperJob</option>
-                                <option value="rabota">Rabota.ru</option>
-                                <option value="crypto">Crypto / Web3</option>
-                                <option value="remote">WWR & Remote</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-slate-400 font-medium block mb-0.5">Сортировка:</label>
-                            <select id="filter-sort" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-md px-1.5 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
-                                <option value="newest">⚡ Свежие (по времени публикации)</option>
-                                <option value="score_desc">🔥 Топ мэтч (% совпадения)</option>
-                                <option value="salary">💰 По зарплате</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Vacancy List -->
-                <div class="flex flex-col gap-2.5 h-[calc(100vh-16rem)] overflow-y-auto pr-1" id="vacancy-list">
-                    <div class="p-4 text-center text-slate-500">Загрузка вакансий...</div>
-                </div>
-            </div>
-
-            <!-- Main Content: Vacancy Details -->
-            <div class="w-full lg:w-2/3 h-[calc(100vh-12rem)] overflow-y-auto pr-1 min-w-0" id="vacancy-details">
-                <div
-                    class="glass-panel rounded-xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[400px]">
-                    <span class="text-3xl mb-3">👈</span>
-                    <p class="text-sm font-medium">Выберите вакансию из списка слева</p>
-                </div>
+        <!-- Main Content: Vacancy Details (Full Height) -->
+        <div class="w-full lg:flex-1 h-[calc(100vh-8.5rem)] overflow-y-auto pr-1 min-w-0" id="vacancy-details">
+            <div class="glass-panel rounded-2xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[450px]">
+                <span class="text-4xl mb-3">👈</span>
+                <p class="text-sm font-medium text-slate-300">Выберите вакансию из списка слева</p>
+                <p class="text-xs text-slate-500 mt-1">Здесь откроются детали, авто-отклик, сопроводительное письмо и контакты</p>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Profiles View -->
-    <div id="profiles-view" class="max-w-7xl mx-auto px-4 py-6 hidden">
-        <div class="glass-panel rounded-xl p-6">
-            <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-700/60">
+
+    <!-- Profiles Component -->
+    <!-- Profiles View Component -->
+<div id="profiles-view" class="max-w-[1600px] mx-auto px-3 sm:px-6 py-4 hidden">
+    <div class="glass-panel rounded-2xl p-6 border border-slate-800 shadow-xl">
+        <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-700/60">
+            <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <span>👤</span> Персоны и Резюме
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">Управляйте профилями для откликов на русском и английском языках</p>
+            </div>
+            <button onclick="addProfile()"
+                class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-md shadow-purple-600/20 cursor-pointer transition-all">
+                ➕ Добавить профиль
+            </button>
+        </div>
+        <div class="flex flex-col lg:flex-row gap-6 items-start">
+            <div class="w-full lg:w-1/3 flex flex-col gap-2.5 h-[calc(100vh-12rem)] overflow-y-auto pr-2" id="profiles-list">
+            </div>
+            <div class="w-full lg:w-2/3" id="profile-editor">
+                <div class="text-slate-400 text-center py-20 text-sm">Выберите профиль слева</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Modals Container -->
+    <div id="modals-root">
+        <!-- Settings Modal Component -->
+<div id="settings-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[460px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <span>⚙️</span> Настройки ИИ (Движок Агента)
+            </h2>
+            <button onclick="toggleModal('settings-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <!-- LLM Provider Selector -->
+        <div class="mb-3.5">
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Провайдер интеллекта (LLM)</label>
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="setLlmProvider('gemini')" id="provider-btn-gemini" class="p-2.5 rounded-xl border border-sky-500 bg-sky-950/40 text-left transition-colors">
+                    <div class="text-xs font-bold text-sky-300 flex items-center gap-1.5"><span>☁️</span> Google Gemini</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Облачный ИИ (Flash)</div>
+                </button>
+                <button type="button" onclick="setLlmProvider('lm_studio')" id="provider-btn-lm_studio" class="p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors">
+                    <div class="text-xs font-bold text-slate-300 flex items-center gap-1.5"><span>💻</span> LM Studio</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Локально (0 Rate Limits)</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Gemini Key Block -->
+        <div id="llm-block-gemini" class="mb-3.5">
+            <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-medium text-slate-400">Gemini API Key</label>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+                    class="text-[11px] text-sky-400 hover:text-sky-300 hover:underline flex items-center gap-1 font-medium transition-colors">
+                    <span>Получить ключ в Google AI Studio</span>
+                    <span>↗</span>
+                </a>
+            </div>
+            <input type="password" id="gemini-key" placeholder="AIzaSy..."
+                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+            <p class="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Ключ начинается с <code>AIzaSy...</code></span>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-sky-400/80 hover:text-sky-300 underline font-mono text-[10px]">aistudio.google.com/app/apikey ↗</a>
+            </p>
+        </div>
+
+        <!-- LM Studio URL Block -->
+        <div id="llm-block-lm_studio" class="hidden mb-3.5">
+            <label class="block text-xs font-medium text-slate-400 mb-1">LM Studio Local Server URL</label>
+            <input type="text" id="lm-studio-url" placeholder="http://127.0.0.1:1234/v1" value="http://127.0.0.1:1234/v1"
+                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+            <p class="text-[10px] text-slate-500 mt-1">Запустите сервер в LM Studio на порту 1234 (например, Qwen 2.5 7B или Llama 3.1 8B).</p>
+        </div>
+
+        <div class="mb-3.5 pt-2.5 border-t border-slate-800 space-y-2.5 text-xs">
+            <div class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Калибровка стратегии и резюме</div>
+            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" id="setting-seniority-alignment" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
                 <div>
-                    <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>👤</span> Персоны и Резюме
+                    <div class="text-slate-200 font-medium">Калибровка грейда (Seniority Alignment)</div>
+                    <div class="text-[10px] text-slate-400">Смягчает роль «Лид» до «Frontend/Fullstack» при отклике на Middle/Junior вакансии, устраняя риск отказа за overqualified.</div>
+                </div>
+            </label>
+            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" id="setting-highload-guardrail" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
+                <div>
+                    <div class="text-slate-200 font-medium">Барьер хайлоада (Highload Guardrail)</div>
+                    <div class="text-[10px] text-slate-400">Фокусирует резюме на клиентском перформансе (Core Web Vitals 100/100), блокируя непроверенные обещания распределенного бэкенда.</div>
+                </div>
+            </label>
+        </div>
+
+        <!-- Autonomous Policy Engine Guardrails -->
+        <div class="mb-4 pt-2.5 border-t border-slate-800 space-y-2.5 text-xs">
+            <div class="text-[11px] font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🛡️</span> Политики Автономного Агента
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата (₽)</label>
+                    <input type="number" id="setting-min-salary-rub" placeholder="80000"
+                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата ($)</label>
+                    <input type="number" id="setting-min-salary-usd" placeholder="2000"
+                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 items-center pt-1">
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">Лимит откликов в день</label>
+                    <input type="number" id="setting-daily-limit" placeholder="25"
+                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                </div>
+                <div class="pt-3">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="setting-remote-only" class="rounded border-slate-700 text-purple-500 focus:ring-purple-500 bg-slate-900">
+                        <span class="text-slate-200 text-xs font-medium">Только Remote</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <button onclick="toggleModal('settings-modal')"
+                class="px-4 py-2 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
+            <button onclick="saveConfig()"
+                class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-md shadow-sky-600/20">
+                Сохранить
+            </button>
+        </div>
+    </div>
+</div>
+
+        <!-- Universal AI Parser Modal Component -->
+<div id="ai-parser-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[640px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+                    🪄
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        Умный ИИ-Импорт Вакансий
                     </h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Управляйте профилями для откликов на русском и английском
-                        языках</p>
+                    <p class="text-[11px] text-slate-400">Прямой парсинг любой вакансии по URL или тексту через Gemini с авто-скорингом и питчем</p>
                 </div>
-                <button onclick="addProfile()"
-                    class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1">
-                    ➕ Добавить профиль
-                </button>
             </div>
-            <div class="flex gap-6">
-                <div class="w-1/3 flex flex-col gap-2 h-[calc(100vh-14rem)] overflow-y-auto pr-1" id="profiles-list">
-                </div>
-                <div class="w-2/3" id="profile-editor">
-                    <div class="text-slate-400 text-center py-16 text-sm">Выберите профиль слева</div>
+            <button onclick="toggleModal('ai-parser-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <!-- Mode selector tabs -->
+        <div class="flex items-center gap-2 mb-4 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+            <button id="ai-tab-url" onclick="setAiParseMode('url')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white transition-all flex items-center justify-center gap-1.5">
+                <span>🔗</span> По ссылке (URL)
+            </button>
+            <button id="ai-tab-text" onclick="setAiParseMode('text')" class="flex-1 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-lg transition-all flex items-center justify-center gap-1.5">
+                <span>📝</span> Текст из Telegram / LinkedIn / Email
+            </button>
+        </div>
+
+        <!-- URL Input Container -->
+        <div id="ai-input-url-container" class="mb-4">
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Ссылка на вакансию (Setka, HH, LinkedIn, сайт компании или ATS):</label>
+            <input type="url" id="ai-input-url" placeholder="https://example.com/careers/senior-frontend-engineer"
+                class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono">
+            <p class="text-[10px] text-slate-500 mt-1.5">ИИ загрузит страницу, очистит HTML и извлечет стек, зарплату, грейд и контакты.</p>
+        </div>
+
+        <!-- Text Input Container -->
+        <div id="ai-input-text-container" class="mb-4 hidden">
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Сырой текст вакансии:</label>
+            <textarea id="ai-input-text" rows="7" placeholder="Вставьте сюда скопированный пост из Telegram, личное сообщение от рекрутера, описание с закрытого сайта..."
+                class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"></textarea>
+            <p class="text-[10px] text-slate-500 mt-1.5">ИИ структурирует текст, выделит ключевые требования, найдет контакты и сформирует питч.</p>
+        </div>
+
+        <!-- Loader / Status indicator -->
+        <div id="ai-parse-loader" class="hidden mb-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/60">
+            <div class="flex items-center gap-3">
+                <div class="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                <div class="text-xs text-purple-200">
+                    <div class="font-bold">ИИ анализирует вакансию...</div>
+                    <div class="text-[11px] text-purple-300/80">Извлечение требований, расчет мэтч-скора и генерация кастомного отклика.</div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Modals -->
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal fixed inset-0 z-50 items-center justify-center">
-        <div class="glass-panel p-5 rounded-xl w-[420px] border border-slate-700 shadow-2xl">
-            <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2"><span>⚙️</span> Настройки ИИ (Движок Агента)</h2>
-
-            <!-- LLM Provider Selector -->
-            <div class="mb-3">
-                <label class="block text-xs font-medium text-slate-400 mb-1.5">Провайдер интеллекта (LLM)</label>
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="setLlmProvider('gemini')" id="provider-btn-gemini" class="p-2 rounded-lg border border-sky-500 bg-sky-950/40 text-left transition-colors">
-                        <div class="text-xs font-bold text-sky-300 flex items-center gap-1.5"><span>☁️</span> Google Gemini</div>
-                        <div class="text-[10px] text-slate-400 mt-0.5">Облачный ИИ (Flash)</div>
-                    </button>
-                    <button type="button" onclick="setLlmProvider('lm_studio')" id="provider-btn-lm_studio" class="p-2 rounded-lg border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors">
-                        <div class="text-xs font-bold text-slate-300 flex items-center gap-1.5"><span>💻</span> LM Studio</div>
-                        <div class="text-[10px] text-slate-400 mt-0.5">Локально (0 Rate Limits)</div>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Gemini Key Block -->
-            <div id="llm-block-gemini" class="mb-3">
-                <label class="block text-xs font-medium text-slate-400 mb-1">Gemini API Key</label>
-                <input type="password" id="gemini-key" placeholder="AIzaSy..."
-                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
-                <p class="text-[11px] text-slate-500 mt-1">Ключ из Google AI Studio (aistudio.google.com). Начинается с <code>AIzaSy...</code></p>
-            </div>
-
-            <!-- LM Studio URL Block -->
-            <div id="llm-block-lm_studio" class="hidden mb-3">
-                <label class="block text-xs font-medium text-slate-400 mb-1">LM Studio Local Server URL</label>
-                <input type="text" id="lm-studio-url" placeholder="http://127.0.0.1:1234/v1" value="http://127.0.0.1:1234/v1"
-                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
-                <p class="text-[11px] text-slate-500 mt-1">Запустите сервер в LM Studio на порту 1234 (например, Qwen 2.5 7B или Llama 3.1 8B).</p>
-            </div>
-
-            <div class="mb-3 pt-2 border-t border-slate-800/80 space-y-2.5 text-xs">
-                <div class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Калибровка стратегии и резюме</div>
-                <label class="flex items-start gap-2 cursor-pointer select-none">
-                    <input type="checkbox" id="setting-seniority-alignment" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
-                    <div>
-                        <div class="text-slate-200 font-medium">Калибровка грейда (Seniority Alignment)</div>
-                        <div class="text-[10px] text-slate-400">Смягчает роль «Лид» до «Frontend/Fullstack» при отклике на Middle/Junior вакансии, устраняя риск отказа за overqualified.</div>
-                    </div>
-                </label>
-                <label class="flex items-start gap-2 cursor-pointer select-none">
-                    <input type="checkbox" id="setting-highload-guardrail" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
-                    <div>
-                        <div class="text-slate-200 font-medium">Барьер хайлоада (Highload Guardrail)</div>
-                        <div class="text-[10px] text-slate-400">Фокусирует резюме на клиентском перформансе (Core Web Vitals 100/100), блокируя непроверенные обещания распределенного бэкенда.</div>
-                    </div>
-                </label>
-            </div>
-
-            <!-- Autonomous Policy Engine Guardrails (Phase 7) -->
-            <div class="mb-3 pt-2 border-t border-slate-800/80 space-y-2.5 text-xs">
-                <div class="text-[11px] font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>🛡️</span> Политики Автономного Агента
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата (₽)</label>
-                        <input type="number" id="setting-min-salary-rub" placeholder="80000"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата ($)</label>
-                        <input type="number" id="setting-min-salary-usd" placeholder="2000"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 items-center pt-1">
-                    <div>
-                        <label class="block text-[10px] font-medium text-slate-400 mb-1">Лимит откликов в день</label>
-                        <input type="number" id="setting-daily-limit" placeholder="25"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
-                    </div>
-                    <div class="pt-3">
-                        <label class="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" id="setting-remote-only" class="rounded border-slate-700 text-purple-500 focus:ring-purple-500 bg-slate-900">
-                            <span class="text-slate-200 text-xs font-medium">Только Remote</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="toggleModal('settings-modal')"
-                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
-                <button onclick="saveConfig()"
-                    class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Сохранить</button>
-            </div>
+        <!-- Error message container -->
+        <div id="ai-parse-error" class="hidden mb-4 p-3 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 flex items-center gap-2">
+            <span>⚠️</span>
+            <span id="ai-parse-error-msg">Ошибка</span>
         </div>
-    </div>
 
-    <!-- Universal AI Parser Modal -->
-    <div id="ai-parser-modal" class="modal fixed inset-0 z-50 items-center justify-center">
-        <div class="glass-panel p-6 rounded-2xl w-[640px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
-                        🪄
-                    </div>
-                    <div>
-                        <h2 class="text-base font-bold text-white flex items-center gap-2">
-                            Умный ИИ-Импорт Вакансий
-                        </h2>
-                        <p class="text-[11px] text-slate-400">Прямой парсинг любой вакансии по URL или тексту через Gemini с авто-скорингом и питчем</p>
-                    </div>
-                </div>
-                <button onclick="toggleModal('ai-parser-modal')" class="text-slate-400 hover:text-white text-sm p-1">✕</button>
-            </div>
-
-            <!-- Mode selector tabs -->
-            <div class="flex items-center gap-2 mb-4 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
-                <button id="ai-tab-url" onclick="setAiParseMode('url')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white transition-all flex items-center justify-center gap-1.5">
-                    <span>🔗</span> По ссылке (URL)
-                </button>
-                <button id="ai-tab-text" onclick="setAiParseMode('text')" class="flex-1 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-lg transition-all flex items-center justify-center gap-1.5">
-                    <span>📝</span> Текст из Telegram / LinkedIn / Email
-                </button>
-            </div>
-
-            <!-- URL Input Container -->
-            <div id="ai-input-url-container" class="mb-4">
-                <label class="block text-xs font-medium text-slate-300 mb-1.5">Ссылка на вакансию (Setka, HH, LinkedIn, сайт компании или ATS):</label>
-                <input type="url" id="ai-input-url" placeholder="https://example.com/careers/senior-frontend-engineer"
-                    class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono">
-                <p class="text-[10px] text-slate-500 mt-1.5">ИИ загрузит страницу, очистит HTML и извлечет стек, зарплату, грейд и контакты.</p>
-            </div>
-
-            <!-- Text Input Container -->
-            <div id="ai-input-text-container" class="mb-4 hidden">
-                <label class="block text-xs font-medium text-slate-300 mb-1.5">Сырой текст вакансии:</label>
-                <textarea id="ai-input-text" rows="7" placeholder="Вставьте сюда скопированный пост из Telegram, личное сообщение от рекрутера, описание с закрытого сайта..."
-                    class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"></textarea>
-                <p class="text-[10px] text-slate-500 mt-1.5">ИИ структурирует текст, выделит ключевые требования, найдет контакты и сформирует питч.</p>
-            </div>
-
-            <!-- Loader / Status indicator -->
-            <div id="ai-parse-loader" class="hidden mb-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/60">
-                <div class="flex items-center gap-3">
-                    <div class="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
-                    <div class="text-xs text-purple-200">
-                        <div class="font-bold">ИИ анализирует вакансию...</div>
-                        <div class="text-[11px] text-purple-300/80">Извлечение требований, расчет мэтч-скора и генерация кастомного отклика.</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Error message container -->
-            <div id="ai-parse-error" class="hidden mb-4 p-3 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 flex items-center gap-2">
-                <span>⚠️</span>
-                <span id="ai-parse-error-msg">Ошибка</span>
-            </div>
-
-            <!-- Modal Action Buttons -->
-            <div class="flex items-center justify-between pt-3 border-t border-slate-800">
-                <span class="text-[11px] text-slate-500">Автоматически сохраняется в статус «Новые»</span>
-                <div class="flex items-center gap-2">
-                    <button onclick="toggleModal('ai-parser-modal')" type="button"
-                        class="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
-                    <button id="ai-parse-submit-btn" onclick="executeAiParse()" type="button"
-                        class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/20 flex items-center gap-2">
-                        <span>🪄</span> Распарсить и добавить
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Harvest Modal -->
-    <div id="harvest-modal" class="modal fixed inset-0 z-50 items-center justify-center">
-        <div class="glass-panel p-6 rounded-2xl w-[620px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-                <div class="flex items-center gap-3">
-                    <div id="harvest-radar" class="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-lg animate-pulse">
-                        🔄
-                    </div>
-                    <div>
-                        <h2 class="text-base font-bold text-white flex items-center gap-2">
-                            Сбор вакансий по источникам
-                        </h2>
-                        <p class="text-[11px] text-slate-400">Greenhouse, Lever, Hacker News, Jobicy, HH.ru, SuperJob, Rabota.ru, Хабр, Telegram, WWR, Crypto</p>
-                    </div>
-                </div>
-                <div id="harvest-badge" class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
-                    <span>Сканирование...</span>
-                </div>
-            </div>
-
-            <!-- Active animated progress card -->
-            <div id="harvest-status-card" class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 mb-3">
-                <div class="flex items-center justify-between mb-2 text-xs">
-                    <span id="harvest-current-step" class="font-semibold text-slate-200">Инициализация модулей поиска...</span>
-                    <span id="harvest-percent" class="text-indigo-400 font-mono font-bold">В процессе</span>
-                </div>
-                <!-- Progress bar -->
-                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div id="harvest-progress-bar" class="bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full w-1/3 transition-all duration-500 animate-pulse"></div>
-                </div>
-                <div class="grid grid-cols-4 gap-2 mt-3 text-[11px] text-slate-400 text-center">
-                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
-                        <div class="text-slate-500 text-[10px]">Площадки</div>
-                        <div id="harvest-metric-scrapers" class="font-bold text-slate-300 mt-0.5">0 / 11</div>
-                    </div>
-                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
-                        <div class="text-slate-500 text-[10px]">Сохранено</div>
-                        <div id="harvest-metric-saved" class="font-bold text-emerald-400 mt-0.5">0</div>
-                    </div>
-                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
-                        <div class="text-slate-500 text-[10px]">Анти-BS отсев</div>
-                        <div id="harvest-metric-filtered" class="font-bold text-amber-400 mt-0.5">0</div>
-                    </div>
-                    <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
-                        <div class="text-slate-500 text-[10px]">Дубликаты</div>
-                        <div id="harvest-metric-dups" class="font-bold text-slate-400 mt-0.5">0</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Terminal Details -->
-            <div class="mb-4">
-                <button onclick="toggleTerminalLogs()" type="button" class="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 py-1 px-2 rounded-lg hover:bg-slate-800/50 transition-colors">
-                    <span class="flex items-center gap-1.5">
-                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span id="toggle-logs-text">Лог терминала в реальном времени</span>
-                    </span>
-                    <span id="toggle-logs-arrow">▲</span>
-                </button>
-                <div id="terminal-container" class="mt-2">
-                    <div class="terminal text-[11px] h-48 overflow-y-auto font-mono leading-relaxed bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 text-slate-300 shadow-inner" id="harvest-logs">Ожидание запуска...</div>
-                </div>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button onclick="closeHarvest()" id="harvest-close-btn"
-                    class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-2 ring-2 ring-emerald-500/40 hidden">
-                    <span>🎉</span> Посмотреть найденные вакансии
+        <!-- Modal Action Buttons -->
+        <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+            <span class="text-[11px] text-slate-500">Автоматически сохраняется в статус «Новые»</span>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleModal('ai-parser-modal')" type="button"
+                    class="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
+                <button id="ai-parse-submit-btn" onclick="executeAiParse()" type="button"
+                    class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/20 flex items-center gap-2">
+                    <span>🪄</span> Распарсить и добавить
                 </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Cropper Modal -->
-    <div id="cropper-modal" class="modal fixed inset-0 z-[60] items-center justify-center">
-        <div class="glass-panel p-5 rounded-xl w-[500px] border border-slate-700 shadow-2xl">
-            <h2 class="text-base font-bold mb-3 text-white">Центрирование фото (1:1)</h2>
-            <div class="w-full h-[320px] bg-slate-900 mb-3 overflow-hidden flex justify-center rounded-lg">
-                <img id="cropper-image" class="max-w-full hidden">
-            </div>
-            <div class="flex justify-end gap-2">
-                <button onclick="toggleModal('cropper-modal')"
-                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Отмена</button>
-                <button onclick="saveCrop()"
-                    class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg">Применить
-                    аватар</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bookmarklet Info & Setup Modal -->
-    <div id="bookmarklet-modal" class="modal fixed inset-0 z-50 items-center justify-center">
-        <div class="glass-panel p-6 rounded-2xl w-[560px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-base">
-                        🔖
-                    </div>
-                    <div>
-                        <h2 class="text-base font-bold text-white">Установка Auto-Apply Закладки (v3.0)</h2>
-                        <p class="text-[11px] text-slate-400">Универсальный авто-отклик: Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</p>
-                    </div>
+        <!-- Harvest Modal Component -->
+<div id="harvest-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[620px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div id="harvest-radar" class="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-lg animate-pulse">
+                    🔄
                 </div>
-                <button onclick="toggleModal('bookmarklet-modal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
-            </div>
-
-            <div class="space-y-4 text-xs text-slate-300">
-                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div>
-                        <div class="font-semibold text-white mb-1">Способ 1 (Самый быстрый):</div>
-                        <p class="text-[11px] text-slate-400">Зажмите зеленую кнопку и перетащите её на панель закладок браузера (Cmd+Shift+B в Chrome, чтобы показать панель):</p>
-                    </div>
-                    <a id="bookmarklet-modal-btn" href="#" onclick="event.preventDefault(); alert('Зажмите кнопку левой кнопкой мыши и перетащите её наверх, на панель закладок!');"
-                        class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg cursor-grab select-none whitespace-nowrap flex items-center gap-2 ring-2 ring-emerald-500/30">
-                        <span>🔖</span> Auto-Apply
-                    </a>
-                </div>
-
-                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-                    <div class="font-semibold text-white mb-1">Способ 2 (Вручную):</div>
-                    <p class="text-[11px] text-slate-400 mb-2">Создайте любую закладку в браузере, отредактируйте её и вставьте этот код в поле URL:</p>
-                    <div class="flex items-center gap-2">
-                        <input id="bookmarklet-code-input" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-emerald-400 font-mono select-all">
-                        <button onclick="copyBookmarkletCode()" class="bg-slate-800 hover:bg-slate-700 text-white font-medium px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
-                            📋 Копировать
-                        </button>
-                    </div>
-                </div>
-
-                <div class="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-800/60 rounded-xl p-4">
-                    <div class="flex items-center justify-between mb-1.5">
-                        <div class="font-semibold text-purple-300 flex items-center gap-1.5">
-                            <span>🧩</span> Способ 3: Chrome Extension (Side Panel & Agent)
-                        </div>
-                        <span class="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-bold">Рекомендуется</span>
-                    </div>
-                    <p class="text-[11px] text-slate-300 mb-2">
-                        Полноценная боковая панель в браузере с живым анализом вакансий и 1-click заполнением форм:
-                    </p>
-                    <ol class="text-[11px] text-slate-400 list-decimal list-inside space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
-                        <li>Откройте в Chrome: <code class="text-sky-300 font-mono">chrome://extensions</code> и включите <b>«Режим разработчика»</b> (вверху справа).</li>
-                        <li>Нажмите <b>«Загрузить распакованное расширение»</b> (Load unpacked).</li>
-                        <li>Выберите папку <code class="text-purple-300 font-mono">job_hunter/extension</code> в корне проекта.</li>
-                    </ol>
-                </div>
-
-                <div class="bg-indigo-950/40 border border-indigo-900/60 rounded-xl p-3.5 text-[11px] space-y-1.5 text-indigo-200">
-                    <div class="font-bold text-indigo-300">Универсальный авто-заполнитель анкет (ATS & Forms):</div>
-                    <div>1. Откройте любую страницу вакансии или форму отклика (<strong>Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</strong> и др.).</div>
-                    <div>2. Нажмите закладку <strong>«🔖 Auto-Apply»</strong> на панели закладок браузера.</div>
-                    <div>⚡️ Скрипт мгновенно определит форму и автоматически заполнит: <strong>Имя, Фамилию, Email, Телефон, LinkedIn, GitHub, Портфолио, Локацию и Сопроводительное письмо</strong>, а также подсветит поле прикрепления CV!</div>
-                </div>
-            </div>
-
-            <div class="flex justify-end pt-4 mt-4 border-t border-slate-800">
-                <button onclick="toggleModal('bookmarklet-modal')" class="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-4 py-2 rounded-lg">
-                    Понятно
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Blacklist Modal (Доска позора / Черный список) -->
-    <div id="blacklist-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
-        <div class="glass-panel rounded-2xl max-w-lg w-full p-6 border border-rose-900/60 shadow-2xl relative">
-            <div class="flex justify-between items-center pb-3 border-b border-slate-800">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">🛑</span>
-                    <h3 class="text-base font-bold text-white">Внести в Черный список</h3>
-                </div>
-                <button onclick="toggleModal('blacklist-modal')" class="text-slate-400 hover:text-white text-lg">✕</button>
-            </div>
-
-            <div class="py-4 space-y-3">
-                <div id="blacklist-modal-vac-info" class="text-xs font-semibold text-rose-300 bg-rose-950/40 p-2.5 rounded-lg border border-rose-900/50">
-                    Компания — Вакансия
-                </div>
-
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Причина блокировки (выберите тег или укажите причину):</label>
-                    <div class="flex flex-wrap gap-1.5 mb-2.5">
-                        <button type="button" onclick="setBlacklistTag('Навязывание ИП / Самозанятости с 1-го дня (уклонение от ТК РФ, перекладывание рисков)')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 hover:border-rose-800/80 px-2 py-1 rounded-md text-left transition-colors">
-                            🛑 Навязывание ИП/СЗ (ТК РФ)
-                        </button>
-                        <button type="button" onclick="setBlacklistTag('Неоплачиваемое тестовое задание до первого технического скрининга')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 hover:border-amber-800/80 px-2 py-1 rounded-md text-left transition-colors">
-                            ⚠️ Бесплатное тестовое до интервью
-                        </button>
-                        <button type="button" onclick="setBlacklistTag('Серая зарплата / Обман по условиям и обязанностям на собеседовании')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 hover:border-purple-800/80 px-2 py-1 rounded-md text-left transition-colors">
-                            📉 Серая ЗП / Обман по условиям
-                        </button>
-                        <button type="button" onclick="setBlacklistTag('Неадекватный AI/HR-скрининг / Спам / Скамерская воронка')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 hover:border-sky-800/80 px-2 py-1 rounded-md text-left transition-colors">
-                            🤖 Токсичный HR/Бот / Спам
-                        </button>
-                    </div>
-
-                    <textarea id="blacklist-reason-input" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500" placeholder="Подробная причина нарушения..."></textarea>
-                </div>
-
-                <div class="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                    💡 Вакансия будет перемещена во вкладку <strong>«Черный список»</strong>, а запись автоматически добавится в файл <strong>SHAME_LIST.md</strong> в корне проекта для публикации на GitHub.
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        Сбор вакансий по источникам
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Greenhouse, Lever, Hacker News, Jobicy, HH.ru, SuperJob, Rabota.ru, Хабр, Telegram, WWR, Crypto</p>
                 </div>
             </div>
-
-            <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button onclick="toggleModal('blacklist-modal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3.5 py-2 rounded-lg">Отмена</button>
-                <button onclick="confirmBlacklist()" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-md flex items-center gap-1.5">
-                    <span>💩</span> Забанить и внести в Доску позора
-                </button>
+            <div id="harvest-badge" class="text-xs px-2.5 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                <span>Сканирование...</span>
             </div>
         </div>
-    </div>
 
-    <!-- AI Career Agent Live Modal (Phases 2, 5, 7 ReAct Runtime) -->
-    <div id="agent-live-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
-        <div class="glass-panel p-6 rounded-2xl w-[700px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative flex flex-col max-h-[90vh]">
-            <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
-                        🤖
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-base font-bold text-white" id="agent-modal-title">AI Career Agent (ReAct Loop)</h2>
-                            <span id="agent-modal-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-700/60 font-bold uppercase">IDLE</span>
-                        </div>
-                        <p class="text-[11px] text-slate-400" id="agent-modal-subtitle">Автономное наблюдение, подготовка резюме и отклик в вашем Chrome</p>
-                    </div>
-                </div>
-                <button onclick="closeAgentLiveModal()" class="text-slate-400 hover:text-white text-base p-1">✕</button>
+        <!-- Active animated progress card -->
+        <div id="harvest-status-card" class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 mb-3">
+            <div class="flex items-center justify-between mb-2 text-xs">
+                <span id="harvest-current-step" class="font-semibold text-slate-200">Инициализация модулей поиска...</span>
+                <span id="harvest-percent" class="text-indigo-400 font-mono font-bold">В процессе</span>
             </div>
-
-            <!-- Policy Guardrail Banner -->
-            <div id="agent-modal-policy-banner" class="mb-3 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span id="agent-policy-icon">🛡️</span>
-                    <span id="agent-policy-text" class="text-slate-300">Политики безопасности: Remote / Зарплатная вилка / Лимиты</span>
-                </div>
-                <span id="agent-policy-status" class="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-medium">VERIFIED</span>
+            <!-- Progress bar -->
+            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div id="harvest-progress-bar" class="bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 h-2 rounded-full w-1/3 transition-all duration-500 animate-pulse"></div>
             </div>
-
-            <!-- Terminal Live Feed -->
-            <div class="flex-1 bg-slate-950/90 rounded-xl border border-slate-800 p-3 overflow-y-auto font-mono text-[11px] leading-relaxed space-y-1.5 min-h-[220px] max-h-[340px]" id="agent-modal-terminal">
-                <div class="text-slate-500">⚡ Ожидание запуска автономного цикла...</div>
-            </div>
-
-            <!-- Human Approval Card -->
-            <div id="agent-modal-approval-box" class="hidden mt-3 p-4 rounded-xl bg-indigo-950/40 border-2 border-indigo-500/60 shadow-lg">
-                <div class="flex items-start gap-3">
-                    <span class="text-2xl">⏸</span>
-                    <div class="flex-1">
-                        <div class="font-bold text-sm text-indigo-300 mb-0.5">Форма заполнена и проверена валидатором!</div>
-                        <p class="text-xs text-slate-300 mb-3" id="agent-modal-approval-desc">Все обязательные поля, файл резюме и ответы заполнены в вашем Chrome. Проверьте страницу и санкционируйте отправку:</p>
-                        <div class="flex items-center gap-2">
-                            <button id="agent-modal-approve-btn" onclick="approveAgentSessionFromCRM()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 ring-2 ring-emerald-500/40">
-                                <span>🚀</span> Подтвердить и отправить (Submit)
-                            </button>
-                            <button onclick="stopAgentFromCRM()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-xl border border-slate-700">
-                                ⏹ Остановить
-                            </button>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-4 gap-2 mt-3 text-[11px] text-slate-400 text-center">
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                    <div class="text-slate-500 text-[10px]">Площадки</div>
+                    <div id="harvest-metric-scrapers" class="font-bold text-slate-300 mt-0.5">0 / 11</div>
                 </div>
-            </div>
-
-            <!-- Completion Banner -->
-            <div id="agent-modal-complete-box" class="hidden mt-3 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-700/60 text-xs text-emerald-300 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-lg">🎉</span>
-                    <span class="font-bold">Отклик успешно подан! Статус вакансии обновлен в CRM.</span>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                    <div class="text-slate-500 text-[10px]">Сохранено</div>
+                    <div id="harvest-metric-saved" class="font-bold text-emerald-400 mt-0.5">0</div>
                 </div>
-                <button onclick="closeAgentLiveModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-1.5 rounded-lg">Готово</button>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                    <div class="text-slate-500 text-[10px]">Анти-BS отсев</div>
+                    <div id="harvest-metric-filtered" class="font-bold text-amber-400 mt-0.5">0</div>
+                </div>
+                <div class="bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                    <div class="text-slate-500 text-[10px]">Дубликаты</div>
+                    <div id="harvest-metric-dups" class="font-bold text-slate-400 mt-0.5">0</div>
+                </div>
             </div>
         </div>
+
+        <!-- Terminal Details -->
+        <div class="mb-4">
+            <button onclick="toggleTerminalLogs()" type="button" class="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 py-1 px-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span class="flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="toggle-logs-text">Лог терминала в реальном времени</span>
+                </span>
+                <span id="toggle-logs-arrow">▲</span>
+            </button>
+            <div id="terminal-container" class="mt-2">
+                <div class="terminal text-[11px] h-48 overflow-y-auto font-mono leading-relaxed bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 text-slate-300 shadow-inner" id="harvest-logs">Ожидание запуска...</div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onclick="closeHarvest()" id="harvest-close-btn"
+                class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-2 ring-2 ring-emerald-500/40 hidden">
+                <span>🎉</span> Посмотреть найденные вакансии
+            </button>
+        </div>
     </div>
+</div>
 
-    <!-- Shame List Public Export Modal -->
-    <div id="shame-list-modal" class="modal fixed inset-0 z-50 items-center justify-center p-4">
-        <div class="glass-panel rounded-2xl max-w-3xl w-full p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center pb-3 border-b border-slate-800">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">💩</span>
-                    <div>
-                        <h3 class="text-base font-bold text-white">Доска позора недобросовестных работодателей</h3>
-                        <p class="text-[11px] text-slate-400">Публичный реестр для публикации в README или на GitHub Gist</p>
-                    </div>
+        <!-- Cropper Modal Component -->
+<div id="cropper-modal" class="modal">
+    <div class="glass-panel-elevated p-5 rounded-2xl w-[500px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <span>✂️</span> Центрирование фото (1:1)
+            </h2>
+            <button onclick="toggleModal('cropper-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+        <div class="w-full h-[320px] bg-slate-950 mb-3 overflow-hidden flex justify-center rounded-xl border border-slate-800">
+            <img id="cropper-image" class="max-w-full hidden">
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button onclick="toggleModal('cropper-modal')"
+                class="px-4 py-2 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
+            <button onclick="saveCrop()"
+                class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-600/20">
+                Применить аватар
+            </button>
+        </div>
+    </div>
+</div>
+
+        <!-- Bookmarklet Info & Setup Modal Component -->
+<div id="bookmarklet-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[560px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-base">
+                    🔖
                 </div>
-                <button onclick="toggleModal('shame-list-modal')" class="text-slate-400 hover:text-white text-lg">✕</button>
+                <div>
+                    <h2 class="text-base font-bold text-white">Установка Auto-Apply Закладки (v3.0)</h2>
+                    <p class="text-[11px] text-slate-400">Универсальный авто-отклик: Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</p>
+                </div>
+            </div>
+            <button onclick="toggleModal('bookmarklet-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <div class="space-y-4 text-xs text-slate-300">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-white mb-1">Способ 1 (Самый быстрый):</div>
+                    <p class="text-[11px] text-slate-400">Зажмите зеленую кнопку и перетащите её на панель закладок браузера (Cmd+Shift+B в Chrome, чтобы показать панель):</p>
+                </div>
+                <a id="bookmarklet-modal-btn" href="#" onclick="event.preventDefault(); alert('Зажмите кнопку левой кнопкой мыши и перетащите её наверх, на панель закладок!');"
+                    class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg cursor-grab select-none whitespace-nowrap flex items-center gap-2 ring-2 ring-emerald-500/30">
+                    <span>🔖</span> Auto-Apply
+                </a>
             </div>
 
-            <div class="py-3 flex-1 overflow-y-auto">
-                <pre id="shame-list-content" class="bg-slate-950 p-4 rounded-xl text-xs font-mono text-slate-300 whitespace-pre-wrap border border-slate-800 max-h-[50vh] overflow-y-auto select-all"></pre>
-            </div>
-
-            <div class="flex justify-between items-center pt-3 border-t border-slate-800">
-                <span class="text-[11px] text-slate-500">Файл также синхронизирован в корне: <code>SHAME_LIST.md</code></span>
-                <div class="flex gap-2">
-                    <button onclick="copyShameListMarkdown()" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-md flex items-center gap-1.5">
-                        📋 Скопировать Markdown для GitHub
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                <div class="font-semibold text-white mb-1">Способ 2 (Вручную):</div>
+                <p class="text-[11px] text-slate-400 mb-2">Создайте любую закладку в браузере, отредактируйте её и вставьте этот код в поле URL:</p>
+                <div class="flex items-center gap-2">
+                    <input id="bookmarklet-code-input" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-emerald-400 font-mono select-all">
+                    <button onclick="copyBookmarkletCode()" class="bg-slate-800 hover:bg-slate-700 text-white font-medium px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+                        📋 Копировать
                     </button>
-                    <button onclick="toggleModal('shame-list-modal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3.5 py-2 rounded-lg">Закрыть</button>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-800/60 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <div class="font-semibold text-purple-300 flex items-center gap-1.5">
+                        <span>🧩</span> Способ 3: Chrome Extension (Side Panel & Agent)
+                    </div>
+                    <span class="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-bold">Рекомендуется</span>
+                </div>
+                <p class="text-[11px] text-slate-300 mb-2">
+                    Полноценная боковая панель в браузере с живым анализом вакансий и 1-click заполнением форм:
+                </p>
+                <ol class="text-[11px] text-slate-400 list-decimal list-inside space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                    <li>Откройте в Chrome: <code class="text-sky-300 font-mono">chrome://extensions</code> и включите <b>«Режим разработчика»</b> (вверху справа).</li>
+                    <li>Нажмите <b>«Загрузить распакованное расширение»</b> (Load unpacked).</li>
+                    <li>Выберите папку <code class="text-purple-300 font-mono">job_hunter/extension</code> в корне проекта.</li>
+                </ol>
+            </div>
+
+            <div class="bg-indigo-950/40 border border-indigo-900/60 rounded-xl p-3.5 text-[11px] space-y-1.5 text-indigo-200">
+                <div class="font-bold text-indigo-300">Универсальный авто-заполнитель анкет (ATS & Forms):</div>
+                <div>1. Откройте любую страницу вакансии или форму отклика (<strong>Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</strong> и др.).</div>
+                <div>2. Нажмите закладку <strong>«🔖 Auto-Apply»</strong> на панели закладок браузера.</div>
+                <div>⚡️ Скрипт мгновенно определит форму и автоматически заполнит: <strong>Имя, Фамилию, Email, Телефон, LinkedIn, GitHub, Портфолио, Локацию и Сопроводительное письмо</strong>, а также подсветит поле прикрепления CV!</div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-4 mt-4 border-t border-slate-800">
+            <button onclick="toggleModal('bookmarklet-modal')" class="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-4 py-2 rounded-xl">
+                Понятно
+            </button>
+        </div>
+    </div>
+</div>
+
+        <!-- Blacklist Modal Component (Доска позора / Черный список) -->
+<div id="blacklist-modal" class="modal">
+    <div class="glass-panel-elevated rounded-2xl max-w-lg w-full p-6 border border-rose-900/60 shadow-2xl relative">
+        <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">🛑</span>
+                <h3 class="text-base font-bold text-white">Внести в Черный список</h3>
+            </div>
+            <button onclick="toggleModal('blacklist-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <div class="py-4 space-y-3">
+            <div id="blacklist-modal-vac-info" class="text-xs font-semibold text-rose-300 bg-rose-950/40 p-2.5 rounded-xl border border-rose-900/50">
+                Компания — Вакансия
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Причина блокировки (выберите тег или укажите причину):</label>
+                <div class="flex flex-wrap gap-1.5 mb-2.5">
+                    <button type="button" onclick="setBlacklistTag('Навязывание ИП / Самозанятости с 1-го дня (уклонение от ТК РФ, перекладывание рисков)')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 hover:border-rose-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        🛑 Навязывание ИП/СЗ (ТК РФ)
+                    </button>
+                    <button type="button" onclick="setBlacklistTag('Неоплачиваемое тестовое задание до первого технического скрининга')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 hover:border-amber-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        ⚠️ Бесплатное тестовое до интервью
+                    </button>
+                    <button type="button" onclick="setBlacklistTag('Серая зарплата / Обман по условиям и обязанностям на собеседовании')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 hover:border-purple-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        📉 Серая ЗП / Обман по условиям
+                    </button>
+                    <button type="button" onclick="setBlacklistTag('Неадекватный AI/HR-скрининг / Спам / Скамерская воронка')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 hover:border-sky-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        🤖 Токсичный HR/Бот / Спам
+                    </button>
+                </div>
+
+                <textarea id="blacklist-reason-input" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500" placeholder="Подробная причина нарушения..."></textarea>
+            </div>
+
+            <div class="text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                💡 Вакансия будет перемещена во вкладку <strong>«Черный список»</strong>, а запись автоматически добавится в файл <strong>SHAME_LIST.md</strong> в корне проекта для публикации на GitHub.
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <button onclick="toggleModal('blacklist-modal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2 rounded-xl">Отмена</button>
+            <button onclick="confirmBlacklist()" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5">
+                <span>💩</span> Забанить и внести в Доску позора
+            </button>
+        </div>
+    </div>
+</div>
+
+        <!-- AI Career Agent Live Modal Component -->
+<div id="agent-live-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[700px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative flex flex-col max-h-[90vh]">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+                    🤖
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-white" id="agent-modal-title">AI Career Agent (ReAct Loop)</h2>
+                        <span id="agent-modal-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-700/60 font-bold uppercase">IDLE</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400" id="agent-modal-subtitle">Автономное наблюдение, подготовка резюме и отклик в вашем Chrome</p>
+                </div>
+            </div>
+            <button onclick="closeAgentLiveModal()" class="text-slate-400 hover:text-white text-base p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <!-- Policy Guardrail Banner -->
+        <div id="agent-modal-policy-banner" class="mb-3 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span id="agent-policy-icon">🛡️</span>
+                <span id="agent-policy-text" class="text-slate-300">Политики безопасности: Remote / Зарплатная вилка / Лимиты</span>
+            </div>
+            <span id="agent-policy-status" class="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-medium">VERIFIED</span>
+        </div>
+
+        <!-- Terminal Live Feed -->
+        <div class="flex-1 bg-slate-950/90 rounded-xl border border-slate-800 p-3 overflow-y-auto font-mono text-[11px] leading-relaxed space-y-1.5 min-h-[220px] max-h-[340px]" id="agent-modal-terminal">
+            <div class="text-slate-500">⚡ Ожидание запуска автономного цикла...</div>
+        </div>
+
+        <!-- Human Approval Card -->
+        <div id="agent-modal-approval-box" class="hidden mt-3 p-4 rounded-xl bg-indigo-950/40 border-2 border-indigo-500/60 shadow-lg">
+            <div class="flex items-start gap-3">
+                <span class="text-2xl">⏸</span>
+                <div class="flex-1">
+                    <div class="font-bold text-sm text-indigo-300 mb-0.5">Форма заполнена и проверена валидатором!</div>
+                    <p class="text-xs text-slate-300 mb-3" id="agent-modal-approval-desc">Все обязательные поля, файл резюме и ответы заполнены в вашем Chrome. Проверьте страницу и санкционируйте отправку:</p>
+                    <div class="flex items-center gap-2">
+                        <button id="agent-modal-approve-btn" onclick="approveAgentSessionFromCRM()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 ring-2 ring-emerald-500/40">
+                            <span>🚀</span> Подтвердить и отправить (Submit)
+                        </button>
+                        <button onclick="stopAgentFromCRM()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-xl border border-slate-700">
+                            ⏹ Остановить
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- Completion Banner -->
+        <div id="agent-modal-complete-box" class="hidden mt-3 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-700/60 text-xs text-emerald-300 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-lg">🎉</span>
+                <span class="font-bold">Отклик успешно подан! Статус вакансии обновлен в CRM.</span>
+            </div>
+            <button onclick="closeAgentLiveModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-1.5 rounded-lg">Готово</button>
+        </div>
+    </div>
+</div>
+
+        <!-- Shame List Public Export Modal Component -->
+<div id="shame-list-modal" class="modal">
+    <div class="glass-panel-elevated rounded-2xl max-w-3xl w-full p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+                <span class="text-xl">💩</span>
+                <div>
+                    <h3 class="text-base font-bold text-white">Доска позора недобросовестных работодателей</h3>
+                    <p class="text-[11px] text-slate-400">Публичный реестр для публикации в README или на GitHub Gist</p>
+                </div>
+            </div>
+            <button onclick="toggleModal('shame-list-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <div class="py-3 flex-1 overflow-y-auto">
+            <pre id="shame-list-content" class="bg-slate-950 p-4 rounded-xl text-xs font-mono text-slate-300 whitespace-pre-wrap border border-slate-800 max-h-[50vh] overflow-y-auto select-all"></pre>
+        </div>
+
+        <div class="flex justify-between items-center pt-3 border-t border-slate-800">
+            <span class="text-[11px] text-slate-500">Файл также синхронизирован в корне: <code>SHAME_LIST.md</code></span>
+            <div class="flex gap-2">
+                <button onclick="copyShameListMarkdown()" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5">
+                    📋 Скопировать Markdown для GitHub
+                </button>
+                <button onclick="toggleModal('shame-list-modal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2 rounded-xl">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
     </div>
 
     <!-- Modular Vanilla JS Frontend (ADR-006) -->
-    <script src="/static/js/state.js?v=5"></script>
-    <script src="/static/js/utils.js?v=5"></script>
-    <script src="/static/js/api.js?v=5"></script>
-    <script src="/static/js/bookmarklet.js?v=5"></script>
-    <script src="/static/js/views/vacancies.js?v=5"></script>
-    <script src="/static/js/views/profiles.js?v=5"></script>
-    <script src="/static/js/views/modals.js?v=5"></script>
-    <script src="/static/js/app.js?v=5"></script>
+    <script src="/static/js/state.js?v=8"></script>
+    <script src="/static/js/utils.js?v=8"></script>
+    <script src="/static/js/api.js?v=8"></script>
+    <script src="/static/js/bookmarklet.js?v=8"></script>
+    <script src="/static/js/views/vacancies.js?v=8"></script>
+    <script src="/static/js/views/profiles.js?v=8"></script>
+    <script src="/static/js/views/modals.js?v=8"></script>
+    <script src="/static/js/app.js?v=8"></script>
 </body>
 </html>

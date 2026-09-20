@@ -1,21 +1,82 @@
 import sqlite3
 import os
+import sys
 import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "jobs.db")
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "jobs.db")
+TEST_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_jobs.db")
 
-def get_db_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=15.0)
+_CUSTOM_DB_PATH: Optional[str] = None
+
+
+def is_test_environment() -> bool:
+    """Detects if code is executing in a test runner or test environment."""
+    if os.environ.get("JOB_HUNTER_ENV") == "test":
+        return True
+    argv0 = sys.argv[0] if sys.argv else ""
+    base_argv0 = os.path.basename(argv0).lower()
+    if "unittest" in base_argv0 or "pytest" in base_argv0 or base_argv0.startswith("test"):
+        return True
+    if "unittest" in sys.modules or "pytest" in sys.modules:
+        return True
+    main_mod = sys.modules.get("__main__")
+    main_file = getattr(main_mod, "__file__", "") or ""
+    if os.path.basename(main_file).lower().startswith("test"):
+        return True
+    return False
+
+
+def get_db_path() -> str:
+    """Returns the active SQLite database path based on configuration and environment."""
+    if _CUSTOM_DB_PATH is not None:
+        return _CUSTOM_DB_PATH
+    current_global = globals().get("DB_PATH")
+    if current_global and current_global not in (DEFAULT_DB_PATH, TEST_DB_PATH):
+        return current_global
+    env_path = os.environ.get("JOB_HUNTER_DB_PATH")
+    if env_path:
+        return env_path
+    if is_test_environment():
+        return TEST_DB_PATH
+    return DEFAULT_DB_PATH
+
+
+def set_db_path(path: Optional[str]) -> None:
+    """Explicitly sets or resets the active database path."""
+    global _CUSTOM_DB_PATH, DB_PATH
+    _CUSTOM_DB_PATH = path
+    if path:
+        os.environ["JOB_HUNTER_DB_PATH"] = path
+        DB_PATH = path
+    else:
+        os.environ.pop("JOB_HUNTER_DB_PATH", None)
+        DB_PATH = DEFAULT_DB_PATH
+
+
+def reset_db_path() -> None:
+    """Resets the database path back to default / test environment detection."""
+    set_db_path(None)
+
+
+DB_PATH = get_db_path()
+
+
+def get_db_connection(custom_path: Optional[str] = None):
+    target_path = custom_path or get_db_path()
+    if target_path != ":memory:":
+        os.makedirs(os.path.dirname(os.path.abspath(target_path)), exist_ok=True)
+    conn = sqlite3.connect(target_path, timeout=15.0)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
+    if target_path != ":memory:":
+        conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA busy_timeout=15000;")
     return conn
 
-def init_db():
-    conn = get_db_connection()
+
+def init_db(custom_path: Optional[str] = None):
+    conn = get_db_connection(custom_path)
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -68,6 +129,8 @@ def init_db():
         cursor.execute("ALTER TABLE vacancies ADD COLUMN ats_report_json TEXT")
     if 'fsm_state' not in columns:
         cursor.execute("ALTER TABLE vacancies ADD COLUMN fsm_state TEXT DEFAULT 'DISCOVERED'")
+    if 'pitch_rating' not in columns:
+        cursor.execute("ALTER TABLE vacancies ADD COLUMN pitch_rating INTEGER DEFAULT 0")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pitches (
@@ -79,10 +142,21 @@ def init_db():
         status TEXT DEFAULT 'DRAFT', -- 'DRAFT' | 'APPROVED' | 'SENT' | 'REJECTED'
         sent_at TIMESTAMP,
         notes TEXT,
+        rating INTEGER DEFAULT 0,
+        user_edited_content TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (vacancy_id) REFERENCES vacancies (id) ON DELETE CASCADE
     );
     """)
+
+    cursor.execute("PRAGMA table_info(pitches)")
+    pitch_cols = [r[1] for r in cursor.fetchall()]
+    if 'rating' not in pitch_cols:
+        cursor.execute("ALTER TABLE pitches ADD COLUMN rating INTEGER DEFAULT 0")
+    if 'user_edited_content' not in pitch_cols:
+        cursor.execute("ALTER TABLE pitches ADD COLUMN user_edited_content TEXT")
+    if 'created_at' not in pitch_cols:
+        cursor.execute("ALTER TABLE pitches ADD COLUMN created_at TIMESTAMP")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS candidate_profiles (
@@ -327,8 +401,15 @@ def get_stats() -> Dict[str, int]:
     finally:
         conn.close()
 
-def sync_canonical_profiles_to_db(profiles: List[Dict[str, Any]]) -> None:
+def sync_canonical_profiles_to_db(profiles: Optional[List[Dict[str, Any]]] = None) -> None:
     """Syncs canonical candidate profiles into candidate_profiles SQLite table."""
+    if profiles is None:
+        try:
+            from generator.candidate_profile import load_canonical_profiles
+            profiles = load_canonical_profiles()
+        except Exception:
+            profiles = []
+
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()

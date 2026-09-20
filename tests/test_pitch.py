@@ -21,7 +21,7 @@ class TestPitchBuilder(unittest.TestCase):
             "skills": "React, Next.js, TypeScript",
             "description": "Building modern web applications."
         }
-        pitch = generate_pitch(vac)
+        pitch = generate_pitch(vac, use_ai=False)
         cl = pitch["cover_letter"]
         # Telegram and Email must both be present and distinct
         self.assertIn("Telegram:", cl)
@@ -37,7 +37,7 @@ class TestPitchBuilder(unittest.TestCase):
             "skills": "React, TypeScript, Tailwind",
             "description": "Looking for React & TypeScript expert."
         }
-        pitch = generate_pitch(vac)
+        pitch = generate_pitch(vac, use_ai=False)
         score = pitch["score"]
         self.assertIsInstance(score, int)
         self.assertGreaterEqual(score, 40)

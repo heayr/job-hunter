@@ -3,12 +3,13 @@ import sqlite3
 from datetime import datetime
 from typing import Optional
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "jobs.db")
+from tracker.db import get_db_connection
+
 SHAME_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SHAME_LIST.md")
 
 def generate_shame_list_markdown() -> str:
     """Queries all blacklisted vacancies from SQLite and formats a clean Markdown registry."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     

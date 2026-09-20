@@ -11,7 +11,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, get_llm_config, call_lm_studio, extract_json_payload, GEMINI_MODELS
 from generator.pitch_builder import generate_pitch
 from filter.profile_filter import detect_vacancy_grade
 from tracker.db import get_db_connection, save_vacancy
@@ -65,19 +65,19 @@ def heuristic_fallback_parse(raw_text: str, source_url: str = "") -> Dict[str, A
 
     # Detect Company
     company = "Direct Employer"
-    comp_match = re.search(r'(?:компания|company|команда)[\s:]*([A-Za-zА-Яа-я0-9\s_-]+)', first_few, re.I)
+    comp_match = re.search(r'(?:company|компания|startup|проект)[\s:]*([^\n,.]+)', first_few, re.I)
     if comp_match:
         company = comp_match.group(1).strip()
 
     # Detect Remote
-    is_remote = 1 if re.search(r'\b(remote|удаленк|дистанцион|удаленно|anywhere)\b', raw_text, re.I) else 0
+    is_remote = 1 if re.search(r'удален|remote|гибрид|hybrid', raw_text, re.I) else 0
 
-    # Detect Contacts
+    # Contacts
     contacts = extract_contacts(raw_text)
-    contact_handle = contacts.get("primary_handle") or ""
+    contact_handle = contacts.get("primary_handle") or (source_url if source_url else "")
     contact_type = contacts.get("primary_type") or "portal"
 
-    grade = detect_vacancy_grade(title, raw_text[:1000])
+    grade = detect_vacancy_grade(title, raw_text)
 
     return {
         "title": title,
@@ -95,11 +95,48 @@ def heuristic_fallback_parse(raw_text: str, source_url: str = "") -> Dict[str, A
     }
 
 
+def _normalize_parsed_vacancy(parsed: Dict[str, Any], raw_text: str, source_url: str = "") -> Dict[str, Any]:
+    # Validate contact_handle: AI can hallucinate non-existent TG handles
+    ai_handle = str(parsed.get("contact_handle") or "").strip()
+    ai_type = str(parsed.get("contact_type") or "portal").strip()
+
+    # Cross-validate: also extract contacts from raw text via regex
+    regex_contacts = extract_contacts(raw_text)
+    regex_handle = regex_contacts.get("primary_handle") or ""
+    regex_type = regex_contacts.get("primary_type") or "portal"
+
+    # Prefer regex-extracted contact over AI-generated (AI hallucinates)
+    if regex_handle:
+        final_handle = regex_handle
+        final_type = regex_type
+    elif ai_handle and not ai_handle.startswith("http") and not ai_handle.startswith("www."):
+        final_handle = ai_handle
+        final_type = ai_type
+    else:
+        final_handle = source_url if source_url else ""
+        final_type = "portal"
+
+    return {
+        "title": str(parsed.get("title") or "Software Engineer").strip(),
+        "company": str(parsed.get("company") or "Direct Employer").strip(),
+        "location": str(parsed.get("location") or "Remote").strip(),
+        "is_remote": 1 if parsed.get("is_remote") else 0,
+        "salary": str(parsed.get("salary") or "По договоренности").strip(),
+        "grade": str(parsed.get("grade") or "Middle").strip(),
+        "language": "ru" if parsed.get("language", "").lower() == "ru" else "en",
+        "skills": str(parsed.get("skills") or "React, TypeScript, Frontend").strip(),
+        "description": str(parsed.get("description") or raw_text[:2000]).strip(),
+        "contact_name": str(parsed.get("contact_name") or "").strip(),
+        "contact_handle": final_handle,
+        "contact_type": final_type
+    }
+
+
 def parse_with_gemini(raw_text: str, source_url: str = "") -> Dict[str, Any]:
-    """Uses Gemini to parse unstructured job text into strict CRM schema."""
-    api_key = get_api_key()
-    if not api_key:
-        return heuristic_fallback_parse(raw_text, source_url)
+    """Uses configured LLM (LM Studio or Gemini) to parse unstructured job text into strict CRM schema."""
+    cfg = get_llm_config()
+    provider = cfg.get("provider", "gemini")
+    api_key = cfg.get("gemini_api_key", "")
 
     prompt = f"""You are an expert Technical Recruiter and Headhunter.
 Analyze the following unstructured job posting text (which could be from a website, Telegram message, email, or LinkedIn).
@@ -128,6 +165,19 @@ Rules:
 Job Posting Text:
 \"\"\"{raw_text[:6500]}\"\"\"
 """
+
+    # 1. Hot-swapped local LLM (LM Studio)
+    if provider == "lm_studio":
+        raw_json = call_lm_studio(prompt, json_mode=True)
+        if raw_json:
+            parsed = extract_json_payload(raw_json)
+            if parsed:
+                return _normalize_parsed_vacancy(parsed, raw_text, source_url)
+            print(f"  [ai_parser] LM Studio JSON parse failed on output: {raw_json[:120]}")
+
+    # 2. Google Gemini API
+    if not api_key:
+        return heuristic_fallback_parse(raw_text, source_url)
 
     models_to_try = GEMINI_MODELS[:]
 
@@ -158,43 +208,8 @@ Job Posting Text:
                 text = re.sub(r'^```(?:json)?\s*', '', text)
                 text = re.sub(r'\s*```$', '', text).strip()
                 parsed = json.loads(text)
-                
-                # Validation & sensible defaults
-                # Validate contact_handle: AI can hallucinate non-existent TG handles
-                ai_handle = str(parsed.get("contact_handle") or "").strip()
-                ai_type = str(parsed.get("contact_type") or "portal").strip()
 
-                # Cross-validate: also extract contacts from raw text via regex
-                regex_contacts = extract_contacts(raw_text)
-                regex_handle = regex_contacts.get("primary_handle") or ""
-                regex_type = regex_contacts.get("primary_type") or "portal"
-
-                # Prefer regex-extracted contact over AI-generated (AI hallucinates)
-                if regex_handle:
-                    final_handle = regex_handle
-                    final_type = regex_type
-                elif ai_handle and not ai_handle.startswith("http") and not ai_handle.startswith("www."):
-                    # Only trust AI handle if it looks like a real contact (not a URL)
-                    final_handle = ai_handle
-                    final_type = ai_type
-                else:
-                    final_handle = source_url if source_url else ""
-                    final_type = "portal"
-
-                return {
-                    "title": str(parsed.get("title") or "Software Engineer").strip(),
-                    "company": str(parsed.get("company") or "Direct Employer").strip(),
-                    "location": str(parsed.get("location") or "Remote").strip(),
-                    "is_remote": 1 if parsed.get("is_remote") else 0,
-                    "salary": str(parsed.get("salary") or "По договоренности").strip(),
-                    "grade": str(parsed.get("grade") or "Middle").strip(),
-                    "language": "ru" if parsed.get("language", "").lower() == "ru" else "en",
-                    "skills": str(parsed.get("skills") or "React, TypeScript, Frontend").strip(),
-                    "description": str(parsed.get("description") or raw_text[:2000]).strip(),
-                    "contact_name": str(parsed.get("contact_name") or "").strip(),
-                    "contact_handle": final_handle,
-                    "contact_type": final_type
-                }
+                return _normalize_parsed_vacancy(parsed, raw_text, source_url)
         except Exception as e:
             print(f"  [ai_parser] Model {model} attempt failed: {e}")
 
@@ -205,7 +220,8 @@ Job Posting Text:
 def ingest_vacancy_with_ai(
     raw_input: str,
     is_url: bool = False,
-    profile_id: Optional[str] = None
+    profile_id: Optional[str] = None,
+    use_ai: bool = True
 ) -> Dict[str, Any]:
     """
     Main entrypoint: parses URL or raw text, extracts vacancy schema,
@@ -229,12 +245,18 @@ def ingest_vacancy_with_ai(
     if len(clean_text) < 30:
         return {"success": False, "error": "Текст вакансии слишком короткий или не содержит полезной информации"}
 
-    # Parse with AI
-    parsed = parse_with_gemini(clean_text, source_url)
+    # Parse with AI or heuristic fallback
+    if use_ai:
+        parsed = parse_with_gemini(clean_text, source_url)
+    else:
+        parsed = heuristic_fallback_parse(clean_text, source_url)
 
     # Perform Deep Job Understanding (Phase 2)
-    from generator.job_understanding import understand_job_posting
-    understanding = understand_job_posting(parsed["title"], clean_text, parsed["company"], source_url)
+    from generator.job_understanding import understand_job_posting, heuristic_job_understanding
+    if use_ai:
+        understanding = understand_job_posting(parsed["title"], clean_text, parsed["company"], source_url)
+    else:
+        understanding = heuristic_job_understanding(parsed["title"], clean_text, parsed["company"])
 
     # Generate unique ID
     key = source_url or f"{parsed['title']}:{parsed['company']}:{clean_text[:100]}"
@@ -258,13 +280,16 @@ def ingest_vacancy_with_ai(
         "contact_handle": parsed["contact_handle"],
         "contact_type": parsed["contact_type"],
         "published_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "status": "new"
+        "status": "new",
+        "score": 0
     }
 
-    # Generate personalized pitch & match score
-    pitch_data = generate_pitch(vacancy, use_ai=True, profile_id=profile_id)
+    # Generate tailored pitches & score
+    pitch_data = generate_pitch(vacancy, use_ai=use_ai, profile_id=profile_id)
     score = pitch_data.get("score", 70)
+    vacancy["score"] = score
     lang = pitch_data.get("language", vacancy["language"])
+    vacancy["language"] = lang
 
     # Persist in Database
     conn = get_db_connection()
@@ -289,7 +314,7 @@ def ingest_vacancy_with_ai(
             "url": source_url,
             "profile_id": profile_id,
             "lang": lang,
-            "use_ai": True
+            "use_ai": use_ai
         })
 
         understanding = agent_context.get("job_understanding", understanding)

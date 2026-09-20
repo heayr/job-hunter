@@ -160,7 +160,7 @@ function renderProfileEditor() {
                 <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                     <span>👤</span> Основная информация (HH.ru / LinkedIn)
                 </h3>
-                <div class="grid grid-cols-3 gap-3 mb-3">
+                <div class="grid grid-cols-4 gap-3 mb-3">
                     <div>
                         <label class="text-[11px] font-medium text-slate-400 mb-1 block">ID профиля</label>
                         <input id="p-id" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono" value="${escapeHtml(p.id || '')}">
@@ -172,20 +172,28 @@ function renderProfileEditor() {
                             <option value="en" ${p.lang === 'en' ? 'selected' : ''}>🇺🇸 English</option>
                         </select>
                     </div>
-                    <div>
+                    <div class="col-span-2">
                         <label class="text-[11px] font-medium text-slate-400 mb-1 block">Желаемая должность / Headline</label>
                         <input id="p-role" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-medium" value="${escapeHtml(p.role || '')}">
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-5 gap-3">
                     <div>
-                        <label class="text-[11px] font-medium text-slate-400 mb-1 block">Имя и Фамилия</label>
-                        <input id="p-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(p.name || '')}">
+                        <label class="text-[11px] font-medium text-slate-400 mb-1 block">Имя (First Name)</label>
+                        <input id="p-first-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(p.first_name || (p.name || '').split(' ')[0] || '')}" placeholder="Имя">
                     </div>
                     <div>
-                        <label class="text-[11px] font-medium text-slate-400 mb-1 block">Город / Локация</label>
+                        <label class="text-[11px] font-medium text-slate-400 mb-1 block">Фамилия (Last Name)</label>
+                        <input id="p-last-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(p.last_name || (p.name || '').split(' ').slice(1).join(' ') || '')}" placeholder="Фамилия">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-medium text-slate-400 mb-1 block">Город (City)</label>
                         <input id="p-city" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(loc.city || 'Москва')}">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-medium text-slate-400 mb-1 block">Страна (Country)</label>
+                        <input id="p-country" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" value="${escapeHtml(loc.country || 'Россия')}">
                     </div>
                     <div>
                         <label class="text-[11px] font-medium text-slate-400 mb-1 block">Аватар</label>
@@ -453,14 +461,17 @@ async function saveProfiles() {
     p.id = document.getElementById('p-id').value.trim() || ('profile_' + Date.now());
     p.lang = document.getElementById('p-lang').value;
     p.role = document.getElementById('p-role').value;
-    p.name = document.getElementById('p-name').value;
+    p.first_name = document.getElementById('p-first-name')?.value.trim() || '';
+    p.last_name = document.getElementById('p-last-name')?.value.trim() || '';
+    p.name = `${p.first_name} ${p.last_name}`.trim() || p.role;
     p.photo_url = document.getElementById('p-photo').value;
     p.summary = document.getElementById('p-summary').value;
     p.keywords = document.getElementById('p-keys').value;
     p.experience = document.getElementById('p-exp').value;
 
     p.location = p.location || {};
-    p.location.city = document.getElementById('p-city').value;
+    p.location.city = document.getElementById('p-city')?.value.trim() || '';
+    p.location.country = document.getElementById('p-country')?.value.trim() || '';
 
     p.contacts_structured = p.contacts_structured || {};
     p.contacts_structured.telegram = document.getElementById('p-tg').value;

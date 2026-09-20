@@ -130,5 +130,62 @@ class TestResumeParser(unittest.TestCase):
             actual = parse_resume_locally(SAMPLE_EN_CV)
             self.assertEqual(actual, expected)
 
+    def test_parse_docx_tables(self):
+        try:
+            import docx, io
+            from generator.resume_parser import parse_docx
+            doc = docx.Document()
+            doc.add_paragraph("Егор Мышинский")
+            doc.add_paragraph("ОБРАЗОВАНИЕ")
+            tbl = doc.add_table(rows=2, cols=2)
+            tbl.rows[0].cells[0].text = "2024"
+            tbl.rows[0].cells[1].text = "Магистратура\nМИРЭА\nПрикладная информатика"
+            tbl.rows[1].cells[0].text = "2022"
+            tbl.rows[1].cells[1].text = "Бакалавриат\nМИРЭА\nИнформационные системы"
+            bio = io.BytesIO()
+            doc.save(bio)
+            raw = parse_docx(bio.getvalue())
+            profile = parse_resume_locally(raw)
+            self.assertEqual(len(profile["education"]), 2)
+            self.assertEqual(profile["education"][0]["grade"], "Магистратура")
+            self.assertEqual(profile["education"][0]["years"], "2024")
+            self.assertEqual(profile["education"][1]["grade"], "Бакалавриат")
+            self.assertEqual(profile["education"][1]["years"], "2022")
+        except ImportError:
+            pass
+
+    def test_compound_degrees_expansion(self):
+        cv_text = """
+Егор Мышинский
+Frontend-разработчик
+
+ОБРАЗОВАНИЕ
+Магистратура / Бакалавриат  ·  Реклама и связи с общественностью
+РУТ (МИИТ)  ·  2011–2017
+"""
+        profile = parse_resume_locally(cv_text)
+        self.assertEqual(len(profile["education"]), 2)
+        self.assertEqual(profile["education"][0]["grade"], "Магистратура")
+        self.assertEqual(profile["education"][0]["years"], "2015–2017")
+        self.assertEqual(profile["education"][1]["grade"], "Бакалавриат")
+        self.assertEqual(profile["education"][1]["years"], "2011–2015")
+        self.assertEqual(profile["education"][0]["institution"], "РУТ (МИИТ)")
+        self.assertEqual(profile["education"][1]["institution"], "РУТ (МИИТ)")
+
+    def test_compound_plus_degrees_expansion(self):
+        cv_text = """
+Егор Мышинский
+Frontend-разработчик
+
+ОБРАЗОВАНИЕ
+Бакалавриат + Магистратура «Информатика» — МИРЭА, 2018–2024
+"""
+        profile = parse_resume_locally(cv_text)
+        self.assertEqual(len(profile["education"]), 2)
+        self.assertEqual(profile["education"][0]["grade"], "Бакалавриат")
+        self.assertEqual(profile["education"][1]["grade"], "Магистратура")
+        self.assertEqual(profile["education"][0]["institution"], "МИРЭА")
+        self.assertEqual(profile["education"][1]["institution"], "МИРЭА")
+
 if __name__ == "__main__":
     unittest.main()

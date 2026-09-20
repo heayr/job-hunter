@@ -21,6 +21,14 @@ class TestLocalDrillForms(unittest.TestCase):
     def setUpClass(cls):
         init_db()
 
+    def setUp(self):
+        self._bridge = get_browser_bridge()
+        self._orig_cdp = getattr(self._bridge, 'enable_cdp', True)
+        self._bridge.enable_cdp = False
+
+    def tearDown(self):
+        self._bridge.enable_cdp = self._orig_cdp
+
     def _simulate_extension_worker(self, form_elements: list, stop_event: threading.Event):
         """Simulates Chrome Extension content script answering DOM actions."""
         bridge = get_browser_bridge()

@@ -1,0 +1,49 @@
+<!-- Blacklist Modal Component (Доска позора / Черный список) -->
+<div id="blacklist-modal" class="modal">
+    <div class="glass-panel-elevated rounded-2xl max-w-lg w-full p-6 border border-rose-900/60 shadow-2xl relative">
+        <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">🛑</span>
+                <h3 class="text-base font-bold text-white">Внести в Черный список</h3>
+            </div>
+            <button onclick="toggleModal('blacklist-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <div class="py-4 space-y-3">
+            <div id="blacklist-modal-vac-info" class="text-xs font-semibold text-rose-300 bg-rose-950/40 p-2.5 rounded-xl border border-rose-900/50">
+                Компания — Вакансия
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Причина блокировки (выберите тег или укажите причину):</label>
+                <div class="flex flex-wrap gap-1.5 mb-2.5">
+                    <button type="button" onclick="setBlacklistTag('Навязывание ИП / Самозанятости с 1-го дня (уклонение от ТК РФ, перекладывание рисков)')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 hover:border-rose-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        🛑 Навязывание ИП/СЗ (ТК РФ)
+                    </button>
+                    <button type="button" onclick="setBlacklistTag('Неоплачиваемое тестовое задание до первого технического скрининга')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 hover:border-amber-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        ⚠️ Бесплатное тестовое до интервью
+                    </button>
+                    <button type="button" onclick="setBlacklistTag('Серая зарплата / Обман по условиям и обязанностям на собеседовании')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 hover:border-purple-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        📉 Серая ЗП / Обман по условиям
+                    </button>
+                    <button type="button" onclick="setBlacklistTag('Неадекватный AI/HR-скрининг / Спам / Скамерская воронка')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 hover:border-sky-800/80 px-2 py-1 rounded-lg text-left transition-colors">
+                        🤖 Токсичный HR/Бот / Спам
+                    </button>
+                </div>
+
+                <textarea id="blacklist-reason-input" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500" placeholder="Подробная причина нарушения..."></textarea>
+            </div>
+
+            <div class="text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                💡 Вакансия будет перемещена во вкладку <strong>«Черный список»</strong>, а запись автоматически добавится в файл <strong>SHAME_LIST.md</strong> в корне проекта для публикации на GitHub.
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <button onclick="toggleModal('blacklist-modal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2 rounded-xl">Отмена</button>
+            <button onclick="confirmBlacklist()" class="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5">
+                <span>💩</span> Забанить и внести в Доску позора
+            </button>
+        </div>
+    </div>
+</div>

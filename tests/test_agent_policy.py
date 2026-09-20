@@ -22,7 +22,7 @@ class TestAgentPolicy(unittest.TestCase):
             "salary": "$5,500 - $7,000",
             "description": "We are seeking a senior React engineer for 100% remote work."
         }
-        res = evaluate_vacancy_policy(vac, policy=AgentPolicyConfig())
+        res = evaluate_vacancy_policy(vac, policy=AgentPolicyConfig(daily_application_limit=1000))
         self.assertTrue(res.can_apply)
         self.assertEqual(len(res.violations), 0)
 

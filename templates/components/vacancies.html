@@ -1,0 +1,87 @@
+<!-- Vacancies Dashboard View Component -->
+<div id="main-view" class="max-w-[1600px] mx-auto px-3 sm:px-6 py-3">
+    <!-- Analytics Strip -->
+    <!-- include: components/analytics.html -->
+
+    <div class="flex flex-col lg:flex-row gap-4 items-start">
+        <!-- Sidebar: Market Filter + Filters + Vacancy List -->
+        <div class="w-full lg:w-[380px] xl:w-[420px] flex flex-col gap-2.5 shrink-0">
+            <!-- Market Segmented Control -->
+            <div class="glass-panel p-1 rounded-2xl flex items-center gap-1 border border-slate-800 shadow-sm text-xs select-none">
+                <button onclick="setMarket('all')" id="market-btn-all"
+                    class="market-btn active flex-1 py-1.5 px-2 rounded-xl font-medium text-center transition-all flex items-center justify-center gap-1">
+                    <span>🌐</span> Все (<span id="market-count-all">0</span>)
+                </button>
+                <button onclick="setMarket('ru')" id="market-btn-ru"
+                    class="market-btn flex-1 py-1.5 px-2 rounded-xl font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                    <span>🇷🇺</span> RU (<span id="market-count-ru">0</span>)
+                </button>
+                <button onclick="setMarket('en')" id="market-btn-en"
+                    class="market-btn flex-1 py-1.5 px-2 rounded-xl font-medium text-center text-slate-400 transition-all flex items-center justify-center gap-1">
+                    <span>🌍</span> Remote (<span id="market-count-en">0</span>)
+                </button>
+            </div>
+
+            <!-- Compact Search & Filter Controls -->
+            <div class="glass-panel p-3 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <!-- Search Input -->
+                <div class="relative">
+                    <input type="text" id="filter-search" oninput="onFilterChange()" placeholder="🔍 Поиск (React, Frontend, Remote, Сбер...)"
+                        class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+                
+                <!-- Quick Filter Chips (Grades & Match) -->
+                <div class="flex items-center justify-between gap-1 pt-0.5">
+                    <div class="flex flex-wrap gap-1 items-center" id="grade-chips">
+                        <span class="text-[10px] text-slate-500 font-medium mr-0.5">Грейд:</span>
+                        <button type="button" onclick="toggleGradeFilter('Junior')" id="grade-chip-Junior" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Jun</button>
+                        <button type="button" onclick="toggleGradeFilter('Middle')" id="grade-chip-Middle" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Mid</button>
+                        <button type="button" onclick="toggleGradeFilter('Senior')" id="grade-chip-Senior" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Sen</button>
+                        <button type="button" onclick="toggleGradeFilter('Lead')" id="grade-chip-Lead" class="grade-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">Lead</button>
+                    </div>
+                    <div class="flex gap-1 items-center" id="match-chips">
+                        <button type="button" onclick="toggleMatchFilter('80')" id="match-chip-80" class="match-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">🔥 80%+</button>
+                        <button type="button" onclick="toggleMatchFilter('60')" id="match-chip-60" class="match-chip px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-800 bg-slate-900/90 text-slate-400 hover:border-slate-700 transition-all">⚡ 60%+</button>
+                    </div>
+                </div>
+
+                <!-- Source & Sort in 1 compact row -->
+                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+                    <div>
+                        <select id="filter-source" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                            <option value="all">🌐 Все площадки</option>
+                            <option value="tg">Telegram</option>
+                            <option value="hh">HeadHunter</option>
+                            <option value="habr">Хабр Карьера</option>
+                            <option value="superjob">SuperJob</option>
+                            <option value="rabota">Rabota.ru</option>
+                            <option value="crypto">Crypto / Web3</option>
+                            <option value="remote">WWR & Remote</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="filter-sort" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500">
+                            <option value="newest">⚡ По свежести</option>
+                            <option value="score_desc">🔥 По мэтчу (%)</option>
+                            <option value="salary">💰 По зарплате</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vacancy List (Maximally expanded vertical height) -->
+            <div class="flex flex-col gap-2 h-[calc(100vh-13.5rem)] overflow-y-auto pr-1" id="vacancy-list">
+                <div class="p-4 text-center text-slate-500 text-xs">Загрузка вакансий...</div>
+            </div>
+        </div>
+
+        <!-- Main Content: Vacancy Details (Full Height) -->
+        <div class="w-full lg:flex-1 h-[calc(100vh-8.5rem)] overflow-y-auto pr-1 min-w-0" id="vacancy-details">
+            <div class="glass-panel rounded-2xl p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full min-h-[450px]">
+                <span class="text-4xl mb-3">👈</span>
+                <p class="text-sm font-medium text-slate-300">Выберите вакансию из списка слева</p>
+                <p class="text-xs text-slate-500 mt-1">Здесь откроются детали, авто-отклик, сопроводительное письмо и контакты</p>
+            </div>
+        </div>
+    </div>
+</div>

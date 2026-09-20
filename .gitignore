@@ -67,10 +67,8 @@ Thumbs.db
 *~
 
 # ─────────────────────────────────────────────
-#  Agent Metadata & Local Screenshots
+#  Local Screenshots & DB WAL
 # ─────────────────────────────────────────────
-.agents/
-.antigravity/
 .mimocode/
 crm_*.png
 *.png

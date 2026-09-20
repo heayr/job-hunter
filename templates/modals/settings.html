@@ -1,0 +1,113 @@
+<!-- Settings Modal Component -->
+<div id="settings-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[460px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <span>⚙️</span> Настройки ИИ (Движок Агента)
+            </h2>
+            <button onclick="toggleModal('settings-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <!-- LLM Provider Selector -->
+        <div class="mb-3.5">
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Провайдер интеллекта (LLM)</label>
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="setLlmProvider('gemini')" id="provider-btn-gemini" class="p-2.5 rounded-xl border border-sky-500 bg-sky-950/40 text-left transition-colors">
+                    <div class="text-xs font-bold text-sky-300 flex items-center gap-1.5"><span>☁️</span> Google Gemini</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Облачный ИИ (Flash)</div>
+                </button>
+                <button type="button" onclick="setLlmProvider('lm_studio')" id="provider-btn-lm_studio" class="p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors">
+                    <div class="text-xs font-bold text-slate-300 flex items-center gap-1.5"><span>💻</span> LM Studio</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Локально (0 Rate Limits)</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Gemini Key Block -->
+        <div id="llm-block-gemini" class="mb-3.5">
+            <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-medium text-slate-400">Gemini API Key</label>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+                    class="text-[11px] text-sky-400 hover:text-sky-300 hover:underline flex items-center gap-1 font-medium transition-colors">
+                    <span>Получить ключ в Google AI Studio</span>
+                    <span>↗</span>
+                </a>
+            </div>
+            <input type="password" id="gemini-key" placeholder="AIzaSy..."
+                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+            <p class="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>Ключ начинается с <code>AIzaSy...</code></span>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-sky-400/80 hover:text-sky-300 underline font-mono text-[10px]">aistudio.google.com/app/apikey ↗</a>
+            </p>
+        </div>
+
+        <!-- LM Studio URL Block -->
+        <div id="llm-block-lm_studio" class="hidden mb-3.5">
+            <label class="block text-xs font-medium text-slate-400 mb-1">LM Studio Local Server URL</label>
+            <input type="text" id="lm-studio-url" placeholder="http://127.0.0.1:1234/v1" value="http://127.0.0.1:1234/v1"
+                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+            <p class="text-[10px] text-slate-500 mt-1">Запустите сервер в LM Studio на порту 1234 (например, Qwen 2.5 7B или Llama 3.1 8B).</p>
+        </div>
+
+        <div class="mb-3.5 pt-2.5 border-t border-slate-800 space-y-2.5 text-xs">
+            <div class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Калибровка стратегии и резюме</div>
+            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" id="setting-seniority-alignment" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
+                <div>
+                    <div class="text-slate-200 font-medium">Калибровка грейда (Seniority Alignment)</div>
+                    <div class="text-[10px] text-slate-400">Смягчает роль «Лид» до «Frontend/Fullstack» при отклике на Middle/Junior вакансии, устраняя риск отказа за overqualified.</div>
+                </div>
+            </label>
+            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" id="setting-highload-guardrail" checked class="mt-0.5 rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900">
+                <div>
+                    <div class="text-slate-200 font-medium">Барьер хайлоада (Highload Guardrail)</div>
+                    <div class="text-[10px] text-slate-400">Фокусирует резюме на клиентском перформансе (Core Web Vitals 100/100), блокируя непроверенные обещания распределенного бэкенда.</div>
+                </div>
+            </label>
+        </div>
+
+        <!-- Autonomous Policy Engine Guardrails -->
+        <div class="mb-4 pt-2.5 border-t border-slate-800 space-y-2.5 text-xs">
+            <div class="text-[11px] font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🛡️</span> Политики Автономного Агента
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата (₽)</label>
+                    <input type="number" id="setting-min-salary-rub" placeholder="80000"
+                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">Мин. зарплата ($)</label>
+                    <input type="number" id="setting-min-salary-usd" placeholder="2000"
+                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 items-center pt-1">
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">Лимит откликов в день</label>
+                    <input type="number" id="setting-daily-limit" placeholder="25"
+                        class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
+                </div>
+                <div class="pt-3">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="setting-remote-only" class="rounded border-slate-700 text-purple-500 focus:ring-purple-500 bg-slate-900">
+                        <span class="text-slate-200 text-xs font-medium">Только Remote</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <button onclick="toggleModal('settings-modal')"
+                class="px-4 py-2 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
+            <button onclick="saveConfig()"
+                class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-md shadow-sky-600/20">
+                Сохранить
+            </button>
+        </div>
+    </div>
+</div>

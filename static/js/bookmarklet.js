@@ -32,8 +32,8 @@ function initBookmarklet() {
     const portfolio = contacts.portfolio || 'https://nologs.website';
     const telegram = contacts.telegram || '@PotatoChipasu';
     const telegram_url = contacts.telegram_url || (telegram.startsWith('@') ? `https://t.me/${telegram.slice(1)}` : telegram);
-    const loc_en = p.location || 'Yerevan, Armenia / Remote';
-    const loc_ru = 'Ереван, Армения / Удаленно';
+    const loc_en = p.location || 'Moscow, Russia / Remote';
+    const loc_ru = 'Москва, Россия / Удаленно';
 
     const cand = {
         fn_en, ln_en, name_en,

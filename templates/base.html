@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Hunter CRM V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <link rel="stylesheet" href="/static/css/crm.css?v=8">
+</head>
+<body class="min-h-screen">
+    <!-- Navbar Component -->
+    <!-- include: components/navbar.html -->
+
+    <!-- Vacancies Dashboard Component -->
+    <!-- include: components/vacancies.html -->
+
+    <!-- Profiles Component -->
+    <!-- include: components/profiles.html -->
+
+    <!-- Modals Container -->
+    <div id="modals-root">
+        <!-- include: modals/settings.html -->
+        <!-- include: modals/ai_parser.html -->
+        <!-- include: modals/harvest.html -->
+        <!-- include: modals/cropper.html -->
+        <!-- include: modals/bookmarklet.html -->
+        <!-- include: modals/blacklist.html -->
+        <!-- include: modals/agent_live.html -->
+        <!-- include: modals/shame_list.html -->
+    </div>
+
+    <!-- Modular Vanilla JS Frontend (ADR-006) -->
+    <script src="/static/js/state.js?v=8"></script>
+    <script src="/static/js/utils.js?v=8"></script>
+    <script src="/static/js/api.js?v=8"></script>
+    <script src="/static/js/bookmarklet.js?v=8"></script>
+    <script src="/static/js/views/vacancies.js?v=8"></script>
+    <script src="/static/js/views/profiles.js?v=8"></script>
+    <script src="/static/js/views/modals.js?v=8"></script>
+    <script src="/static/js/app.js?v=8"></script>
+</body>
+</html>

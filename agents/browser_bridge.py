@@ -131,6 +131,7 @@ class BrowserBridge:
         """
         Opens a URL in the user's visible Chrome.
         Uses CDP driver when available; otherwise falls back to extension bridge.
+        Does NOT spawn external browser processes when in test or simulated environments.
         """
         cdp = self._get_cdp()
         if cdp:
@@ -141,30 +142,32 @@ class BrowserBridge:
             except Exception:
                 pass
 
-        import subprocess
-        import sys
-        import webbrowser
-
-        # Native launch in user's real Chrome to ensure tab is physically visible
-        try:
-            if sys.platform == "darwin":
-                subprocess.Popen(["open", "-a", "Google Chrome", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            else:
-                webbrowser.open(url)
-        except Exception:
-            pass
-
-        # Also send OPEN_PAGE via extension bridge if extension is active
+        # Try extension bridge (or simulated test worker) first
         res = self.send_command("OPEN_PAGE", {"url": url}, timeout=timeout)
         if res.get("success"):
             return res
 
-        return {
-            "success": True,
-            "url": url,
-            "native_launched": True,
-            "message": "Вкладка открыта в Google Chrome через системный вызов. Ожидаем загрузки страницы и активации расширения."
-        }
+        import os
+        import sys
+        # Only launch physical browser if explicitly enabled and not running automated tests
+        if getattr(self, "allow_native_spawn", False) and "unittest" not in sys.modules and not os.environ.get("JOBHUNTER_NO_BROWSER_SPAWN"):
+            import subprocess
+            import webbrowser
+            try:
+                if sys.platform == "darwin":
+                    subprocess.Popen(["open", "-a", "Google Chrome", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    webbrowser.open(url)
+                return {
+                    "success": True,
+                    "url": url,
+                    "native_launched": True,
+                    "message": "Вкладка открыта в Google Chrome через системный вызов."
+                }
+            except Exception as e:
+                return {"success": False, "error": f"Failed to launch browser: {e}"}
+
+        return res
 
     def inspect_page(self, timeout: float = 15.0) -> Dict[str, Any]:
         cdp = self._get_cdp()

@@ -31,7 +31,7 @@ class SuperJobCDPAdapter:
             self.logger.log("ERROR", "SUPERJOB_ADAPTER", err_msg)
             return {"success": False, "error": err_msg}
 
-        page = self.driver.get_active_page()
+        page = self.driver.get_active_page(avoid_crm=True)
         self.logger.attach_to_page(page)
 
         # 1. Open page

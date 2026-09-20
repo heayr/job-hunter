@@ -59,7 +59,7 @@ class TestThesisCritic(unittest.TestCase):
             "FintechApp"
         )
         reframed_ev = heuristic_evidence_retrieval(self.profile_ru, job_understanding, lang="ru")
-        result = evaluate_and_refine_thesis(self.profile_ru, job_understanding, reframed_ev, lang="ru")
+        result = evaluate_and_refine_thesis(self.profile_ru, job_understanding, reframed_ev, lang="ru", use_ai=False)
 
         self.assertIn("thesis", result)
         self.assertIn("critique", result)

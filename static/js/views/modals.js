@@ -229,21 +229,9 @@ async function startHarvest() {
                     }
                     if (pText) pText.innerText = '100%';
                     if (pStep) pStep.innerHTML = `<span class="text-emerald-400 font-bold">✨ Сбор завершен! Сохранено: ${saved} новых вакансий</span>`;
-                    
-                    if (btn) {
-                        btn.classList.remove('hidden');
-                        btn.classList.add('animate-bounce');
-                        setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
-                    }
 
-                    // Automatically refresh Inbox in background so user immediately sees fresh vacancies
-                    try {
-                        if (typeof loadPitches === 'function') {
-                            await loadPitches();
-                        }
-                    } catch (loadErr) {
-                        console.error("Auto reload pitches error:", loadErr);
-                    }
+                    // Now start enrichment polling
+                    startEnrichPolling(saved);
                 }
             } catch (pollErr) {
                 console.error("Poll error:", pollErr);
@@ -262,6 +250,78 @@ async function startHarvest() {
 function closeHarvest() {
     toggleModal('harvest-modal');
     loadPitches();
+}
+
+function startEnrichPolling(harvestSaved) {
+    const logs = document.getElementById('harvest-logs');
+    const btn = document.getElementById('harvest-close-btn');
+    const pBar = document.getElementById('harvest-progress-bar');
+    const pText = document.getElementById('harvest-percent');
+    const pStep = document.getElementById('harvest-current-step');
+    const metricScrapers = document.getElementById('harvest-metric-scrapers');
+
+    if (logs) logs.innerText += '\n\n🤖 Запуск AI-обогащения (6 агентов на каждую вакансию)...\n';
+    if (logs) logs.scrollTop = logs.scrollHeight;
+    if (pStep) pStep.innerHTML = '🤖 AI-обогащение: <span class="text-violet-300 font-bold">запуск...</span>';
+    if (metricScrapers) metricScrapers.innerText = 'AI Pipeline';
+    if (pBar) {
+        pBar.style.width = '5%';
+        pBar.className = 'bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 h-2 rounded-full transition-all duration-300 animate-pulse';
+    }
+
+    const enrichInterval = setInterval(async () => {
+        try {
+            const statusData = await api.getEnrichStatus();
+            if (logs) {
+                logs.innerText += (statusData.logs || '');
+                logs.scrollTop = logs.scrollHeight;
+            }
+
+            const metrics = statusData.metrics || {};
+            const enriched = metrics.enriched || 0;
+            const total = metrics.total || 0;
+            const failed = metrics.failed || 0;
+            const queued = metrics.queued || 0;
+
+            let currentProg = 5;
+            if (total > 0 && enriched > 0) {
+                currentProg = Math.min(95, 5 + Math.round((enriched / total) * 80));
+            }
+
+            if (pStep) pStep.innerHTML = `🤖 AI-обогащение: <span class="text-violet-300 font-bold">${enriched}/${total}</span> обогащено, <span class="text-amber-300">${queued}</span> в очередь`;
+
+            if (pBar) pBar.style.width = currentProg + '%';
+            if (pText) pText.innerText = currentProg + '%';
+
+            if (!statusData.is_running) {
+                clearInterval(enrichInterval);
+                if (pBar) {
+                    pBar.style.width = '100%';
+                    pBar.classList.remove('animate-pulse');
+                    pBar.className = 'bg-gradient-to-r from-emerald-500 to-green-400 h-2 rounded-full transition-all duration-500';
+                }
+                if (pText) pText.innerText = '100%';
+                if (pStep) pStep.innerHTML = `<span class="text-emerald-400 font-bold">🚀 Готово! ${enriched} обогащено, ${queued} поставлено в очередь</span>`;
+
+                if (btn) {
+                    btn.classList.remove('hidden');
+                    btn.classList.add('animate-bounce');
+                    setTimeout(() => btn.classList.remove('animate-bounce'), 3500);
+                }
+
+                // Refresh inbox
+                try {
+                    if (typeof loadPitches === 'function') {
+                        await loadPitches();
+                    }
+                } catch (loadErr) {
+                    console.error("Auto reload pitches error:", loadErr);
+                }
+            }
+        } catch (pollErr) {
+            console.error("Enrich poll error:", pollErr);
+        }
+    }, 1200);
 }
 
 // --- UNIVERSAL AI VACANCY PARSER ---
@@ -344,3 +404,25 @@ async function executeAiParse() {
         }
     }
 }
+
+function toggleNavActions() {
+    const menu = document.getElementById('nav-actions-menu');
+    const overlay = document.getElementById('nav-actions-overlay');
+    if (!menu) return;
+    const isHidden = menu.classList.contains('hidden');
+    if (isHidden) {
+        menu.classList.remove('hidden');
+        if (overlay) overlay.classList.remove('hidden');
+    } else {
+        menu.classList.add('hidden');
+        if (overlay) overlay.classList.add('hidden');
+    }
+}
+
+function closeNavActions() {
+    const menu = document.getElementById('nav-actions-menu');
+    const overlay = document.getElementById('nav-actions-overlay');
+    if (menu) menu.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
+}
+

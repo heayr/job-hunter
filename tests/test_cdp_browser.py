@@ -37,7 +37,8 @@ class TestCDPBrowserDriver(unittest.TestCase):
         mock_page.locator.return_value = mock_locator
         mock_locator.first = mock_locator
 
-        with patch.object(driver, "get_active_page", return_value=mock_page):
+        with patch.object(driver, "connect", return_value=True), \
+             patch.object(driver, "get_active_page", return_value=mock_page):
             # 1. open_page
             res_open = driver.open_page("https://hh.ru/vacancy/123456")
             self.assertTrue(res_open["success"])
@@ -86,6 +87,27 @@ class TestCDPBrowserDriver(unittest.TestCase):
             res_inspect = bridge.inspect_page()
             self.assertEqual(res_inspect.get("via"), "cdp")
             mock_cdp.inspect_page.assert_called()
+
+    def test_crm_tab_protected(self):
+        driver = CDPBrowserDriver()
+        mock_crm_page = MagicMock()
+        mock_crm_page.url = "http://127.0.0.1:8115/"
+        mock_crm_page.title.return_value = "Job Hunter CRM V3"
+
+        mock_new_page = MagicMock()
+        mock_new_page.url = "about:blank"
+        mock_new_page.title.return_value = "New Tab"
+
+        mock_context = MagicMock()
+        mock_context.pages = [mock_crm_page]
+        mock_context.new_page.return_value = mock_new_page
+
+        driver._context = mock_context
+        with patch.object(driver, "connect", return_value=True):
+            active_p = driver.get_active_page(avoid_crm=True)
+            self.assertIsNot(active_p, mock_crm_page)
+            self.assertIs(active_p, mock_new_page)
+            mock_context.new_page.assert_called_once()
 
 
 if __name__ == "__main__":

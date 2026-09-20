@@ -13,6 +13,32 @@ import subprocess
 
 harvest_process = None
 harvest_log_file = os.path.join(os.path.dirname(__file__), 'harvest.log')
+enrich_process = None
+enrich_log_file = os.path.join(os.path.dirname(__file__), 'enrich.log')
+
+
+def _post_harvest_callback(proc):
+    """Watch harvest subprocess; when it finishes, auto-trigger enrichment + enqueue."""
+    proc.wait()
+    print("[CRM] Harvest finished, auto-triggering enrichment pipeline...", flush=True)
+
+    global enrich_process, enrich_log_file
+    with open(enrich_log_file, 'w', encoding='utf-8') as f:
+        f.write("🚀 Harvest finished. Starting AI enrichment...\n")
+
+    script_path = os.path.join(os.path.dirname(__file__), 'auto_enrich.py')
+    sub_env = dict(os.environ)
+    sub_env["PYTHONUNBUFFERED"] = "1"
+
+    enrich_process = subprocess.Popen(
+        [sys.executable, "-u", script_path, "--auto-enqueue"],
+        stdout=open(enrich_log_file, 'a', encoding='utf-8'),
+        stderr=subprocess.STDOUT,
+        env=sub_env,
+        cwd=os.path.dirname(__file__)
+    )
+    enrich_process.wait()
+    print("[CRM] Enrichment pipeline finished.", flush=True)
 
 # Auto-inject virtual environment packages
 venv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.venv')
@@ -89,6 +115,9 @@ class CRMHandler(BaseHTTPRequestHandler):
                 v.application_strategy_json,
                 v.ats_report_json,
                 COALESCE(v.fsm_state, 'DISCOVERED') AS fsm_state,
+                COALESCE(v.pitch_rating, 0) AS pitch_rating,
+                COALESCE(MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.rating END), 0) AS cl_rating,
+                COALESCE(MAX(CASE WHEN p.pitch_type = 'short_dm' THEN p.rating END), 0) AS dm_rating,
                 MAX(CASE WHEN p.pitch_type = 'short_dm'     THEN p.content END) AS short_dm,
                 MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.content END) AS cover_letter,
                 MAX(CASE WHEN p.pitch_type = 'tailored_cv'  THEN p.content END) AS tailored_cv
@@ -176,9 +205,39 @@ class CRMHandler(BaseHTTPRequestHandler):
 
     def _handle_get(self):
         if self.path == '/':
-            tmpl_path = os.path.join(os.path.dirname(__file__), "crm_v2_template.html")
-            with open(tmpl_path, "r", encoding="utf-8") as f:
-                body = f.read().encode('utf-8')
+            base_dir = os.path.dirname(__file__)
+            templates_dir = os.path.join(base_dir, "templates")
+            base_path = os.path.join(templates_dir, "base.html")
+
+            if os.path.exists(base_path):
+                with open(base_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                def replace_include(match):
+                    rel_path = match.group(1).strip()
+                    include_path = os.path.join(templates_dir, rel_path)
+                    if os.path.exists(include_path):
+                        with open(include_path, "r", encoding="utf-8") as inc_f:
+                            inc_content = inc_f.read()
+                            return re.sub(r'<!--\s*include:\s*([^\s]+)\s*-->', replace_include, inc_content)
+                    return f"<!-- Failed to include: {rel_path} -->"
+
+                full_html = re.sub(r'<!--\s*include:\s*([^\s]+)\s*-->', replace_include, content)
+
+                # Sync to crm_v2_template.html for backward compatibility and offline inspection
+                try:
+                    crm_v2_path = os.path.join(base_dir, "crm_v2_template.html")
+                    with open(crm_v2_path, "w", encoding="utf-8") as f:
+                        f.write(full_html)
+                except Exception:
+                    pass
+
+                body = full_html.encode('utf-8')
+            else:
+                tmpl_path = os.path.join(base_dir, "crm_v2_template.html")
+                with open(tmpl_path, "r", encoding="utf-8") as f:
+                    body = f.read().encode('utf-8')
+
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Content-Length', str(len(body)))
@@ -274,6 +333,41 @@ class CRMHandler(BaseHTTPRequestHandler):
                         metrics["saved"] = int(parts.get("saved", 0))
                         metrics["filtered"] = int(parts.get("filtered", 0))
                         metrics["dups"] = int(parts.get("dups", 0))
+                    except Exception:
+                        pass
+
+            _send_json(self, {
+                "is_running": is_running,
+                "logs": logs,
+                "metrics": metrics
+            })
+
+        # ── Enrichment status ──
+        elif self.path == '/api/harvest/enrich/status':
+            global enrich_process, enrich_log_file
+            is_running = enrich_process is not None and enrich_process.poll() is None
+            logs = ""
+            metrics = {
+                "enriched": 0,
+                "total": 0,
+                "failed": 0,
+                "queued": 0,
+                "name": ""
+            }
+            if os.path.exists(enrich_log_file):
+                with open(enrich_log_file, 'r', encoding='utf-8') as f:
+                    logs = f.read()
+
+                prog_matches = re.findall(r'PROGRESS:([^\n]+)', logs)
+                if prog_matches:
+                    last_match = prog_matches[-1]
+                    parts = dict(part.split('=', 1) for part in last_match.split(':') if '=' in part)
+                    try:
+                        metrics["enriched"] = int(parts.get("enriched", 0))
+                        metrics["total"] = int(parts.get("total", 0))
+                        metrics["failed"] = int(parts.get("failed", 0))
+                        metrics["queued"] = int(parts.get("queued", 0))
+                        metrics["name"] = parts.get("name", "")
                     except Exception:
                         pass
 
@@ -552,6 +646,107 @@ class CRMHandler(BaseHTTPRequestHandler):
             self.update_vacancy_status(vac_id, body.get('status'), body.get('reason'))
             _send_json(self, {"success": True})
 
+        # ── Record recruiter response status (interview / rejected / ghosted) ──
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/response_status'):
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            body = json.loads(self._read_body().decode('utf-8'))
+            response_status = body.get('response_status', 'pending')
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("UPDATE vacancies SET response_status = ? WHERE id = ?", (response_status, vac_id))
+            cur.execute(
+                "UPDATE application_submissions SET response_status = ? WHERE vacancy_id = ?",
+                (response_status, vac_id)
+            )
+            conn.commit()
+            conn.close()
+            _send_json(self, {"success": True, "vacancy_id": vac_id, "response_status": response_status})
+
+        # ── Rate vacancy pitch / cover letter (Feedback loop) ──
+        elif self.path == '/api/pitches/rate' or (self.path.startswith('/api/vacancies/') and self.path.endswith('/rate_pitch')):
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id')
+            if not vac_id and self.path.startswith('/api/vacancies/'):
+                vac_id = urllib.parse.unquote(self.path.split('/')[3])
+
+            rating = int(body.get('rating', 0))
+            pitch_type = body.get('pitch_type')
+            cover_letter = body.get('cover_letter')
+            short_dm = body.get('short_dm')
+
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("UPDATE vacancies SET pitch_rating = ? WHERE id = ?", (rating, vac_id))
+
+            status_str = 'APPROVED' if rating > 0 else ('REJECTED' if rating < 0 else 'DRAFT')
+
+            if pitch_type in ('cover_letter', None):
+                if cover_letter:
+                    cur.execute("""
+                        UPDATE pitches 
+                        SET rating = ?, status = ?, content = ?, user_edited_content = ?
+                        WHERE vacancy_id = ? AND pitch_type = 'cover_letter'
+                    """, (rating, status_str, cover_letter, cover_letter, vac_id))
+                else:
+                    cur.execute("""
+                        UPDATE pitches 
+                        SET rating = ?, status = ?
+                        WHERE vacancy_id = ? AND pitch_type = 'cover_letter'
+                    """, (rating, status_str, vac_id))
+
+            if pitch_type in ('short_dm', None):
+                if short_dm:
+                    cur.execute("""
+                        UPDATE pitches 
+                        SET rating = ?, status = ?, content = ?, user_edited_content = ?
+                        WHERE vacancy_id = ? AND pitch_type = 'short_dm'
+                    """, (rating, status_str, short_dm, short_dm, vac_id))
+                else:
+                    cur.execute("""
+                        UPDATE pitches 
+                        SET rating = ?, status = ?
+                        WHERE vacancy_id = ? AND pitch_type = 'short_dm'
+                    """, (rating, status_str, vac_id))
+
+            conn.commit()
+            conn.close()
+            _send_json(self, {"success": True, "vacancy_id": vac_id, "rating": rating})
+
+        # ── Save pitch edits without regenerating ──
+        elif self.path == '/api/pitches/save' or (self.path.startswith('/api/vacancies/') and self.path.endswith('/save_pitch')):
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id')
+            if not vac_id and self.path.startswith('/api/vacancies/'):
+                vac_id = urllib.parse.unquote(self.path.split('/')[3])
+
+            cover_letter = body.get('cover_letter')
+            short_dm = body.get('short_dm')
+
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            if cover_letter is not None:
+                cur.execute("""
+                    UPDATE pitches 
+                    SET content = ?, user_edited_content = ?
+                    WHERE vacancy_id = ? AND pitch_type = 'cover_letter'
+                """, (cover_letter, cover_letter, vac_id))
+                if cur.rowcount == 0:
+                    self.upsert_pitch(cur, vac_id, 'cover_letter', 'ru', cover_letter)
+
+            if short_dm is not None:
+                cur.execute("""
+                    UPDATE pitches 
+                    SET content = ?, user_edited_content = ?
+                    WHERE vacancy_id = ? AND pitch_type = 'short_dm'
+                """, (short_dm, short_dm, vac_id))
+                if cur.rowcount == 0:
+                    self.upsert_pitch(cur, vac_id, 'short_dm', 'ru', short_dm)
+
+            conn.commit()
+            conn.close()
+            _send_json(self, {"success": True, "vacancy_id": vac_id})
+
         # ── Apply via Telegram ──
         elif self.path.startswith('/api/vacancies/') and self.path.endswith('/apply_tg'):
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
@@ -696,6 +891,12 @@ class CRMHandler(BaseHTTPRequestHandler):
             if harvest_process and harvest_process.poll() is None:
                 _send_json(self, {"status": "running", "message": "Already running"})
                 return
+
+            # Read optional body (auto_enrich flag)
+            try:
+                body = json.loads(self._read_body().decode('utf-8'))
+            except Exception:
+                body = {}
             
             with open(harvest_log_file, 'w', encoding='utf-8') as f:
                 f.write("🚀 Запуск сбора вакансий...\n")
@@ -707,6 +908,34 @@ class CRMHandler(BaseHTTPRequestHandler):
             harvest_process = subprocess.Popen(
                 [sys.executable, "-u", script_path],
                 stdout=open(harvest_log_file, 'a', encoding='utf-8'),
+                stderr=subprocess.STDOUT,
+                env=sub_env,
+                cwd=os.path.dirname(__file__)
+            )
+
+            # Auto-trigger enrichment after harvest finishes (default: on)
+            if body.get("auto_enrich", True):
+                threading.Thread(target=_post_harvest_callback, args=(harvest_process,), daemon=True).start()
+
+            _send_json(self, {"status": "started", "auto_enrich": body.get("auto_enrich", True)})
+
+        # ── Manual enrich trigger ──
+        elif self.path == '/api/harvest/enrich':
+            global enrich_process, enrich_log_file
+            if enrich_process and enrich_process.poll() is None:
+                _send_json(self, {"status": "running", "message": "Enrichment already running"})
+                return
+
+            with open(enrich_log_file, 'w', encoding='utf-8') as f:
+                f.write("🚀 Starting AI enrichment...\n")
+
+            script_path = os.path.join(os.path.dirname(__file__), 'auto_enrich.py')
+            sub_env = dict(os.environ)
+            sub_env["PYTHONUNBUFFERED"] = "1"
+
+            enrich_process = subprocess.Popen(
+                [sys.executable, "-u", script_path, "--auto-enqueue"],
+                stdout=open(enrich_log_file, 'a', encoding='utf-8'),
                 stderr=subprocess.STDOUT,
                 env=sub_env,
                 cwd=os.path.dirname(__file__)

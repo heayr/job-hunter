@@ -33,6 +33,36 @@ window.api = {
         return await res.json();
     },
 
+    async ratePitch(vacId, rating, pitchType = null, shortDm = null, coverLetter = null) {
+        const res = await fetch('/api/pitches/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vacancy_id: vacId,
+                rating,
+                pitch_type: pitchType,
+                short_dm: shortDm,
+                cover_letter: coverLetter
+            })
+        });
+        if (!res.ok) throw new Error(`Failed to rate pitch: ${res.status}`);
+        return await res.json();
+    },
+
+    async savePitch(vacId, shortDm = null, coverLetter = null) {
+        const res = await fetch('/api/pitches/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vacancy_id: vacId,
+                short_dm: shortDm,
+                cover_letter: coverLetter
+            })
+        });
+        if (!res.ok) throw new Error(`Failed to save pitch: ${res.status}`);
+        return await res.json();
+    },
+
     async getProfiles() {
         const res = await fetch('/api/profiles');
         if (!res.ok) throw new Error(`Failed to load profiles: ${res.status}`);
@@ -87,6 +117,12 @@ window.api = {
     async getHarvestStatus() {
         const res = await fetch('/api/harvest/status');
         if (!res.ok) throw new Error(`Failed to get harvest status: ${res.status}`);
+        return await res.json();
+    },
+
+    async getEnrichStatus() {
+        const res = await fetch('/api/harvest/enrich/status');
+        if (!res.ok) throw new Error(`Failed to get enrich status: ${res.status}`);
         return await res.json();
     },
 

@@ -1,0 +1,98 @@
+<!-- Navbar Component -->
+<nav class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-40 backdrop-blur-md shadow-md w-full">
+    <div class="max-w-[1600px] mx-auto px-4 lg:px-6 w-full">
+        <div class="flex justify-between py-2.5 gap-4 items-center w-full min-w-0">
+            
+            <!-- Left: Brand & Navigation Tabs -->
+            <div class="flex items-center gap-3 sm:gap-4 shrink-0">
+                <!-- Brand Mark -->
+                <div class="flex items-center gap-1.5 shrink-0 select-none cursor-pointer" onclick="setTab('inbox')">
+                    <span class="text-xl">⚡</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-sm sm:text-base font-bold bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent whitespace-nowrap">
+                            Job Hunter
+                        </span>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">v3</span>
+                    </div>
+                </div>
+                
+                <!-- Primary Workflow Tabs (All 6 tabs permanently visible) -->
+                <div class="flex items-center gap-0.5 sm:gap-1 border-l border-slate-800 pl-2 sm:pl-3 shrink-0 py-0.5">
+                    <button onclick="setTab('inbox')" id="tab-inbox" class="tab-btn active px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>📥</span> <span>Inbox</span>
+                        <span id="count-inbox" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono">0</span>
+                    </button>
+                    <button onclick="setTab('sent')" id="tab-sent" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>📤</span> <span>Отправлено</span>
+                        <span id="count-sent" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono">0</span>
+                    </button>
+                    <button onclick="setTab('replied')" id="tab-replied" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>💬</span> <span>Ответили</span>
+                        <span id="count-replied" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono text-emerald-400">0</span>
+                    </button>
+                    <button onclick="setTab('archive')" id="tab-archive" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap text-xs flex items-center gap-1">
+                        <span>📦</span> <span>Архив</span>
+                        <span id="count-archive" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono">0</span>
+                    </button>
+                    <button onclick="setTab('blacklist')" id="tab-blacklist" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg text-rose-400/80 hover:text-rose-300 whitespace-nowrap text-xs flex items-center gap-1" title="Чёрный список / Доска позора">
+                        <span>🛑</span> <span>ЧС</span>
+                        <span id="count-blacklist" class="tab-badge px-1.5 py-0.5 rounded-md text-[11px] font-mono text-rose-400">0</span>
+                    </button>
+                    <button onclick="setTab('profiles')" id="tab-profiles" class="tab-btn px-2 sm:px-2.5 py-1.5 rounded-lg text-purple-400/90 hover:text-purple-300 whitespace-nowrap text-xs font-semibold flex items-center gap-1">
+                        <span>👤</span> <span>Профили</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Controls & Actions -->
+            <div class="flex items-center gap-2 shrink-0">
+                <!-- Quick Active Resume Selector (2xl screens only) -->
+                <div class="hidden 2xl:flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs shadow-sm">
+                    <span class="text-purple-400 font-semibold whitespace-nowrap">🎯</span>
+                    <select id="active-profile-select" onchange="changeActiveProfile(this.value)" class="bg-transparent text-slate-200 text-xs border-none outline-none cursor-pointer pr-1 max-w-[130px] truncate">
+                        <option value="">Загрузка...</option>
+                    </select>
+                </div>
+                
+                <!-- Chrome CDP Status Badge -->
+                <button id="cdp-status-badge" onclick="launchChromeAgent()" title="Статус Chrome для автономного отклика (кликните для запуска)" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors shadow-sm cursor-pointer whitespace-nowrap">
+                    <span id="cdp-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                    <span id="cdp-text">Chrome</span>
+                </button>
+
+                <!-- Actions Dropdown -->
+                <div class="relative">
+                    <button id="nav-actions-btn" onclick="toggleNavActions()" 
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer whitespace-nowrap">
+                        <span>⚡</span> <span class="hidden sm:inline">Действия</span> ▾
+                    </button>
+                    
+                    <div id="nav-actions-overlay" onclick="closeNavActions()" class="fixed inset-0 z-40 hidden"></div>
+                    
+                    <div id="nav-actions-menu" class="absolute right-0 top-full mt-2 hidden z-50 w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden py-1 text-xs">
+                        <button onclick="launchChromeAgent(); closeNavActions();" class="w-full text-left px-4 py-2.5 text-amber-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>🌐</span> Открыть Chrome Агента (9222)
+                        </button>
+                        <a href="#" onclick="event.preventDefault(); toggleModal('bookmarklet-modal'); closeNavActions();" class="text-left px-4 py-2.5 text-emerald-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>🔖</span> Auto-Apply (Bookmarklet)
+                        </a>
+                        <button onclick="toggleModal('ai-parser-modal'); closeNavActions();" class="w-full text-left px-4 py-2.5 text-purple-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>🪄</span> Добавить через ИИ
+                        </button>
+                        <button onclick="startHarvest(); closeNavActions();" class="w-full text-left px-4 py-2.5 text-sky-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2 border-b border-slate-700/50">
+                            <span>🔄</span> Собрать вакансии
+                        </button>
+                        
+                        <button onclick="openShameListModal(); closeNavActions();" class="w-full text-left px-4 py-2.5 text-rose-400 hover:bg-slate-700/80 transition-colors flex items-center gap-2">
+                            <span>💩</span> Доска позора
+                        </button>
+                        <button onclick="toggleModal('settings-modal'); closeNavActions();" class="w-full text-left px-4 py-2.5 text-slate-300 hover:bg-slate-700/80 transition-colors flex items-center gap-2 border-t border-slate-700/50">
+                            <span>⚙️</span> Настройки ИИ
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</nav>

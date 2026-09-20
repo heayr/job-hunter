@@ -26,7 +26,7 @@ function setMarket(market) {
     }
 
     // If current vacancy is filtered out, re-select
-    const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
+    const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new', 'analyzed'] : [currentTab];
     let filtered = vacancies.filter(v => targetStatus.includes(v.status));
     if (currentMarket === 'ru') {
         filtered = filtered.filter(v => (v.language || 'ru') === 'ru');
@@ -48,7 +48,7 @@ function setTab(tab) {
         b.classList.remove('active', 'text-slate-400');
         if (b.id === `tab-${tab}`) {
             b.classList.add('active');
-        } else if (b.id !== 'tab-profiles') {
+        } else {
             b.classList.add('text-slate-400');
         }
     });
@@ -68,7 +68,7 @@ function setTab(tab) {
 }
 
 function updateCounts() {
-    const statusFilter = (v, s) => (s === 'inbox') ? (v.status === 'inbox' || v.status === 'new') : (v.status === s);
+    const statusFilter = (v, s) => (s === 'inbox') ? (v.status === 'inbox' || v.status === 'new' || v.status === 'analyzed') : (v.status === s);
 
     const countInbox = vacancies.filter(v => statusFilter(v, 'inbox')).length;
     const countSent = vacancies.filter(v => statusFilter(v, 'sent')).length;
@@ -199,7 +199,7 @@ function selectVac(id) {
 function renderList() {
     const listEl = document.getElementById('vacancy-list');
     if (!listEl) return;
-    const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new'] : [currentTab];
+    const targetStatus = (currentTab === 'inbox') ? ['inbox', 'new', 'analyzed'] : [currentTab];
     let filtered = vacancies.filter(v => targetStatus.includes(v.status));
 
     // 1. Market filter (ru / en)
@@ -445,7 +445,7 @@ function renderDetails() {
             </button>
         </div>` : ''}
 
-        <div class="glass-panel rounded-xl p-5 border-l-4 ${isEn ? 'border-l-sky-500' : 'border-l-amber-500'} mb-4 shadow-sm">
+        <div class="glass-panel rounded-xl p-5 border-l-4 ${isEn ? 'border-l-sky-500' : 'border-l-amber-500'} mb-3 shadow-sm">
             <div class="flex flex-col gap-3">
                 <div class="flex items-center gap-2 flex-wrap">
                     <h2 class="text-xl font-bold text-white">${v.title}</h2>
@@ -463,14 +463,85 @@ function renderDetails() {
                     <a href="${formatVacancyUrl(v.url)}" target="_blank" class="text-slate-400 hover:text-white underline">Оригинал вакансии ↗</a>
                 </div>
                 
-                <div class="mt-1">
+                <div class="mt-0.5">
                     ${contactInfo}
+                </div>
+            </div>
+
+            <!-- Top Sticky-style Action Toolbar -->
+            <div class="mt-4 pt-3.5 border-t border-slate-700/60 flex flex-wrap gap-2.5 items-center justify-between">
+                <div class="flex flex-wrap gap-2 items-center">
+                    ${actionBtnHtml}
+                    <button onclick="rewriteAI('${v.id}')" id="btn-rewrite-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer">
+                        <span>✨</span> Переписать (AI)
+                    </button>
+                    <a href="/cv/${v.id}" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer">
+                        <span>📄</span> PDF
+                    </a>
+                </div>
+                
+                <div class="flex gap-2 items-center">
+                    ${(v.status === 'inbox' || v.status === 'new' || v.status === 'analyzed') ? `<button onclick="updateStatus('${v.id}', 'sent')" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer">✅ Отправлено</button>` : ''}
+                    ${v.status === 'sent' ? `
+                        <button onclick="setResponseStatus('${v.id}', 'interview')" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer" title="Ответили / пригласили">💬 Ответили</button>
+                        <button onclick="setResponseStatus('${v.id}', 'rejected')" class="bg-rose-700/80 hover:bg-rose-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer" title="Отказ получен">❌ Отказ</button>
+                        <button onclick="setResponseStatus('${v.id}', 'ghosted')" class="bg-slate-600/80 hover:bg-slate-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer" title="Тишина / не ответили">🔕 Тишина</button>
+                    ` : ''}
+
+                    <div class="relative action-menu-container">
+                        <button onclick="toggleActionMenu('${v.id}', event)" id="btn-menu-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm">
+                            <span>•••</span> Ещё ▾
+                        </button>
+                        
+                        <!-- Dropdown Menu opening DOWNWARDS cleanly without overlay trap -->
+                        <div id="menu-${v.id}" class="action-menu-dropdown absolute right-0 top-full mt-1.5 hidden z-50 w-64">
+                            <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col py-1 text-xs">
+                                <button onclick="copyVacancyLink('${escapeHtml(v.url || '')}'); closeAllActionMenus();" class="text-left px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700/60 flex items-center gap-2 cursor-pointer">
+                                    <span class="text-[12px]">🔗</span> Скопировать ссылку
+                                </button>
+                                <button onclick="copyVacancyDescription('${v.id}'); closeAllActionMenus();" class="text-left px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700/60 flex items-center gap-2 cursor-pointer">
+                                    <span class="text-[12px]">📋</span> Скопировать описание
+                                </button>
+                                <a href="${directAtsUrl}" target="_blank" onclick="closeAllActionMenus()" class="text-left px-3.5 py-2 text-xs text-indigo-300 hover:bg-slate-700 transition-colors border-b border-slate-700/60 flex items-center gap-2">
+                                    <span class="text-[12px]">🏢</span> Вакансия в ATS (Greenhouse)
+                                </a>
+                                <a href="${hrSearchUrl}" target="_blank" onclick="closeAllActionMenus()" class="text-left px-3.5 py-2 text-xs text-sky-300 hover:bg-slate-700 transition-colors border-b border-slate-700/60 flex items-center gap-2">
+                                    <span class="text-[12px]">🔍</span> Найти HR (LinkedIn/TG)
+                                </a>
+                                <a href="${ctoSearchUrl}" target="_blank" onclick="closeAllActionMenus()" class="text-left px-3.5 py-2 text-xs text-amber-300 hover:bg-slate-700 transition-colors border-b border-slate-700/60 flex items-center gap-2">
+                                    <span class="text-[12px]">⚡</span> Найти CTO / Тимлида
+                                </a>
+                                <a href="${emailSearchUrl}" target="_blank" onclick="closeAllActionMenus()" class="text-left px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700/60 flex items-center gap-2">
+                                    <span class="text-[12px]">✉️</span> Корп. Email
+                                </a>
+                                
+                                ${v.status === 'archive' ? `
+                                    <button onclick="closeAllActionMenus(); updateStatus('${v.id}', 'inbox');" class="text-left px-3.5 py-2 text-xs text-emerald-300 hover:bg-slate-700 transition-colors flex items-center gap-2 cursor-pointer">
+                                        <span class="text-[12px]">↩</span> Восстановить в Inbox
+                                    </button>
+                                ` : `
+                                    <button onclick="closeAllActionMenus(); updateStatus('${v.id}', 'archive');" class="text-left px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2 cursor-pointer">
+                                        <span class="text-[12px]">📦</span> В архив
+                                    </button>
+                                `}
+                                ${v.status === 'blacklist' ? `
+                                    <button onclick="closeAllActionMenus(); updateStatus('${v.id}', 'inbox');" class="text-left px-3.5 py-2 text-xs text-emerald-300 hover:bg-slate-700 transition-colors border-t border-slate-700/60 flex items-center gap-2 cursor-pointer">
+                                        <span class="text-[12px]">✅</span> Убрать из Чёрного списка
+                                    </button>
+                                ` : `
+                                    <button onclick="closeAllActionMenus(); openBlacklistModal('${v.id}');" class="text-left px-3.5 py-2 text-xs text-rose-400 hover:bg-rose-950/60 transition-colors border-t border-slate-700/60 flex items-center gap-2 cursor-pointer">
+                                        <span class="text-[12px]">💩</span> В Чёрный список (ТК РФ)
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Persona Active Indicator -->
-        <div class="bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-between mb-4">
+        <div class="bg-slate-900/60 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
                 <span>🎯 Активное резюме под вакансию:</span>
                 <span class="font-medium text-purple-300">${personaHint}</span>
@@ -478,66 +549,70 @@ function renderDetails() {
             <button onclick="setTab('profiles')" class="text-purple-400 hover:underline text-[11px]">Редактировать ↗</button>
         </div>
 
-        <div id="ai-progress-${v.id}" class="hidden mb-4 bg-slate-900/90 rounded-lg p-3 border border-slate-700 text-xs">
+        <div id="ai-progress-${v.id}" class="hidden mb-3 bg-slate-900/90 rounded-lg p-3 border border-slate-700 text-xs">
             <div class="text-slate-400 flex items-center gap-2">
                 <span class="animate-spin">⏳</span>
                 <span id="ai-text-${v.id}">Генерация текста и оценка матчинга...</span>
             </div>
         </div>
 
-        <div class="flex flex-col gap-4 mb-4">
-            <div>
-                <div class="flex justify-between items-center mb-1.5">
-                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">💬 Short DM (${isEn ? 'English' : 'Русский'})</h3>
-                    <button onclick="copyFieldText('dm-box')" class="text-[11px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Копировать</button>
-                </div>
-                <textarea id="dm-box" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-300 h-28 focus:outline-none focus:border-sky-500 font-sans leading-relaxed">${v.short_dm || ''}</textarea>
-            </div>
-
-            <div>
-                <div class="flex justify-between items-center mb-1.5">
-                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">📧 Cover Letter (${isEn ? 'English' : 'Русский'})</h3>
-                    <button onclick="copyFieldText('cl-box')" class="text-[11px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Копировать</button>
-                </div>
-                <textarea id="cl-box" class="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-300 h-44 focus:outline-none focus:border-sky-500 font-sans leading-relaxed">${v.cover_letter || ''}</textarea>
-            </div>
-        </div>
-
-        <div class="pt-4 border-t border-slate-700/60 flex flex-col gap-3">
-            <div class="flex flex-wrap gap-2 items-center justify-between">
-                <div class="flex flex-wrap gap-2 items-center">
-                    ${actionBtnHtml}
-                    <button onclick="rewriteAI('${v.id}')" id="btn-rewrite-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm">
-                        <span>✨</span> Переписать (AI)
-                    </button>
-                    <a href="/cv/${v.id}" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 shadow-sm">
-                        <span>📄</span> PDF
-                    </a>
-                </div>
-                
-                <div class="flex gap-2 items-center mt-2 sm:mt-0">
-                    ${(v.status === 'inbox' || v.status === 'new') ? `<button onclick="updateStatus('${v.id}', 'sent')" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">✅ Отправлено</button>` : ''}
-                    ${v.status === 'sent' ? `<button onclick="updateStatus('${v.id}', 'replied')" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">💬 Ответили</button>` : ''}
-                    
-                    <div class="relative">
-                        <button onclick="toggleActionMenu('${v.id}')" id="btn-menu-${v.id}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1 border border-slate-700">
-                            ⚙️ Ещё ▾
+        <div class="flex flex-col gap-3.5 mb-3">
+            <!-- Short DM Box with Rating & Actions -->
+            <div class="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800/80">
+                <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">💬 Short DM (${isEn ? 'English' : 'Русский'})</h3>
+                        ${(v.dm_rating === 1 || v.pitch_rating === 1) ? `<span class="text-[10px] bg-emerald-950/90 text-emerald-300 border border-emerald-700/70 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 shadow-sm">⭐ Одобрено</span>` : ''}
+                        ${(v.dm_rating === -1 || (v.pitch_rating === -1 && v.dm_rating !== 1)) ? `<span class="text-[10px] bg-rose-950/90 text-rose-300 border border-rose-700/70 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 shadow-sm">❌ Отклонено</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button onclick="ratePitch('${v.id}', 1, 'short_dm')" id="btn-rate-up-dm-${v.id}" class="text-xs ${v.dm_rating === 1 ? 'bg-emerald-600 text-white font-semibold shadow-sm' : 'bg-slate-800 hover:bg-emerald-900/40 text-slate-300 hover:text-emerald-300'} px-2.5 py-1 rounded-lg border border-slate-700 transition-all cursor-pointer flex items-center gap-1" title="Одобрить питч">
+                            <span>👍</span> ${v.dm_rating === 1 ? 'Одобрено' : 'Одобрить'}
                         </button>
-                        <div onclick="closeActionMenu('${v.id}')" id="menu-overlay-${v.id}" class="fixed inset-0 z-40 hidden"></div>
-                        
-                        <div id="menu-${v.id}" class="absolute right-0 bottom-full mb-1 hidden z-50">
-                            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden w-64 flex flex-col">
-                                <a href="${directAtsUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-indigo-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">🏢</span> Вакансия в ATS (Greenhouse)</a>
-                                <a href="${hrSearchUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-sky-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">🔍</span> Найти HR (LinkedIn/TG)</a>
-                                <a href="${ctoSearchUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-amber-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">⚡</span> Найти CTO / Тимлида</a>
-                                <a href="${emailSearchUrl}" target="_blank" onclick="closeActionMenu('${v.id}')" class="text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">✉️</span> Корп. Email</a>
-                                
-                                <button onclick="closeActionMenu('${v.id}'); updateStatus('${v.id}', 'archive');" class="text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-1.5"><span class="text-[10px]">📦</span> В архив</button>
-                                <button onclick="closeActionMenu('${v.id}'); openBlacklistModal('${v.id}');" class="text-left px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/50 transition-colors border-t border-slate-700 flex items-center gap-1.5"><span class="text-[10px]">💩</span> В Черный список (ТК РФ)</button>
-                            </div>
-                        </div>
+                        <button onclick="ratePitch('${v.id}', -1, 'short_dm')" id="btn-rate-down-dm-${v.id}" class="text-xs ${v.dm_rating === -1 ? 'bg-rose-700 text-white font-semibold shadow-sm' : 'bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300'} px-2 py-1 rounded-lg border border-slate-700 transition-all cursor-pointer flex items-center gap-1" title="Отклонить питч">
+                            <span>👎</span>
+                        </button>
+                        <button onclick="savePitchText('${v.id}', 'short_dm')" id="btn-save-dm-${v.id}" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 transition-colors cursor-pointer flex items-center gap-1" title="Сохранить изменения текста">
+                            <span>💾</span> Сохранить
+                        </button>
+                        <button onclick="copyFieldText('dm-box')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1">
+                            <span>📋</span> Копировать
+                        </button>
                     </div>
                 </div>
+                <textarea id="dm-box" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-200 h-24 focus:outline-none focus:border-sky-500 font-sans leading-relaxed transition-colors">${v.short_dm || ''}</textarea>
+            </div>
+
+            <!-- Cover Letter Box with Rating, Few-Shot Badge & Actions -->
+            <div class="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800/80">
+                <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">📧 Cover Letter (${isEn ? 'English' : 'Русский'})</h3>
+                        ${(v.cl_rating === 1 || v.pitch_rating === 1) ? `<span class="text-[10px] bg-emerald-950/90 text-emerald-300 border border-emerald-700/70 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1 shadow-sm">⭐ Эталон (Few-Shot)</span>` : ''}
+                        ${(v.cl_rating === -1 || (v.pitch_rating === -1 && v.cl_rating !== 1)) ? `<span class="text-[10px] bg-rose-950/90 text-rose-300 border border-rose-700/70 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 shadow-sm">❌ Отклонено</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button onclick="ratePitch('${v.id}', 1, 'cover_letter')" id="btn-rate-up-cl-${v.id}" class="text-xs ${v.cl_rating === 1 ? 'bg-emerald-600 text-white font-semibold shadow-sm' : 'bg-slate-800 hover:bg-emerald-900/40 text-slate-300 hover:text-emerald-300'} px-2.5 py-1 rounded-lg border border-slate-700 transition-all cursor-pointer flex items-center gap-1" title="Одобрить и обучать ИИ на этом стиле">
+                            <span>👍</span> ${v.cl_rating === 1 ? 'Эталон стиля' : 'Одобрить'}
+                        </button>
+                        <button onclick="ratePitch('${v.id}', -1, 'cover_letter')" id="btn-rate-down-cl-${v.id}" class="text-xs ${v.cl_rating === -1 ? 'bg-rose-700 text-white font-semibold shadow-sm' : 'bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300'} px-2 py-1 rounded-lg border border-slate-700 transition-all cursor-pointer flex items-center gap-1" title="Отклонить">
+                            <span>👎</span>
+                        </button>
+                        <button onclick="savePitchText('${v.id}', 'cover_letter')" id="btn-save-cl-${v.id}" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700 transition-colors cursor-pointer flex items-center gap-1" title="Сохранить изменения текста">
+                            <span>💾</span> Сохранить
+                        </button>
+                        <button onclick="copyFieldText('cl-box')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1">
+                            <span>📋</span> Копировать
+                        </button>
+                    </div>
+                </div>
+                <textarea id="cl-box" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-200 h-44 focus:outline-none focus:border-sky-500 font-sans leading-relaxed transition-colors">${v.cover_letter || ''}</textarea>
+                
+                ${(v.cl_rating === 1 || v.pitch_rating === 1) ? `
+                <div class="mt-2.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-[11px] text-emerald-300/90 flex items-center gap-2">
+                    <span>💡</span>
+                    <span>Сопроводительное сохранено как <b>эталон стиля</b>. ИИ учитывает его структуру и тон при будущих генерациях (Few-Shot).</span>
+                </div>` : ''}
             </div>
         </div>
 
@@ -1040,7 +1115,26 @@ async function applyTg(vacId) {
     }
 }
 
+async function setResponseStatus(vac_id, response) {
+    const labels = { interview: '💬 Ответили — приглашение!', rejected: '❌ Отказ записан', ghosted: '🔕 Тишина записана' };
+    try {
+        await fetch(`/api/vacancies/${vac_id}/response_status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ response_status: response })
+        });
+        const v = vacancies.find(v => String(v.id) === String(vac_id));
+        if (v) v.response_status = response;
+        showToast(labels[response] || 'Статус обновлен');
+        renderList();
+        renderDetails();
+    } catch (e) {
+        alert('Ошибка обновления статуса: ' + e);
+    }
+}
+
 async function updateStatus(vac_id, status, reason = null) {
+
     try {
         await api.updateVacancyStatus(vac_id, status, reason);
         const v = vacancies.find(v => String(v.id) === String(vac_id));
@@ -1121,36 +1215,135 @@ function copyShameListMarkdown() {
     }
 }
 
-function toggleActionMenu(vacId) {
+function closeAllActionMenus() {
+    document.querySelectorAll('.action-menu-dropdown').forEach(m => m.classList.add('hidden'));
+}
+
+function toggleActionMenu(vacId, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     const menu = document.getElementById(`menu-${vacId}`);
-    const overlay = document.getElementById(`menu-overlay-${vacId}`);
-    const btn = document.getElementById(`btn-menu-${vacId}`);
     if (!menu) return;
 
     const isOpening = menu.classList.contains('hidden');
+    closeAllActionMenus();
+
     if (isOpening) {
-        if (btn) {
-            const rect = btn.getBoundingClientRect();
-            // If space above is less than 260px (menu height ~240px), open downwards instead of upwards
-            if (rect.top < 260) {
-                menu.classList.remove('bottom-full', 'mb-1');
-                menu.classList.add('top-full', 'mt-1');
-            } else {
-                menu.classList.remove('top-full', 'mt-1');
-                menu.classList.add('bottom-full', 'mb-1');
-            }
-        }
         menu.classList.remove('hidden');
-        if (overlay) overlay.classList.remove('hidden');
-    } else {
-        menu.classList.add('hidden');
-        if (overlay) overlay.classList.add('hidden');
     }
 }
 
 function closeActionMenu(vacId) {
     const menu = document.getElementById(`menu-${vacId}`);
-    const overlay = document.getElementById(`menu-overlay-${vacId}`);
     if (menu) menu.classList.add('hidden');
-    if (overlay) overlay.classList.add('hidden');
 }
+
+// Global click & Escape dismissal for dropdown menus
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu-container')) {
+        closeAllActionMenus();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeAllActionMenus();
+    }
+});
+
+function copyVacancyLink(url) {
+    if (!url) {
+        showToast('⚠️ У вакансии нет ссылки');
+        return;
+    }
+    navigator.clipboard.writeText(url);
+    showToast('🔗 Ссылка на вакансию скопирована!');
+}
+
+function copyVacancyDescription(vacId) {
+    const vac = vacancies.find(x => x.id === vacId) || currentVac;
+    if (!vac || !vac.description) {
+        showToast('⚠️ Нет описания для копирования');
+        return;
+    }
+    navigator.clipboard.writeText(vac.description);
+    showToast('📋 Описание вакансии скопировано!');
+}
+
+async function ratePitch(vacId, rating, pitchType) {
+    try {
+        const dmBox = document.getElementById('dm-box');
+        const clBox = document.getElementById('cl-box');
+        const shortDm = dmBox ? dmBox.value : (currentVac ? currentVac.short_dm : null);
+        const coverLetter = clBox ? clBox.value : (currentVac ? currentVac.cover_letter : null);
+
+        const res = await api.ratePitch(vacId, rating, pitchType, shortDm, coverLetter);
+        if (res.success) {
+            // Update in-memory vacancy
+            const vac = vacancies.find(x => x.id === vacId);
+            if (vac) {
+                if (pitchType === 'cover_letter') vac.cl_rating = rating;
+                if (pitchType === 'short_dm') vac.dm_rating = rating;
+                vac.pitch_rating = rating;
+                if (coverLetter) vac.cover_letter = coverLetter;
+                if (shortDm) vac.short_dm = shortDm;
+            }
+            if (currentVac && currentVac.id === vacId) {
+                if (pitchType === 'cover_letter') currentVac.cl_rating = rating;
+                if (pitchType === 'short_dm') currentVac.dm_rating = rating;
+                currentVac.pitch_rating = rating;
+                if (coverLetter) currentVac.cover_letter = coverLetter;
+                if (shortDm) currentVac.short_dm = shortDm;
+            }
+
+            if (rating === 1) {
+                showToast(pitchType === 'cover_letter' 
+                    ? '👍 Сопроводительное сохранено как эталон стиля (Few-Shot)!' 
+                    : '👍 Питч Short DM одобрен!');
+            } else if (rating === -1) {
+                showToast('👎 Отмечено как неудачное (ИИ учтет при новой генерации)');
+            } else {
+                showToast('ℹ️ Оценка сброшена');
+            }
+
+            renderDetails();
+        } else {
+            showToast('❌ Не удалось сохранить оценку');
+        }
+    } catch (e) {
+        console.error('Failed to rate pitch:', e);
+        showToast('❌ Ошибка при сохранении оценки: ' + e.message);
+    }
+}
+
+async function savePitchText(vacId, pitchType) {
+    try {
+        const dmBox = document.getElementById('dm-box');
+        const clBox = document.getElementById('cl-box');
+        const shortDm = dmBox ? dmBox.value : null;
+        const coverLetter = clBox ? clBox.value : null;
+
+        const res = await api.savePitch(vacId, shortDm, coverLetter);
+        if (res.success) {
+            const vac = vacancies.find(x => x.id === vacId);
+            if (vac) {
+                if (shortDm !== null) vac.short_dm = shortDm;
+                if (coverLetter !== null) vac.cover_letter = coverLetter;
+            }
+            if (currentVac && currentVac.id === vacId) {
+                if (shortDm !== null) currentVac.short_dm = shortDm;
+                if (coverLetter !== null) currentVac.cover_letter = coverLetter;
+            }
+            showToast('💾 Текст успешно сохранен в базу данных!');
+            renderDetails();
+        } else {
+            showToast('❌ Не удалось сохранить изменения');
+        }
+    } catch (e) {
+        console.error('Failed to save pitch:', e);
+        showToast('❌ Ошибка при сохранении: ' + e.message);
+    }
+}
+

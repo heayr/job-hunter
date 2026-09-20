@@ -1,0 +1,75 @@
+<!-- Universal AI Parser Modal Component -->
+<div id="ai-parser-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[640px] max-w-[95vw] border border-slate-700/80 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+                    🪄
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        Умный ИИ-Импорт Вакансий
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Прямой парсинг любой вакансии по URL или тексту через Gemini с авто-скорингом и питчем</p>
+                </div>
+            </div>
+            <button onclick="toggleModal('ai-parser-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <!-- Mode selector tabs -->
+        <div class="flex items-center gap-2 mb-4 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+            <button id="ai-tab-url" onclick="setAiParseMode('url')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white transition-all flex items-center justify-center gap-1.5">
+                <span>🔗</span> По ссылке (URL)
+            </button>
+            <button id="ai-tab-text" onclick="setAiParseMode('text')" class="flex-1 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-lg transition-all flex items-center justify-center gap-1.5">
+                <span>📝</span> Текст из Telegram / LinkedIn / Email
+            </button>
+        </div>
+
+        <!-- URL Input Container -->
+        <div id="ai-input-url-container" class="mb-4">
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Ссылка на вакансию (Setka, HH, LinkedIn, сайт компании или ATS):</label>
+            <input type="url" id="ai-input-url" placeholder="https://example.com/careers/senior-frontend-engineer"
+                class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors font-mono">
+            <p class="text-[10px] text-slate-500 mt-1.5">ИИ загрузит страницу, очистит HTML и извлечет стек, зарплату, грейд и контакты.</p>
+        </div>
+
+        <!-- Text Input Container -->
+        <div id="ai-input-text-container" class="mb-4 hidden">
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Сырой текст вакансии:</label>
+            <textarea id="ai-input-text" rows="7" placeholder="Вставьте сюда скопированный пост из Telegram, личное сообщение от рекрутера, описание с закрытого сайта..."
+                class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"></textarea>
+            <p class="text-[10px] text-slate-500 mt-1.5">ИИ структурирует текст, выделит ключевые требования, найдет контакты и сформирует питч.</p>
+        </div>
+
+        <!-- Loader / Status indicator -->
+        <div id="ai-parse-loader" class="hidden mb-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/60">
+            <div class="flex items-center gap-3">
+                <div class="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                <div class="text-xs text-purple-200">
+                    <div class="font-bold">ИИ анализирует вакансию...</div>
+                    <div class="text-[11px] text-purple-300/80">Извлечение требований, расчет мэтч-скора и генерация кастомного отклика.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error message container -->
+        <div id="ai-parse-error" class="hidden mb-4 p-3 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 flex items-center gap-2">
+            <span>⚠️</span>
+            <span id="ai-parse-error-msg">Ошибка</span>
+        </div>
+
+        <!-- Modal Action Buttons -->
+        <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+            <span class="text-[11px] text-slate-500">Автоматически сохраняется в статус «Новые»</span>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleModal('ai-parser-modal')" type="button"
+                    class="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">Отмена</button>
+                <button id="ai-parse-submit-btn" onclick="executeAiParse()" type="button"
+                    class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/20 flex items-center gap-2">
+                    <span>🪄</span> Распарсить и добавить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

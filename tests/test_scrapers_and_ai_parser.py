@@ -12,7 +12,8 @@ from scrapers.jobicy_scraper import JobicyScraper
 from scrapers.getmatch_scraper import GetMatchScraper
 from scrapers.setka_scraper import SetkaScraper
 from enricher.ai_parser import heuristic_fallback_parse, ingest_vacancy_with_ai
-from tracker.db import DB_PATH
+from tracker.db import get_db_connection
+from unittest.mock import patch
 
 
 class TestScrapersAndAiParser(unittest.TestCase):
@@ -68,35 +69,54 @@ class TestScrapersAndAiParser(unittest.TestCase):
         Stack: React, TypeScript, GraphQL, Node.js, Docker
         Contact: jobs@nextgencloud.io
         """
-        result = ingest_vacancy_with_ai(sample, is_url=False)
-        self.assertTrue(result["success"], msg=f"Ingest failed: {result.get('error')}")
-        self.assertIn("vacancy_id", result)
-        self.assertGreater(result["score"], 0)
+        mock_parsed = heuristic_fallback_parse(sample)
+        mock_parsed["title"] = "Fullstack Engineer (React & TypeScript)"
+        mock_parsed["company"] = "NextGen Cloud Systems"
+        mock_understanding = {
+            "role_overview": {"title": "Fullstack Engineer", "company": "NextGen Cloud Systems", "seniority": "Senior"},
+            "facts": {"explicit_requirements": ["React", "TypeScript", "Node.js", "Docker"]},
+            "reasoning": {"likely_team_problems": ["Scaling frontend-backend interactions"]}
+        }
 
-        vac_id = result["vacancy_id"]
+        mock_pitches = {
+            "short_dm": "Mock short DM",
+            "cover_letter": "Mock cover letter",
+            "tailored_cv": "Mock tailored CV",
+            "language": "en",
+            "score": 88
+        }
 
-        # Verify SQLite persistence
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
+        with patch("enricher.ai_parser.parse_with_gemini", return_value=mock_parsed), \
+             patch("generator.job_understanding.understand_job_posting", return_value=mock_understanding), \
+             patch("enricher.ai_parser.generate_pitch", return_value=mock_pitches):
+            result = ingest_vacancy_with_ai(sample, is_url=False, use_ai=False)
+            self.assertTrue(result["success"], msg=f"Ingest failed: {result.get('error')}")
+            self.assertIn("vacancy_id", result)
+            self.assertGreater(result["score"], 0)
 
-        cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
-        vac_row = cur.fetchone()
-        self.assertIsNotNone(vac_row)
-        self.assertEqual(vac_row["source"], "ai_import")
-        self.assertGreater(vac_row["score"], 0)
+            vac_id = result["vacancy_id"]
 
-        # Verify Pitches generated and persisted
-        cur.execute("SELECT * FROM pitches WHERE vacancy_id = ?", (vac_id,))
-        pitches = cur.fetchall()
-        self.assertGreaterEqual(len(pitches), 3)
+            # Verify SQLite persistence in isolated DB
+            conn = get_db_connection()
+            cur = conn.cursor()
 
-        pitch_types = [p["pitch_type"] for p in pitches]
-        self.assertIn("short_dm", pitch_types)
-        self.assertIn("cover_letter", pitch_types)
-        self.assertIn("tailored_cv", pitch_types)
+            cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
+            vac_row = cur.fetchone()
+            self.assertIsNotNone(vac_row)
+            self.assertEqual(vac_row["source"], "ai_import")
+            self.assertGreater(vac_row["score"], 0)
 
-        conn.close()
+            # Verify Pitches generated and persisted
+            cur.execute("SELECT * FROM pitches WHERE vacancy_id = ?", (vac_id,))
+            pitches = cur.fetchall()
+            self.assertGreaterEqual(len(pitches), 3)
+
+            pitch_types = [p["pitch_type"] for p in pitches]
+            self.assertIn("short_dm", pitch_types)
+            self.assertIn("cover_letter", pitch_types)
+            self.assertIn("tailored_cv", pitch_types)
+
+            conn.close()
 
     def test_getmatch_scraper_instantiation(self):
         scraper = GetMatchScraper()

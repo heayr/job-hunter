@@ -1,0 +1,71 @@
+<!-- Bookmarklet Info & Setup Modal Component -->
+<div id="bookmarklet-modal" class="modal">
+    <div class="glass-panel-elevated p-6 rounded-2xl w-[560px] max-w-[95vw] border border-slate-700 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-base">
+                    🔖
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-white">Установка Auto-Apply Закладки (v3.0)</h2>
+                    <p class="text-[11px] text-slate-400">Универсальный авто-отклик: Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</p>
+                </div>
+            </div>
+            <button onclick="toggleModal('bookmarklet-modal')" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+
+        <div class="space-y-4 text-xs text-slate-300">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-white mb-1">Способ 1 (Самый быстрый):</div>
+                    <p class="text-[11px] text-slate-400">Зажмите зеленую кнопку и перетащите её на панель закладок браузера (Cmd+Shift+B в Chrome, чтобы показать панель):</p>
+                </div>
+                <a id="bookmarklet-modal-btn" href="#" onclick="event.preventDefault(); alert('Зажмите кнопку левой кнопкой мыши и перетащите её наверх, на панель закладок!');"
+                    class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg cursor-grab select-none whitespace-nowrap flex items-center gap-2 ring-2 ring-emerald-500/30">
+                    <span>🔖</span> Auto-Apply
+                </a>
+            </div>
+
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                <div class="font-semibold text-white mb-1">Способ 2 (Вручную):</div>
+                <p class="text-[11px] text-slate-400 mb-2">Создайте любую закладку в браузере, отредактируйте её и вставьте этот код в поле URL:</p>
+                <div class="flex items-center gap-2">
+                    <input id="bookmarklet-code-input" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-emerald-400 font-mono select-all">
+                    <button onclick="copyBookmarkletCode()" class="bg-slate-800 hover:bg-slate-700 text-white font-medium px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+                        📋 Копировать
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-800/60 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <div class="font-semibold text-purple-300 flex items-center gap-1.5">
+                        <span>🧩</span> Способ 3: Chrome Extension (Side Panel & Agent)
+                    </div>
+                    <span class="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-bold">Рекомендуется</span>
+                </div>
+                <p class="text-[11px] text-slate-300 mb-2">
+                    Полноценная боковая панель в браузере с живым анализом вакансий и 1-click заполнением форм:
+                </p>
+                <ol class="text-[11px] text-slate-400 list-decimal list-inside space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                    <li>Откройте в Chrome: <code class="text-sky-300 font-mono">chrome://extensions</code> и включите <b>«Режим разработчика»</b> (вверху справа).</li>
+                    <li>Нажмите <b>«Загрузить распакованное расширение»</b> (Load unpacked).</li>
+                    <li>Выберите папку <code class="text-purple-300 font-mono">job_hunter/extension</code> в корне проекта.</li>
+                </ol>
+            </div>
+
+            <div class="bg-indigo-950/40 border border-indigo-900/60 rounded-xl p-3.5 text-[11px] space-y-1.5 text-indigo-200">
+                <div class="font-bold text-indigo-300">Универсальный авто-заполнитель анкет (ATS & Forms):</div>
+                <div>1. Откройте любую страницу вакансии или форму отклика (<strong>Personio, Greenhouse, Lever, Workable, Ashby, HH.ru, LinkedIn</strong> и др.).</div>
+                <div>2. Нажмите закладку <strong>«🔖 Auto-Apply»</strong> на панели закладок браузера.</div>
+                <div>⚡️ Скрипт мгновенно определит форму и автоматически заполнит: <strong>Имя, Фамилию, Email, Телефон, LinkedIn, GitHub, Портфолио, Локацию и Сопроводительное письмо</strong>, а также подсветит поле прикрепления CV!</div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-4 mt-4 border-t border-slate-800">
+            <button onclick="toggleModal('bookmarklet-modal')" class="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-4 py-2 rounded-xl">
+                Понятно
+            </button>
+        </div>
+    </div>
+</div>

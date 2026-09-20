@@ -51,7 +51,7 @@ class TestNewScrapersAndMarkets(unittest.TestCase):
             os.remove(test_db)
         
         try:
-            db.DB_PATH = test_db
+            db.set_db_path(test_db)
             db.init_db()
             
             vac_ru = {
@@ -93,7 +93,7 @@ class TestNewScrapersAndMarkets(unittest.TestCase):
             self.assertEqual(by_id["telegram"], "ru")
             self.assertEqual(by_id["crypto"], "en")
         finally:
-            db.DB_PATH = original_db_path
+            db.set_db_path(original_db_path)
             if os.path.exists(test_db):
                 os.remove(test_db)
 

@@ -256,9 +256,9 @@ def answer_choice_question(
         for opt in clean_opts:
             if opt.lower() in cand_loc or cand_loc in opt.lower():
                 return opt
-        # Common defaults
+        # Default to Russia / Russian Federation for Russian candidate
         for opt in clean_opts:
-            if any(c in opt.lower() for c in ["russia", "georgia", "armenia", "россия"]):
+            if any(c in opt.lower() for c in ["russian federation", "russia", "россия", "рф"]):
                 return opt
 
     # 4. LLM choice matching if API key available

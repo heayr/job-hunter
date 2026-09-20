@@ -112,6 +112,43 @@ class TestCRMEndpoints(unittest.TestCase):
         except urllib.error.URLError:
             self.skipTest("CRM server is not running on test port")
 
+    def test_rate_pitch_endpoint(self):
+        try:
+            res = urllib.request.urlopen(f"{self.base_url}/api/pitches", timeout=3)
+            data = json.loads(res.read().decode('utf-8'))
+            if not data:
+                self.skipTest("No vacancies available in DB")
+            v_id = data[0]["id"]
+            req = urllib.request.Request(
+                f"{self.base_url}/api/pitches/rate",
+                data=json.dumps({"vacancy_id": v_id, "rating": 1, "pitch_type": "cover_letter"}).encode('utf-8'),
+                headers={"Content-Type": "application/json"}
+            )
+            r_res = urllib.request.urlopen(req, timeout=3)
+            r_data = json.loads(r_res.read().decode('utf-8'))
+            self.assertTrue(r_data.get("success"))
+            self.assertEqual(r_data.get("rating"), 1)
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
+    def test_save_pitch_endpoint(self):
+        try:
+            res = urllib.request.urlopen(f"{self.base_url}/api/pitches", timeout=3)
+            data = json.loads(res.read().decode('utf-8'))
+            if not data:
+                self.skipTest("No vacancies available in DB")
+            v_id = data[0]["id"]
+            req = urllib.request.Request(
+                f"{self.base_url}/api/pitches/save",
+                data=json.dumps({"vacancy_id": v_id, "cover_letter": "Custom edited cover letter"}).encode('utf-8'),
+                headers={"Content-Type": "application/json"}
+            )
+            s_res = urllib.request.urlopen(req, timeout=3)
+            s_data = json.loads(s_res.read().decode('utf-8'))
+            self.assertTrue(s_data.get("success"))
+        except urllib.error.URLError:
+            self.skipTest("CRM server is not running on test port")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -267,18 +267,22 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, A
 #  Main pitch generator
 # ─────────────────────────────────────────────
 
-def select_dynamic_achievements(full_text: str, lang: str = "ru", profile: Optional[Dict] = None) -> List[str]:
+def select_dynamic_achievements(full_text: str, lang: str = "ru", profile: Optional[Dict] = None, use_ai: bool = True) -> List[str]:
     """Select the 2-3 most relevant real achievements from candidate's profile matching the job requirements."""
-    # If a profile is provided, run Phase 3 Evidence Reframing Engine
+    # If a profile is provided, run Evidence Reframing Engine
     if profile:
         try:
-            from generator.evidence_retriever import retrieve_and_reframe_evidence
             job_dummy = {
                 "role_overview": {"title": full_text[:80], "company": ""},
                 "facts": {"explicit_requirements": [full_text[:500]]},
                 "reasoning": {"likely_team_problems": [full_text[:500]]}
             }
-            reframed = retrieve_and_reframe_evidence(profile, job_dummy, lang=lang)
+            if use_ai:
+                from generator.evidence_retriever import retrieve_and_reframe_evidence
+                reframed = retrieve_and_reframe_evidence(profile, job_dummy, lang=lang)
+            else:
+                from generator.evidence_retriever import heuristic_evidence_retrieval
+                reframed = heuristic_evidence_retrieval(profile, job_dummy, lang=lang)
             bullets = [m["aggressive_framing"] for m in reframed.get("matched_evidence", [])]
             if bullets:
                 return bullets[:3]
@@ -366,7 +370,7 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Op
     warning_header = f"[{warn_text}]\n\n" if warnings else ""
 
     # Select real matching achievements with Phase 3 reframing
-    achievements = select_dynamic_achievements(f"{title} {skills} {desc}", lang=lang, profile=profile)
+    achievements = select_dynamic_achievements(f"{title} {skills} {desc}", lang=lang, profile=profile, use_ai=use_ai)
     bullet_text = "\n".join(f"• {b}" for b in achievements)
 
     # Phase 10: Use Cover Letter Engine with cognitive loop

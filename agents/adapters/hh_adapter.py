@@ -36,7 +36,7 @@ class HeadHunterCDPAdapter:
                 "error": err_msg
             }
 
-        page = self.driver.get_active_page()
+        page = self.driver.get_active_page(avoid_crm=True)
         self.logger.attach_to_page(page)
 
         # Step 1: Open vacancy

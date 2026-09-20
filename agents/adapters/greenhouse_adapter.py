@@ -43,7 +43,7 @@ class GreenhouseCDPAdapter:
             self.logger.log("ERROR", "GREENHOUSE_ADAPTER", err_msg)
             return {"success": False, "error": err_msg}
 
-        page = self.driver.get_active_page()
+        page = self.driver.get_active_page(avoid_crm=True)
         self.logger.attach_to_page(page)
 
         try:

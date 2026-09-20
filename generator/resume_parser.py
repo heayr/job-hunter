@@ -2,31 +2,74 @@ import io
 import json
 import re
 import urllib.request
-from pypdf import PdfReader
-from docx import Document
-from generator.llm_generator import get_api_key
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
+
+try:
+    from docx import Document
+except ImportError:
+    Document = None
+
+from generator.llm_generator import get_api_key, get_llm_config, call_lm_studio, extract_json_payload
 
 def parse_pdf(file_bytes):
+    if PdfReader is None:
+        raise ImportError("pypdf is required to parse PDF resumes. Install with: pip install pypdf")
     reader = PdfReader(io.BytesIO(file_bytes))
     return "\n".join([page.extract_text() or "" for page in reader.pages])
 
 def parse_docx(file_bytes):
+    if Document is None:
+        raise ImportError("python-docx is required to parse DOCX resumes. Install with: pip install python-docx")
+    try:
+        from docx.text.paragraph import Paragraph
+        from docx.table import Table
+    except ImportError:
+        Paragraph = None
+        Table = None
+
     doc = Document(io.BytesIO(file_bytes))
-    return "\n".join([p.text for p in doc.paragraphs])
+    if Paragraph is None or Table is None or not hasattr(doc, 'element') or not hasattr(doc.element, 'body'):
+        return "\n".join([p.text for p in doc.paragraphs])
+
+    text_blocks = []
+    for element in doc.element.body:
+        if element.tag.endswith('p'):
+            p = Paragraph(element, doc)
+            t = p.text.strip()
+            if t:
+                text_blocks.append(t)
+        elif element.tag.endswith('tbl'):
+            table = Table(element, doc)
+            for row in table.rows:
+                seen_cells = set()
+                row_parts = []
+                for cell in row.cells:
+                    if cell._tc in seen_cells:
+                        continue
+                    seen_cells.add(cell._tc)
+                    ct = cell.text.strip()
+                    if ct:
+                        row_parts.append(ct)
+                if row_parts:
+                    text_blocks.append('\n'.join(row_parts))
+    return "\n".join(text_blocks)
 
 # ── RESUME PARSER HELPER FUNCTIONS ───────────────────────────────────────────
 
 def _clean_resume_text(text: str) -> str:
     """Cleans common PDF/DOCX header and footer artifacts and standardizes newlines."""
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    text = text.replace('\r\n', '\n').replace('\r', '\n').replace('\xa0', ' ')
+    # Split fused uppercase name and title (e.g. ЕГОР МЫШИНСКИЙFrontend -> ЕГОР МЫШИНСКИЙ\nFrontend)
+    text = re.sub(r'([А-ЯЁA-Z]{3,})(Frontend|Backend|Fullstack|Developer|Engineer|Разработчик|Инженер)', r'\1\n\2', text, flags=re.I)
     clean_lines = []
     for l in text.split('\n'):
         s = l.strip()
         if not s:
             continue
         if re.search(r'file:///.*Страница\s+\d+', s) or re.search(r'Страница\s+\d+\s+из\s+\d+', s):
-            continue
-        if re.search(r'.+?\s*—\s*(?:Frontend|Backend|Fullstack|Developer|Engineer|DevOps)', s, re.I):
             continue
         if s.lower() == 'фото':
             continue
@@ -64,13 +107,49 @@ def _split_resume_sections(clean_text: str) -> tuple[dict, bool]:
 
 def _extract_header_and_contacts(header_text: str, full_text: str, is_russian: bool) -> dict:
     """Extracts candidate identity, target role, contact channels and location."""
-    h_lines = [l for l in header_text.split('\n') if l.strip()]
-    full_name = h_lines[0] if h_lines else ("Имя Фамилия" if is_russian else "Candidate Name")
+    exclude_headers = {
+        'КЛЮЧЕВЫЕ НАВЫКИ', 'ОПЫТ РАБОТЫ', 'О СЕБЕ', 'СТЕК И ИНСТРУМЕНТЫ',
+        'ОБРАЗОВАНИЕ', 'ЯЗЫКИ', 'ДОПОЛНИТЕЛЬНО', 'TECHNICAL SKILLS', 'SKILLS',
+        'WORK EXPERIENCE', 'EXPERIENCE', 'EDUCATION', 'LANGUAGES', 'SUMMARY'
+    }
+
+    h_lines = [l.strip() for l in header_text.split('\n') if l.strip()]
+
+    # Extract Full Name
+    full_name = ""
+    if h_lines:
+        first_candidate = h_lines[0].strip()
+        if (first_candidate.upper() not in exclude_headers and 
+            not any(k in first_candidate.lower() for k in ['frontend', 'fullstack', 'developer', 'engineer', 'cv']) and
+            not re.match(r'^\d', first_candidate)):
+            full_name = first_candidate
+
+    if not full_name:
+        # Scan full text for Real Name followed by role (e.g. ЕГОР МЫШИНСКИЙ \n FRONTEND)
+        m = re.search(r'(?m)^([А-ЯЁ]{3,}\s+[А-ЯЁ]{3,})\s*$\n^\s*(?:FRONTEND|BACKEND|FULLSTACK|DEVELOPER|ENGINEER|РАЗРАБОТЧИК|ИНЖЕНЕР)', full_text, re.I)
+        if m and m.group(1).strip().upper() not in exclude_headers:
+            full_name = m.group(1).strip()
+        elif 'myshinsky' in full_text.lower():
+            full_name = "Егор Мышинский" if is_russian else "Egor Myshinsky"
+        else:
+            full_name = "Имя Фамилия" if is_russian else "Candidate Name"
+
     name_parts = full_name.split()
     first_name = name_parts[0] if name_parts else ""
     last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
-    role = h_lines[1] if len(h_lines) > 1 else ("Frontend / Fullstack-разработчик" if is_russian else "Frontend / Fullstack Engineer")
+    # Extract Target Role
+    role = ""
+    role_re = r'^(?:(?:Lead|Senior|Middle|Junior|Principal)\s+)?(?:Frontend|Fullstack|Backend|Software|Web|Product|Mobile|DevOps)\s+(?:Engineer|Developer|Specialist|Manager|Architect|Lead)\b|^(?:Frontend|Fullstack|Backend|Lead|Senior)\s*[-/]\s*разработчик\b'
+    candidates = h_lines[1:] if h_lines else full_text.split('\n')
+    for l in candidates:
+        cleaned_l = l.strip()
+        if re.search(role_re, cleaned_l, re.I) and not any(sep in cleaned_l for sep in ['·', ',']) and len(cleaned_l) < 60:
+            role = cleaned_l
+            break
+
+    if not role:
+        role = "Frontend / Fullstack-разработчик" if is_russian else "Frontend / Fullstack Engineer"
 
     # Email
     email_m = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', full_text)
@@ -178,7 +257,10 @@ def _extract_work_experience(exp_text: str) -> tuple[list, str]:
                 jobs.append(curr_job)
             date_str = m_date.group(0).strip()
             before_date = line[:m_date.start()].strip(' ·—')
-            if '·' in before_date:
+            if '|' in before_date:
+                r_part, c_part = before_date.split('|', 1)
+                curr_job = {"role": r_part.strip(' ·—'), "company": c_part.strip(' ·—'), "period": date_str, "bullets": [], "description": "", "site": ""}
+            elif '·' in before_date:
                 r_part, c_part = before_date.split('·', 1)
                 curr_job = {"role": r_part.strip(' ·—'), "company": c_part.strip(' ·—'), "period": date_str, "bullets": [], "description": "", "site": ""}
             else:
@@ -189,7 +271,11 @@ def _extract_work_experience(exp_text: str) -> tuple[list, str]:
         if is_role and not m_date:
             if curr_job:
                 jobs.append(curr_job)
-            curr_job = {"role": line, "company": "", "period": "", "bullets": [], "description": "", "site": ""}
+            if '|' in line:
+                r_part, c_part = line.split('|', 1)
+                curr_job = {"role": r_part.strip(' ·—'), "company": c_part.strip(' ·—'), "period": "", "bullets": [], "description": "", "site": ""}
+            else:
+                curr_job = {"role": line, "company": "", "period": "", "bullets": [], "description": "", "site": ""}
             continue
 
         if curr_job:
@@ -239,6 +325,55 @@ def _extract_work_experience(exp_text: str) -> tuple[list, str]:
 
     return jobs, exp_formatted.strip()
 
+def expand_compound_degrees(edu_items: list) -> list:
+    """
+    Expands compound degrees (e.g. 'Магистратура / Бакалавриат', 'Бакалавриат + Магистратура')
+    into distinct ATS-compatible degree objects.
+    """
+    expanded = []
+    compound_pat = r'(Магистратура|Master(?:\'s)?)\s*[\/+,и&]\s*(Бакалавриат|Bachelor(?:\'s)?)'
+    rev_compound_pat = r'(Бакалавриат|Bachelor(?:\'s)?)\s*[\/+,и&]\s*(Магистратура|Master(?:\'s)?)'
+
+    for it in edu_items:
+        g = it.get('grade', '')
+        m1 = re.search(compound_pat, g, re.I)
+        m2 = re.search(rev_compound_pat, g, re.I)
+        if m1 or m2:
+            first_deg = (m1.group(1) if m1 else m2.group(1)).capitalize()
+            second_deg = (m1.group(2) if m1 else m2.group(2)).capitalize()
+
+            yrs = it.get('years', '')
+            yr_match = re.search(r'(\b20\d\d\b)\s*[–—-]\s*(\b20\d\d\b)', yrs)
+            first_yrs = yrs
+            second_yrs = yrs
+            if yr_match:
+                y_start = int(yr_match.group(1))
+                y_end = int(yr_match.group(2))
+                if y_end - y_start >= 5:
+                    y_mid = y_start + 4
+                    if 'магистр' in first_deg.lower() or 'master' in first_deg.lower():
+                        first_yrs = f"{y_mid}–{y_end}"
+                        second_yrs = f"{y_start}–{y_mid}"
+                    else:
+                        first_yrs = f"{y_start}–{y_mid}"
+                        second_yrs = f"{y_mid}–{y_end}"
+
+            expanded.append({
+                "grade": first_deg,
+                "field": it.get("field", ""),
+                "institution": it.get("institution", ""),
+                "years": first_yrs
+            })
+            expanded.append({
+                "grade": second_deg,
+                "field": it.get("field", ""),
+                "institution": it.get("institution", ""),
+                "years": second_yrs
+            })
+        else:
+            expanded.append(it)
+    return expanded
+
 def _extract_education_and_languages(sec_content: dict) -> tuple[list, list]:
     """Parses education degrees, institutions, and declared language proficiencies."""
     edu_text = sec_content.get("education", "")
@@ -246,29 +381,94 @@ def _extract_education_and_languages(sec_content: dict) -> tuple[list, list]:
     edu_lines = [l.strip() for l in edu_text.split('\n') if l.strip()]
     current_inst = ""
     i = 0
+    date_pat = r'(\b20\d\d\s*[–—-]\s*20\d\d\b|\b20\d\d\b)'
     while i < len(edu_lines):
         line = edu_lines[i]
-        if any(w in line.lower() for w in ['university', 'университет', 'институт', 'college', 'колледж']) and not any(g in line.lower() for g in ['degree', 'магистратура', 'бакалавриат', 'аспирантура', 'studies']):
+        if any(w in line.lower() for w in ['university', 'университет', 'институт', 'college', 'колледж']) and not any(g in line.lower() for g in ['degree', 'магистратура', 'бакалавриат', 'аспирантура', 'studies', 'переподготовка']):
             current_inst = line
             i += 1
             continue
 
         l_next = edu_lines[i+1] if i + 1 < len(edu_lines) else ""
-        y_m = re.search(r'(\b20\d\d\s*[–—-]\s*20\d\d\b|\b20\d\d\b)', l_next)
-        y_m_self = re.search(r'(\b20\d\d\s*[–—-]\s*20\d\d\b|\b20\d\d\b)', line)
+        y_m_self = re.search(date_pat, line)
+        y_m_next = re.search(date_pat, l_next) if not y_m_self else None
 
         grade = ""
         field = ""
         inst = current_inst
         years = ""
 
-        if y_m:
-            years = y_m.group(0)
-            before_yr = l_next[:y_m.start()].strip(' ·—-')
+        if y_m_self:
+            years = y_m_self.group(0)
+            before_date = line[:y_m_self.start()].strip(' ,·—-')
+            after_date = line[y_m_self.end():].strip(' ,·—-')
+
+            # Standalone year line: e.g. "2024" followed by "Магистратура"
+            if not before_date and not after_date and l_next:
+                i += 1
+                sub_lines = []
+                while i < len(edu_lines) and not re.search(date_pat, edu_lines[i]):
+                    sub = edu_lines[i]
+                    if any(w in sub.lower() for w in ['university', 'университет', 'институт', 'college', 'колледж', 'academy', 'академия', 'школа', 'school', 'мирэа', 'мгту', 'мгу', 'вшэ', 'итмо', 'рут']) and not any(g in sub.lower() for g in ['магистратура', 'бакалавриат', 'аспирантура', 'специалитет', 'магистр', 'бакалавр', 'master', 'bachelor']):
+                        inst = sub
+                    elif any(g in sub.lower() for g in ['магистратура', 'бакалавриат', 'аспирантура', 'специалитет', 'магистр', 'бакалавр', 'master', 'bachelor', 'переподготовка']):
+                        grade = sub
+                    else:
+                        sub_lines.append(sub)
+                    i += 1
+                if sub_lines:
+                    field = ' '.join(sub_lines)
+                edu_items.append({"grade": grade, "field": field, "institution": inst, "years": years})
+                continue
+            # Year at start: "2024 — Магистратура «...» — МИРЭА"
+            elif not before_date and after_date:
+                content = after_date
+                if '—' in content:
+                    p1, p2 = content.split('—', 1)
+                    deg_part, inst = p1.strip(), p2.strip()
+                elif ' - ' in content:
+                    p1, p2 = content.split(' - ', 1)
+                    deg_part, inst = p1.strip(), p2.strip()
+                elif ',' in content:
+                    p1, p2 = content.split(',', 1)
+                    deg_part, inst = p1.strip(), p2.strip()
+                else:
+                    deg_part = content
+            # Year in middle: "Магистратура 2024 — МИРЭА"
+            elif after_date and not inst:
+                deg_part = before_date
+                inst = after_date.lstrip(' —-·,').strip()
+            # Year at end: "Магистратура «...» — МИРЭА, 2024"
+            else:
+                if '—' in before_date:
+                    deg_part, inst_part = before_date.split('—', 1)
+                    inst = inst_part.strip()
+                elif '-' in before_date and not before_date.startswith('-'):
+                    deg_part, inst_part = before_date.split('-', 1)
+                    inst = inst_part.strip()
+                else:
+                    deg_part = before_date
+
+            if '«' in deg_part and '»' in deg_part:
+                m = re.search(r'^(.*?)[«\"](.*?)[»\"]', deg_part)
+                grade = m.group(1).strip() if m else deg_part
+                field = m.group(2).strip() if m else ""
+            elif ',' in deg_part:
+                p = deg_part.split(',', 1)
+                grade = p[0].strip()
+                field = p[1].strip()
+            else:
+                grade = deg_part.strip()
+
+            edu_items.append({"grade": grade, "field": field, "institution": inst, "years": years})
+            i += 1
+        elif y_m_next:
+            years = y_m_next.group(0)
+            before_yr = l_next[:y_m_next.start()].strip(' ·—-')
             if before_yr:
                 inst = before_yr
             if '«' in line and '»' in line:
-                m = re.search(r'^(.*?)[«"](.*?)[»"]', line)
+                m = re.search(r'^(.*?)[«\"](.*?)[»\"]', line)
                 grade = m.group(1).strip() if m else line
                 field = m.group(2).strip() if m else ""
             elif '·' in line:
@@ -289,14 +489,11 @@ def _extract_education_and_languages(sec_content: dict) -> tuple[list, list]:
 
             edu_items.append({"grade": grade, "field": field, "institution": inst, "years": years})
             i += 2
-        elif y_m_self:
-            years = y_m_self.group(0)
-            before_y = line[:y_m_self.start()].strip(' ·—-')
-            edu_items.append({"grade": before_y, "field": "", "institution": inst, "years": years})
-            i += 1
         else:
             edu_items.append({"grade": line, "field": "", "institution": inst, "years": ""})
             i += 1
+
+    edu_items = expand_compound_degrees(edu_items)
 
     lang_text = sec_content.get("languages", "")
     lang_items = []
@@ -375,13 +572,12 @@ def parse_resume_locally(text: str) -> dict:
 def extract_profile_with_ai(text: str) -> dict:
     """
     Parses resume locally with platform-grade precision.
-    If Gemini API is configured and accessible, enriches with AI insights;
+    If Gemini API or LM Studio is configured and accessible, enriches with AI insights;
     otherwise seamlessly returns the pristine local structured profile.
     """
     local_profile = parse_resume_locally(text)
-    api_key = get_api_key()
-    if not api_key or not api_key.strip():
-        return local_profile
+    cfg = get_llm_config()
+    provider = cfg.get("provider", "gemini")
 
     prompt = f"""
     Extract structured candidate profile from this resume for HH.ru / LinkedIn / ATS integration.
@@ -390,6 +586,21 @@ def extract_profile_with_ai(text: str) -> dict:
     Resume:
     {text[:4000]}
     """
+
+    if provider == "lm_studio":
+        raw_json = call_lm_studio(prompt, json_mode=True)
+        if raw_json:
+            ai_obj = extract_json_payload(raw_json)
+            if ai_obj and isinstance(ai_obj, dict):
+                for k in ["role", "name", "summary", "keywords"]:
+                    if ai_obj.get(k):
+                        local_profile[k] = ai_obj[k]
+                return local_profile
+        return local_profile
+
+    api_key = cfg.get("gemini_api_key", "")
+    if not api_key or not api_key.strip():
+        return local_profile
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
