@@ -210,13 +210,16 @@ Write EVERYTHING in {language_name}.
 If the job description is in Russian, write in Russian. If in English, write in English.
 Mixing languages = automatic failure.
 
-COVER LETTER RULES (follow exactly):
+COVER LETTER & SHORT DM RULES (follow exactly):
 
-RULE 1 — OPENING HOOK (most important):
-BANNED openers: "Hello [Company] Team", "I am writing to apply", "I am excited/thrilled/passionate",
-"Dear Hiring Manager", "Здравствуйте команда", "Меня зовут", "Я хочу откликнуться на вакансию".
+RULE 1 — OPENING HOOK & BAN ON "CAPTAIN OBVIOUS":
+ABSOLUTELY BANNED OPENERS (immediate failure):
+- "Вижу, что вы ищете...", "Вижу, что в [Company] ищут...", "Заметил, что вы в поиске...", "Увидел вашу вакансию...", "Увидел, что открыта позиция..."
+- "I see that you are looking for...", "I noticed you're hiring...", "Saw your opening at [Company]..."
+- "Hello [Company] Team", "I am writing to apply", "I am excited/thrilled/passionate", "Dear Hiring Manager", "Здравствуйте команда", "Меня зовут", "Я хочу откликнуться на вакансию".
+NEVER state to the recruiter/company what they are searching for ("Вижу, что ищете X"). They wrote the posting, they know who they are hiring.
 REQUIRED: Start with ONE concrete observation about THIS specific company's technical challenge,
-product scale, or engineering problem visible in the job description.
+product scale, or engineering problem visible in the job description, or directly state your technical angle.
 Examples:
 - "Running SSR on 100M+ monthly active users means bundle size is not a metric — it's a cost."
 - "Когда сервис принимает 50k запросов в секунду, гидратация React — это не деталь, это архитектура."
@@ -241,14 +244,19 @@ RULE 4 — NO FOUNDER FRAMING:
 Never say "my startup", "my project", "я фаундер". 
 Frame as: "Lead Frontend Engineer at NoLogs SaaS" or "продуктовый инженер в SaaS NoLogs".
 
-RULE 5 — LENGTH:
-Cover letter: 3 paragraphs maximum. No padding. End with contacts on the last line.
-Short DM: 2-3 sentences. Punchy. Direct. No "I hope this message finds you well."
+RULE 5 — STRICTLY NO HALLUCINATING FOREIGN STACKS:
+Candidate's real stack is: React, Next.js, TypeScript, Tailwind CSS, Node.js, FastAPI, PostgreSQL, Docker.
+If the vacancy requires technologies NOT in the candidate's profile (e.g. .NET, C#, Angular, Java, PHP, 1C, Flutter, Go):
+DO NOT claim to be a Senior developer in those technologies! Never pretend to have years of experience with .NET or Angular if not in profile.
+Instead, bridge through candidate's real expertise: complex frontend architecture, enterprise web platforms, robust API integration, or high-performance UI. Be honest and grounded.
 
+RULE 6 — LENGTH & FORMAT:
+Cover letter: 3 paragraphs maximum. No padding. End with contacts on the last line.
+Short DM: 2-3 sentences. Punchy. Direct. Peer-to-peer.
 SHORT DM format:
-- Sentence 1: Their specific opening + your most relevant technical angle.
-- Sentence 2: One hard proof point matching their top requirement.
-- Sentence 3: Clear CTA (call/chat/portfolio link).
+- Sentence 1: Direct hook and technical overlap (e.g., "Привет! Откликаюсь на позицию {title}. По стеку и задачам: [моя ключевая компетенция/пересечение]." or "Hi! Applying for the {title} role. My core focus is [key technical match]."). STRICTLY NO "Вижу, что вы ищете" or repeating their vacancy description!
+- Sentence 2: One hard proof point or metric matching their primary engineering challenge.
+- Sentence 3: Concise CTA (portfolio/GitHub link, offer to connect).
 {gold_examples_text}
 MATCH SCORE (0-100):
 - 80-98: Frontend/Fullstack/Product Web role matching React, Next.js, TypeScript core stack

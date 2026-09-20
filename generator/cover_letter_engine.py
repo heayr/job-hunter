@@ -77,11 +77,15 @@ def critic_refine_letter(
     notes = []
     refined = text
 
-    # Remove generic subservient openings
+    # Remove generic subservient or Captain Obvious openings
     subservient_patterns = [
         (r'(?i)меня зовут .*?,\s*и я хочу предложить свою кандидатуру на вакансию', 'Откликаюсь на позицию'),
         (r'(?i)с большим интересом прочитал описание вакансии', 'Изучил требования к позиции'),
         (r'(?i)буду бесконечно рад любой возможности пообщаться', 'Буду рад обсудить задачи с командой'),
+        (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*вижу,\s*что\s+(?:в\s+[^,.]+?\s+)?(?:ищут|вы\s+в\s+поиске|вы\s+ищете)[^,.]*?[,.]?\s*', 'Привет! '),
+        (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*увидел\s+(?:вашу\s+)?(?:позицию|вакансию)\s+«?[^»\n]+?»?\s*(?:в\s+[^,\n]+?)?[!,.]?\s*', 'Привет! Откликаюсь на позицию. '),
+        (r'(?i)i\s+see\s+(?:that\s+)?(?:you\s+are|they\s+are)\s+looking\s+for\s+.*?[,.]?\s*', 'Applying for the role. '),
+        (r'(?i)saw\s+your\s+.*?opening\s+at\s+.*?[,.]?\s*', 'Applying for the role. '),
         (r'(?i)i am thrilled to apply for the position of', 'Applying for the'),
         (r'(?i)i believe i am the ideal candidate for', 'My background directly addresses'),
         (r'(?i)thank you for your time and consideration', 'Looking forward to connecting')
@@ -89,7 +93,7 @@ def critic_refine_letter(
     for pattern, repl in subservient_patterns:
         if re.search(pattern, refined):
             refined = re.sub(pattern, repl, refined)
-            notes.append(f"Replaced subservient phrasing matching '{pattern}'")
+            notes.append(f"Replaced subservient/cliche phrasing matching '{pattern}'")
 
     # Clean generic fluff
     fluff_found = detect_generic_fluff(refined)
@@ -172,13 +176,13 @@ def heuristic_cover_letter(
 Telegram: {tg} | Email: {email}
 GitHub: {github} | LinkedIn: {linkedin}"""
 
-        draft_dm = f"""Привет! Увидел позицию «{title}» в {company}.
+        draft_dm = f"""Привет! Откликаюсь на позицию «{title}» в {company}.
 
-Мой стек (React 19, Next.js 16, TypeScript) напрямую закрывает ваши задачи. {highlights[0]}
+Мой стек (React 19, Next.js 16, TypeScript) напрямую закрывает ключевые требования: {highlights[0]}
 
 GitHub: {github} | LinkedIn: {linkedin}
 
-Если поиск актуален — буду рад пообщаться!"""
+Буду рад обсудить задачи с командой!"""
 
     else:
         core_hook = f"Autonomous product-focused engineer with full ownership of client architecture and high delivery speed." if is_middle else f"Senior product engineer with end-to-end technical ownership and proven delivery track record."
@@ -201,13 +205,13 @@ Best regards,
 Telegram: {tg} | Email: {email}
 GitHub: {github} | LinkedIn: {linkedin}"""
 
-        draft_dm = f"""Hi! Saw your {title} opening at {company}.
+        draft_dm = f"""Hi! Applying for the {title} position at {company}.
 
-My experience with React 19, Next.js 16, and TypeScript aligns directly with your stack. {highlights[0]}
+My background with React 19, Next.js 16, and TypeScript directly matches your requirements: {highlights[0]}
 
 GitHub: {github} | LinkedIn: {linkedin}
 
-Still interviewing for this role? Would love to connect!"""
+Looking forward to connecting!"""
 
     # Run Critic stage
     final_cl, cl_notes = critic_refine_letter(draft_cl, strategy, lang=lang)

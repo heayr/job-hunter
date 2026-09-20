@@ -144,6 +144,16 @@ class TestLocalDrillForms(unittest.TestCase):
 
         finally:
             stop_worker.set()
+            try:
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("DELETE FROM pitches WHERE vacancy_id = ?", (vac_id,))
+                cur.execute("DELETE FROM agent_sessions WHERE vacancy_id = ?", (vac_id,))
+                cur.execute("DELETE FROM vacancies WHERE id = ?", (vac_id,))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
 
     def test_end_to_end_drill_form_b_dynamic_react(self):
         """Tests end-to-end ReAct loop on Form B (Dynamic React-like controlled form)."""

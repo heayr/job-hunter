@@ -160,15 +160,15 @@ class CRMHandler(BaseHTTPRequestHandler):
             print(f"[SHAME_LIST] Error updating markdown: {e}")
 
     def upsert_pitch(self, cur, vac_id, pitch_type, lang, content):
-        """INSERT or UPDATE a pitch row (handles both new and existing pitches)."""
+        """INSERT or UPDATE a pitch row (handles both new and existing pitches). Resets rating to DRAFT on update."""
         cur.execute('''
-            INSERT INTO pitches (vacancy_id, pitch_type, language, content)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO pitches (vacancy_id, pitch_type, language, content, rating, status)
+            VALUES (?, ?, ?, ?, 0, 'DRAFT')
             ON CONFLICT DO NOTHING
         ''', (vac_id, pitch_type, lang, content))
         if cur.rowcount == 0:
             cur.execute('''
-                UPDATE pitches SET content = ? WHERE vacancy_id = ? AND pitch_type = ?
+                UPDATE pitches SET content = ?, rating = 0, status = 'DRAFT' WHERE vacancy_id = ? AND pitch_type = ?
             ''', (content, vac_id, pitch_type))
 
     # ─────────────────────────────────────────────
@@ -623,6 +623,10 @@ class CRMHandler(BaseHTTPRequestHandler):
                 self.upsert_pitch(cur, vac_id, 'cover_letter', pitch_data['language'], pitch_data['cover_letter'])
                 self.upsert_pitch(cur, vac_id, 'tailored_cv',  pitch_data['language'], pitch_data['tailored_cv'])
 
+                # Reset pitch rating for vacancy and clear previous ratings
+                cur.execute("UPDATE vacancies SET pitch_rating = 0 WHERE id = ?", (vac_id,))
+                cur.execute("UPDATE pitches SET rating = 0, status = 'DRAFT' WHERE vacancy_id = ?", (vac_id,))
+
                 # Always save score (even 0)
                 score = pitch_data.get('score')
                 if score is not None:
@@ -637,6 +641,9 @@ class CRMHandler(BaseHTTPRequestHandler):
                 "short_dm": pitch_data['short_dm'],
                 "cover_letter": pitch_data['cover_letter'],
                 "score": pitch_data.get('score', 0),
+                "pitch_rating": 0,
+                "cl_rating": 0,
+                "dm_rating": 0,
             })
 
         # ── Update vacancy status ──

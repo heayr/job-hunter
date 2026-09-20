@@ -1055,7 +1055,18 @@ async function rewriteAI(vac_id) {
             if (v) {
                 v.short_dm = data.short_dm;
                 v.cover_letter = data.cover_letter;
-                if (data.score) v.score = data.score;
+                if (data.score !== undefined) v.score = data.score;
+                v.pitch_rating = 0;
+                v.cl_rating = 0;
+                v.dm_rating = 0;
+            }
+            if (currentVac && String(currentVac.id) === String(vac_id)) {
+                currentVac.short_dm = data.short_dm;
+                currentVac.cover_letter = data.cover_letter;
+                if (data.score !== undefined) currentVac.score = data.score;
+                currentVac.pitch_rating = 0;
+                currentVac.cl_rating = 0;
+                currentVac.dm_rating = 0;
             }
             renderDetails();
             renderList();

@@ -413,10 +413,10 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Op
 
             short_dm = (
                 warning_header +
-                f"{greeting_dm} Saw your {title} opening at {company}.\n\n"
+                f"{greeting_dm} Applying for the {title} position at {company}.\n\n"
                 f"My focus aligns directly with your stack ({highlight_kw}). {top_fact}\n\n"
                 f"{github} | {linkedin}\n\n"
-                f"Still interviewing for this role? Would love to connect!"
+                f"Looking forward to discussing the role with your team!"
             )
             cover_letter = (
                 warning_header +
@@ -435,10 +435,10 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Op
 
             short_dm = (
                 warning_header +
-                f"{greeting_dm} Увидел вакансию «{title}» в {company}.\n\n"
+                f"{greeting_dm} Откликаюсь на позицию «{title}» в {company}.\n\n"
                 f"Мой стек и опыт напрямую пересекаются с вашими задачами ({highlight_kw}). {top_fact}\n\n"
                 f"{github} | {linkedin}\n\n"
-                f"Если позиция актуальна — буду рад пообщаться!"
+                f"Буду рад обсудить задачи с командой!"
             )
             cover_letter = (
                 warning_header +

@@ -37,6 +37,17 @@ class TestAgentApprovalPrivileged(unittest.TestCase):
         )
         update_agent_session(self.session_id, state="WAITING_FOR_USER", approval_token=self.approval_token)
 
+    def tearDown(self):
+        from tracker.db import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM pitches WHERE vacancy_id = ?", (self.vacancy_id,))
+        cur.execute("DELETE FROM agent_sessions WHERE vacancy_id = ?", (self.vacancy_id,))
+        cur.execute("DELETE FROM application_history WHERE vacancy_id = ?", (self.vacancy_id,))
+        cur.execute("DELETE FROM vacancies WHERE id = ?", (self.vacancy_id,))
+        conn.commit()
+        conn.close()
+
     def test_submit_rejects_missing_or_invalid_token(self):
         # 1. Invalid token
         res1 = ToolRegistry.execute_tool("browser_submit_application", {

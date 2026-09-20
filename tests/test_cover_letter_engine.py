@@ -23,7 +23,7 @@ class TestCoverLetterEngine(unittest.TestCase):
     def test_validate_valid_cover_letter(self):
         valid = {
             "cover_letter": "Здравствуйте! Откликаюсь на позицию Senior Frontend Developer в TechCorp. Специализируюсь на продуктовом фронтенде с фокусом на масштабируемую архитектуру. Ключевые результаты: Next.js 16, React 19, PageSpeed 100/100. Буду рад обсудить задачи!",
-            "short_dm": "Привет! Увидел вакансию Senior Frontend Developer. Мой стек (React 19, Next.js 16) напрямую закрывает задачи. Буду рад пообщаться!",
+            "short_dm": "Привет! Откликаюсь на позицию Senior Frontend Developer. Мой стек (React 19, Next.js 16) напрямую закрывает задачи. Буду рад пообщаться!",
             "core_hook": "Специализируюсь на продуктовой веб-разработке.",
             "tone_assessment": "Pragmatic, peer-to-peer",
             "critique_notes": ["Removed generic fluff"],
@@ -52,6 +52,19 @@ class TestCoverLetterEngine(unittest.TestCase):
         self.assertNotIn("хочу предложить свою кандидатуру", refined.lower())
         self.assertIn("Откликаюсь на позицию", refined)
         self.assertGreater(len(notes), 0)
+
+    def test_critic_refine_letter_replaces_captain_obvious_openers(self):
+        obvious_dm = "Привет! Вижу, что в Top Selection ищут Senior на .NET + Angular для enterprise-продуктов. Мой стек закрывает задачи."
+        strategy = {"deliberate_omissions": []}
+        refined, notes = critic_refine_letter(obvious_dm, strategy, lang="ru")
+        self.assertNotIn("вижу, что", refined.lower())
+        self.assertNotIn("ищут", refined.lower())
+        self.assertGreater(len(notes), 0)
+
+        obvious_dm_2 = "Привет! Увидел вакансию «Senior Frontend» в TechCorp. Буду рад пообщаться!"
+        refined_2, notes_2 = critic_refine_letter(obvious_dm_2, strategy, lang="ru")
+        self.assertNotIn("увидел вакансию", refined_2.lower())
+        self.assertIn("Откликаюсь на позицию", refined_2)
 
     def test_fact_check_flags_unverified_dangerous_tech(self):
         clean_text = "Experienced in React 19, Next.js 16, TypeScript, Docker, and FastAPI."
