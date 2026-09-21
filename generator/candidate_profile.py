@@ -191,6 +191,9 @@ def upgrade_legacy_profile(legacy: Dict[str, Any]) -> Dict[str, Any]:
         "evidence": evidence,
         "screening_facts": legacy.get("screening_facts") or dict(DEFAULT_SCREENING_FACTS),
 
+        # ── Key quantified achievements for pitch generation ──
+        "key_achievements": legacy.get("key_achievements") or [],
+
         # ── Backward compatibility fields for legacy UI & Bookmarklet ──
         "name": name,
         "role": role,

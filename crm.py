@@ -116,6 +116,7 @@ class CRMHandler(BaseHTTPRequestHandler):
                 v.ats_report_json,
                 COALESCE(v.fsm_state, 'DISCOVERED') AS fsm_state,
                 COALESCE(v.pitch_rating, 0) AS pitch_rating,
+                v.viewed_at,
                 COALESCE(MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.rating END), 0) AS cl_rating,
                 COALESCE(MAX(CASE WHEN p.pitch_type = 'short_dm' THEN p.rating END), 0) AS dm_rating,
                 MAX(CASE WHEN p.pitch_type = 'short_dm'     THEN p.content END) AS short_dm,
@@ -170,6 +171,121 @@ class CRMHandler(BaseHTTPRequestHandler):
             cur.execute('''
                 UPDATE pitches SET content = ?, rating = 0, status = 'DRAFT' WHERE vacancy_id = ? AND pitch_type = ?
             ''', (content, vac_id, pitch_type))
+
+    def _send_sse(self, event, data):
+        """Send a Server-Sent Event."""
+        msg = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+        self.wfile.write(msg.encode('utf-8'))
+        self.wfile.flush()
+
+    def _handle_rewrite_stream(self):
+        """SSE streaming endpoint for AI pitch rewrite with real-time progress."""
+        import time as _time
+        from generator.pitch_builder import generate_pitch, determine_language, select_profile, extract_target_keywords
+
+        vac_id = urllib.parse.unquote(self.path.split('/')[3])
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM vacancies WHERE id = ?", (vac_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        v_dict = dict(row)
+
+        # Set up SSE headers
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+
+        try:
+            # Stage 1: Analyzing vacancy
+            self._send_sse("progress", {"stage": "analyzing", "percent": 10, "message": "Анализирую вакансию..."})
+            _time.sleep(0.3)
+
+            title = v_dict.get("title", "")
+            company = v_dict.get("company", "")
+            desc = v_dict.get("description", "")
+            skills = v_dict.get("skills", "")
+            lang = determine_language(v_dict)
+            profile = select_profile(lang)
+
+            # Stage 2: Matching achievements
+            self._send_sse("progress", {"stage": "matching", "percent": 25, "message": "Подбираю релевантные достижения..."})
+            _time.sleep(0.3)
+
+            target_kws = extract_target_keywords(title, skills, desc)
+            self._send_sse("progress", {"stage": "matching", "percent": 35, "message": f"Найдено {len(target_kws)} ключевых технологий: {', '.join(target_kws[:4])}"})
+            _time.sleep(0.2)
+
+            # Stage 3: Generating via AI
+            self._send_sse("progress", {"stage": "generating", "percent": 40, "message": "Запускаю AI-модель..."})
+            _time.sleep(0.2)
+
+            # Call the actual AI generation
+            pitch_data = generate_pitch(v_dict, use_ai=True)
+
+            if pitch_data.get("ai_generated"):
+                # Stage 4: Streaming results
+                short_dm = pitch_data.get("short_dm", "")
+                cover_letter = pitch_data.get("cover_letter", "")
+                score = pitch_data.get("score", 0)
+
+                self._send_sse("progress", {"stage": "streaming", "percent": 70, "message": "Получен ответ AI. Стриминг текста..."})
+                _time.sleep(0.2)
+
+                # Stream short DM word by word
+                self._send_sse("progress", {"stage": "streaming_dm", "percent": 75, "message": "Генерирую Short DM..."})
+                dm_words = short_dm.split()
+                dm_streamed = ""
+                for i, word in enumerate(dm_words):
+                    dm_streamed += (" " if i > 0 else "") + word
+                    self._send_sse("chunk", {"field": "short_dm", "text": dm_streamed, "percent": 75 + int(10 * i / max(len(dm_words), 1))})
+                    _time.sleep(0.02)
+
+                self._send_sse("progress", {"stage": "streaming_cl", "percent": 85, "message": "Генерирую Cover Letter..."})
+                cl_words = cover_letter.split()
+                cl_streamed = ""
+                for i, word in enumerate(cl_words):
+                    cl_streamed += (" " if i > 0 else "") + word
+                    self._send_sse("chunk", {"field": "cover_letter", "text": cl_streamed, "percent": 85 + int(10 * i / max(len(cl_words), 1))})
+                    _time.sleep(0.015)
+
+                # Stage 5: Saving
+                self._send_sse("progress", {"stage": "saving", "percent": 97, "message": "Сохраняю в базу..."})
+                _time.sleep(0.2)
+
+                self.upsert_pitch(cur, vac_id, 'short_dm', pitch_data['language'], short_dm)
+                self.upsert_pitch(cur, vac_id, 'cover_letter', pitch_data['language'], cover_letter)
+                self.upsert_pitch(cur, vac_id, 'tailored_cv', pitch_data['language'], pitch_data.get('tailored_cv', ''))
+                cur.execute("UPDATE vacancies SET pitch_rating = 0 WHERE id = ?", (vac_id,))
+                cur.execute("UPDATE pitches SET rating = 0, status = 'DRAFT' WHERE vacancy_id = ?", (vac_id,))
+                if score is not None:
+                    cur.execute("UPDATE vacancies SET score = ? WHERE id = ?", (score, vac_id))
+                conn.commit()
+
+                self._send_sse("done", {
+                    "success": True,
+                    "short_dm": short_dm,
+                    "cover_letter": cover_letter,
+                    "score": score,
+                    "language": pitch_data['language']
+                })
+            else:
+                error = pitch_data.get("error", "AI generation failed")
+                self._send_sse("error", {"message": error})
+
+        except Exception as e:
+            self._send_sse("error", {"message": str(e)})
+        finally:
+            conn.close()
 
     # ─────────────────────────────────────────────
     #  CORS preflight
@@ -574,6 +690,10 @@ class CRMHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
 
+        # ── SSE streaming for AI rewrite (EventSource = GET) ──
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/rewrite-stream'):
+            self._handle_rewrite_stream()
+
         else:
             self.send_response(404)
             self.end_headers()
@@ -600,7 +720,7 @@ class CRMHandler(BaseHTTPRequestHandler):
         return self.rfile.read(length)
 
     def _handle_post(self):
-        # ── Rewrite vacancy pitches via AI ──
+        # ── Rewrite vacancy pitches via AI (legacy sync) ──
         if self.path.startswith('/api/vacancies/') and self.path.endswith('/rewrite'):
             from generator.pitch_builder import generate_pitch
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
@@ -653,6 +773,16 @@ class CRMHandler(BaseHTTPRequestHandler):
             self.update_vacancy_status(vac_id, body.get('status'), body.get('reason'))
             _send_json(self, {"success": True})
 
+        # ── Mark vacancy as viewed ──
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/viewed'):
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("UPDATE vacancies SET viewed_at = CURRENT_TIMESTAMP WHERE id = ? AND viewed_at IS NULL", (vac_id,))
+            conn.commit()
+            conn.close()
+            _send_json(self, {"success": True})
+
         # ── Record recruiter response status (interview / rejected / ghosted) ──
         elif self.path.startswith('/api/vacancies/') and self.path.endswith('/response_status'):
             vac_id = urllib.parse.unquote(self.path.split('/')[3])
@@ -668,6 +798,55 @@ class CRMHandler(BaseHTTPRequestHandler):
             conn.commit()
             conn.close()
             _send_json(self, {"success": True, "vacancy_id": vac_id, "response_status": response_status})
+
+        # ── Re-fetch full description from vacancy URL ──
+        elif self.path.startswith('/api/vacancies/') and self.path.endswith('/refetch-desc'):
+            import urllib.request as _urllib_req
+            vac_id = urllib.parse.unquote(self.path.split('/')[3])
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT url, source FROM vacancies WHERE id = ?", (vac_id,))
+            row = cur.fetchone()
+            if not row:
+                conn.close()
+                _send_json(self, {"success": False, "error": "Vacancy not found"}, status=404)
+                return
+            vac_url, source = row[0], row[1]
+            if not vac_url or source != 'habr':
+                conn.close()
+                _send_json(self, {"success": False, "error": "Refetch only supported for Habr vacancies"})
+                return
+            # Fetch and parse full description
+            new_desc = ""
+            try:
+                import html as html_mod
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    'Accept': 'text/html,application/xhtml+xml',
+                    'Accept-Language': 'ru-RU,ru;q=0.9',
+                }
+                req = _urllib_req.Request(vac_url, headers=headers)
+                with _urllib_req.urlopen(req, timeout=12) as resp:
+                    page = resp.read().decode('utf-8', errors='ignore')
+                m = re.search(r'<div class="vacancy-description[^"]*"[^>]*>(.*?)</div>\s*(?=<div class="|(?:</section|</article))', page, re.DOTALL)
+                if not m:
+                    m = re.search(r'<div class="job-description[^"]*"[^>]*>(.*?)</div>', page, re.DOTALL)
+                if m:
+                    raw = re.sub(r'<[^>]+>', ' ', m.group(1))
+                    raw = html_mod.unescape(raw)
+                    new_desc = re.sub(r'\s+', ' ', raw).strip()[:4000]
+            except Exception as e:
+                conn.close()
+                _send_json(self, {"success": False, "error": f"Fetch failed: {e}"})
+                return
+            if new_desc and len(new_desc) > 200:
+                cur.execute("UPDATE vacancies SET description = ? WHERE id = ?", (new_desc, vac_id))
+                conn.commit()
+                conn.close()
+                _send_json(self, {"success": True, "description": new_desc[:200] + "..."})
+            else:
+                conn.close()
+                _send_json(self, {"success": False, "error": "Could not extract description from page"})
 
         # ── Rate vacancy pitch / cover letter (Feedback loop) ──
         elif self.path == '/api/pitches/rate' or (self.path.startswith('/api/vacancies/') and self.path.endswith('/rate_pitch')):
@@ -849,6 +1028,41 @@ class CRMHandler(BaseHTTPRequestHandler):
 
             profile_data = extract_profile_with_ai(text)
             _send_json(self, {"success": True, "profile": profile_data})
+
+        # ── Generate actualized resume for a specific vacancy (for HH/Habr update) ──
+        elif self.path == '/api/vacancies/actualize-resume':
+            body = json.loads(self._read_body().decode('utf-8'))
+            vac_id = body.get('vacancy_id', '')
+            profile_id = body.get('profile_id')
+
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM vacancies WHERE id = ?', (vac_id,))
+            row = cur.fetchone()
+            conn.close()
+
+            if not row:
+                _send_json(self, {"error": "Vacancy not found"}, status=404)
+                return
+
+            vacancy = dict(row)
+
+            from generator.pitch_builder import build_tailored_cv, extract_target_keywords, determine_language
+            lang = determine_language(vacancy)
+            target_kws = extract_target_keywords(
+                vacancy.get("title", ""),
+                vacancy.get("skills", ""),
+                vacancy.get("description", "")
+            )
+            tailored_cv = build_tailored_cv(vacancy, target_kws, lang=lang, profile_id=profile_id)
+
+            _send_json(self, {
+                "success": True,
+                "vacancy_id": vac_id,
+                "tailored_cv": tailored_cv,
+                "target_keywords": target_kws,
+                "language": lang
+            })
 
         # ── Save config (API key, etc.) ──
         elif self.path == '/api/config':

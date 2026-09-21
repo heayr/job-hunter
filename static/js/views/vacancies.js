@@ -8,10 +8,26 @@ async function loadPitches() {
         updateCounts();
         renderList();
         renderDetails();
+        // Restore vacancy from URL hash on page load
+        restoreFromHash();
     } catch (e) {
         console.error("Failed to load vacancies", e);
     }
 }
+
+function restoreFromHash() {
+    const hash = location.hash.slice(1);
+    if (!hash) return;
+    const id = decodeURIComponent(hash);
+    const vac = vacancies.find(v => String(v.id) === id);
+    if (vac) {
+        currentVac = vac;
+        renderList();
+        renderDetails();
+    }
+}
+
+window.addEventListener('hashchange', restoreFromHash);
 
 function setMarket(market) {
     currentMarket = market;
@@ -192,6 +208,15 @@ function onFilterChange() {
 
 function selectVac(id) {
     currentVac = vacancies.find(v => String(v.id) === String(id));
+    if (currentVac) {
+        // Update URL hash for deep linking
+        history.replaceState(null, '', '#' + encodeURIComponent(currentVac.id));
+        // Mark as viewed on first select
+        if (!currentVac.viewed_at) {
+            currentVac.viewed_at = new Date().toISOString();
+            api.post(`/api/vacancies/${encodeURIComponent(currentVac.id)}/viewed`, {}).catch(() => {});
+        }
+    }
     renderList();
     renderDetails();
 }
@@ -263,6 +288,8 @@ function renderList() {
 
     listEl.innerHTML = filtered.map(v => {
         const isEn = v.language === 'en';
+        const isViewed = Boolean(v.viewed_at);
+        const viewedDot = isViewed ? '' : '<span class="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0" title="Не просмотрено"></span>';
         const langBadge = isEn
             ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-950/80 text-sky-400 border border-sky-800/70 flex items-center gap-1">🌍 EN</span>`
             : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/70 flex items-center gap-1">🇷🇺 RU</span>`;
@@ -318,7 +345,7 @@ function renderList() {
                     ${v.score > 0 ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${v.score >= 80 ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/80' : v.score >= 50 ? 'bg-amber-900/50 text-amber-400 border border-amber-800/80' : 'bg-rose-900/50 text-rose-400 border border-rose-800/80'}">🔥 ${v.score}% Match</span>` : ''}
                 </div>
             </div>
-            <h3 class="font-semibold text-slate-200 text-sm truncate" title="${v.title}">${v.title}</h3>
+            <h3 class="font-semibold text-slate-200 text-sm truncate flex items-center gap-1.5" title="${v.title}">${viewedDot}${v.title}</h3>
             <div class="text-sky-400 text-xs mt-1 flex items-center justify-between">
                 <span class="truncate pr-2 ${isBlacklist ? 'text-rose-300' : ''}">🏢 ${v.company}</span>
                 ${v.salary && v.salary !== 'Не указана' ? `<span class="text-emerald-400 font-medium whitespace-nowrap">${v.salary}</span>` : ''}
@@ -1040,45 +1067,115 @@ async function rewriteAI(vac_id) {
 
     if (btn) {
         btn.disabled = true;
+        btn.innerHTML = '<span class="animate-pulse">✨</span> Генерация...';
         btn.classList.add('opacity-50');
     }
     if (prog) prog.classList.remove('hidden');
-    if (ptext) ptext.innerText = 'Запрос в Gemini... (подбираем персону и генерируем pitch)';
+
+    // Create dynamic progress bar if not exists
+    let progressBar = document.getElementById(`ai-progressbar-${vac_id}`);
+    if (!progressBar && prog) {
+        const barHtml = `
+            <div id="ai-progressbar-${vac_id}" class="mt-2.5">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span id="ai-stage-${vac_id}" class="text-[11px] text-slate-400">Инициализация...</span>
+                    <span id="ai-percent-${vac_id}" class="text-[11px] font-mono text-indigo-400">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div id="ai-bar-${vac_id}" class="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                </div>
+                <div id="ai-substage-${vac_id}" class="text-[10px] text-slate-500 mt-1.5 min-h-[14px]"></div>
+            </div>`;
+        prog.insertAdjacentHTML('beforeend', barHtml);
+        progressBar = document.getElementById(`ai-progressbar-${vac_id}`);
+    }
+
+    const stageEl = document.getElementById(`ai-stage-${vac_id}`);
+    const percentEl = document.getElementById(`ai-percent-${vac_id}`);
+    const barEl = document.getElementById(`ai-bar-${vac_id}`);
+    const substageEl = document.getElementById(`ai-substage-${vac_id}`);
+
+    function updateProgress(data) {
+        const pct = data.percent || 0;
+        if (stageEl) stageEl.textContent = data.message || '';
+        if (percentEl) percentEl.textContent = pct + '%';
+        if (barEl) barEl.style.width = pct + '%';
+        if (substageEl && data.stage) {
+            const icons = { analyzing: '🔍', matching: '🎯', generating: '🤖', streaming: '📡', streaming_dm: '💬', streaming_cl: '📝', saving: '💾' };
+            substageEl.textContent = (icons[data.stage] || '') + ' ' + (data.message || '');
+        }
+    }
 
     try {
-        const data = await api.rewriteAI(vac_id);
-        if (data.success) {
-            if (ptext) ptext.innerHTML = '<span class="text-emerald-400 font-medium">✅ Готово! Текст обновлен.</span>';
-            setTimeout(() => { if (prog) prog.classList.add('hidden'); }, 2000);
+        api.rewriteAIStream(vac_id, {
+            onProgress: (data) => {
+                updateProgress(data);
+                if (ptext) ptext.innerText = data.message || '';
+            },
+            onChunk: (data) => {
+                const v = vacancies.find(v => String(v.id) === String(vac_id));
+                if (v) {
+                    if (data.field === 'short_dm') v.short_dm = data.text;
+                    if (data.field === 'cover_letter') v.cover_letter = data.text;
+                }
+                if (currentVac && String(currentVac.id) === String(vac_id)) {
+                    if (data.field === 'short_dm') currentVac.short_dm = data.text;
+                    if (data.field === 'cover_letter') currentVac.cover_letter = data.text;
+                }
+                renderDetails();
+                // Update progress during streaming
+                const pct = data.percent || 0;
+                if (barEl) barEl.style.width = pct + '%';
+                if (percentEl) percentEl.textContent = pct + '%';
+            },
+            onDone: (data) => {
+                if (barEl) barEl.style.width = '100%';
+                if (percentEl) percentEl.textContent = '100%';
+                if (stageEl) stageEl.textContent = '✅ Готово!';
+                if (ptext) ptext.innerHTML = '<span class="text-emerald-400 font-medium">✅ Текст обновлен и сохранен.</span>';
+                if (substageEl) substageEl.textContent = '';
 
-            const v = vacancies.find(v => String(v.id) === String(vac_id));
-            if (v) {
-                v.short_dm = data.short_dm;
-                v.cover_letter = data.cover_letter;
-                if (data.score !== undefined) v.score = data.score;
-                v.pitch_rating = 0;
-                v.cl_rating = 0;
-                v.dm_rating = 0;
+                const v = vacancies.find(v => String(v.id) === String(vac_id));
+                if (v) {
+                    v.short_dm = data.short_dm;
+                    v.cover_letter = data.cover_letter;
+                    if (data.score !== undefined) v.score = data.score;
+                    v.pitch_rating = 0;
+                    v.cl_rating = 0;
+                    v.dm_rating = 0;
+                }
+                if (currentVac && String(currentVac.id) === String(vac_id)) {
+                    currentVac.short_dm = data.short_dm;
+                    currentVac.cover_letter = data.cover_letter;
+                    if (data.score !== undefined) currentVac.score = data.score;
+                    currentVac.pitch_rating = 0;
+                    currentVac.cl_rating = 0;
+                    currentVac.dm_rating = 0;
+                }
+                renderDetails();
+                renderList();
+                setTimeout(() => {
+                    if (prog) prog.classList.add('hidden');
+                    if (progressBar) progressBar.remove();
+                }, 2500);
+            },
+            onError: (data) => {
+                if (ptext) ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ ${data.message || 'Ошибка генерации'}</span>`;
+                if (barEl) barEl.classList.add('bg-rose-500');
+                if (stageEl) stageEl.textContent = '❌ Ошибка';
+                setTimeout(() => {
+                    if (prog) prog.classList.add('hidden');
+                    if (progressBar) progressBar.remove();
+                }, 3000);
             }
-            if (currentVac && String(currentVac.id) === String(vac_id)) {
-                currentVac.short_dm = data.short_dm;
-                currentVac.cover_letter = data.cover_letter;
-                if (data.score !== undefined) currentVac.score = data.score;
-                currentVac.pitch_rating = 0;
-                currentVac.cl_rating = 0;
-                currentVac.dm_rating = 0;
-            }
-            renderDetails();
-            renderList();
-        } else {
-            if (ptext) ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ ${data.error || 'Ошибка генерации'}</span>`;
-        }
+        });
     } catch (e) {
         if (ptext) ptext.innerHTML = `<span class="text-rose-400 font-medium">❌ Ошибка сети. Проверьте VPN и консоль сервера.</span>`;
     }
 
     if (btn) {
         btn.disabled = false;
+        btn.innerHTML = '<span>✨</span> Переписать (AI)';
         btn.classList.remove('opacity-50');
     }
 }

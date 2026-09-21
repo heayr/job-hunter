@@ -1,54 +1,53 @@
 # System Architecture
 
-Job Hunter CRM — autonomous local-first AI career agent. Scrapes jobs, generates tailored pitches via Gemini AI, auto-fills application forms in the browser with anti-detection, and tracks the full application lifecycle.
+Job Hunter CRM — autonomous local-first AI career agent & application engine. Scrapes jobs across 14+ sources, generates evidence-grounded pitches via Gemini AI or local LLMs (LM Studio), auto-fills applications in the browser via Chrome DevTools Protocol (CDP) and Manifest V3 extension, streams rewrite progress in real-time, and tracks the full application lifecycle.
 
 ---
 
 ## High-Level Data Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        1. JOB MARKET INGESTION                      │
-│  Telegram · HH.ru · Habr · RemoteOK · Remotive · WWR · Crypto     │
-│  SuperJob · Rabota.ru · HackerNews · Jobicy · ATS (Greenhouse etc) │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     2. PROCESSING PIPELINE                          │
-│  Anti-BS Filter → Market Segmentation (RU/EN) → Score Matcher      │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     3. AI COGNITIVE AGENT (6 agents)                │
-│  JobAnalyst → CompanyResearcher → CandidateStrategist              │
-│  → Writer → Critic → FactChecker                                   │
-│                                                                     │
-│  Outputs: understanding · thesis · strategy · resume · cover letter │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     4. LOCAL STORAGE (SQLite)                       │
-│  vacancies · pitches · candidate_profiles · application_history     │
-│  agent_tasks · agent_run_logs · company_dossiers                    │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     5. CRM WEB UI                                   │
-│  Dashboard · Vacancy Details · Profiles · Settings · Modals         │
-│  Python HTTP server (:8115) + Vanilla JS + Tailwind CSS            │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     6. BROWSER AUTOMATION                           │
-│  Chrome Extension (Manifest V3)                                     │
-│  ├── core.js            — anti-detection utilities                  │
-│  ├── platform-adapters.js — HH, LinkedIn, ATS, Generic adapters    │
-│  ├── autofill.js        — form filling engine                      │
-│  ├── automation.js      — CAPTCHA detect, auto-submit, multi-step  │
-│  ├── content_script.js  — message orchestrator                     │
-│  ├── background.js      — autonomous agent worker                  │
-│  └── sidepanel.js       — side panel UI controller                 │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         1. JOB MARKET INGESTION (14+ Sources)               │
+│  Telegram · HH.ru · Habr · SuperJob · Rabota.ru · Setka · GetMatch          │
+│  RemoteOK · Remotive · WWR · CryptoJobsList · HackerNews · Jobicy · ATS     │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              2. PROCESSING PIPELINE                         │
+│  Anti-BS Filter → Market Routing (RU/EN) → Tech Match Scorer (0–100%)       │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      3. AI COGNITIVE AGENT (6-Agent Pipeline)               │
+│  JobAnalyst → CompanyResearcher → CandidateStrategist                       │
+│  → Writer → Critic (Anti-Cliché) → FactChecker (Zero-Hallucination)        │
+│                                                                             │
+│  Outputs: understanding · thesis · strategy · resume · cover letter · DM    │
+│  Real-time SSE progress streaming directly to Web UI                        │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              4. LOCAL STORAGE (SQLite)                      │
+│  vacancies (with viewed_at, pitch_rating, FSM state)                        │
+│  pitches (with granular ratings, auto-reset) · candidate_profiles           │
+│  application_history · agent_tasks · agent_run_logs · company_dossiers      │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              5. MODULAR CRM WEB UI                          │
+│  Dashboard · Viewed Tracking · Profiles Editor · Settings · SSE Progress    │
+│  Python stdlib HTTP server (:8115) + Modular Vanilla JS + Tailwind CSS      │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              6. BROWSER AUTOMATION                          │
+│  A. Chrome Live Bridge (CDP port 9222) via launch_chrome.sh                 │
+│     Deterministic HeadHunter & Habr automation in user's active session     │
+│  B. Chrome Extension (Manifest V3)                                          │
+│     autofill · anti-detection · multi-step traversal · CAPTCHA detection    │
+│  C. Smart Bookmarklet (Zero-install fallback)                               │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -57,11 +56,12 @@ Job Hunter CRM — autonomous local-first AI career agent. Scrapes jobs, generat
 
 | Layer | Technology | Why |
 |---|---|---|
-| Backend | Python 3.x (`http.server`, `sqlite3`, `urllib`) | Zero dependencies, instant cold start |
-| Frontend | Vanilla JS + Tailwind CSS (CDN) | No build step, instant reload |
-| Database | SQLite (`jobs.db`) | 100% local, zero config |
-| AI | Google Gemini API (`gemini-flash`) | Fast, cheap, structured output |
-| Automation | Chrome Extension (Manifest V3) | Runs in user's authenticated browser, immune to bot detection |
+| **Backend** | Python 3.10+ (`http.server`, `sqlite3`, `urllib`) | Zero external dependencies, instant cold start (<100ms), zero package rot. |
+| **Frontend** | Modular Vanilla JS (`static/js/`) + Tailwind CSS (CDN) | Zero build step, instant reload on save, clean separation of concerns. |
+| **Database** | SQLite (`jobs.db`) with auto-migrations | 100% local data ownership, zero server config. |
+| **AI Engine** | Google Gemini API & Local LLMs (LM Studio / Ollama) | Low latency, structured output, option for 100% offline private inference. |
+| **Automation** | Chrome CDP Bridge + Manifest V3 Extension + Bookmarklet | Runs in user's authenticated context, immune to Cloudflare and bot detection. |
+| **Testing** | Pytest, Hypothesis, Coverage | Measurable Quality Score, property-based fuzzing, automated metrics. |
 
 ---
 
@@ -69,87 +69,111 @@ Job Hunter CRM — autonomous local-first AI career agent. Scrapes jobs, generat
 
 ```
 job_hunter/
-├── crm.py                    # HTTP server — all API endpoints (682 lines)
-├── crm_v2_template.html      # Single-file CRM UI
-├── start.sh                  # Launch script (kills old, starts new)
-├── jobs.db                   # SQLite database
-├── config.json               # Gemini API key + settings
+├── crm.py                     # HTTP server — REST API + SSE streaming endpoints
+├── crm_v2_template.html       # Main CRM dashboard markup
+├── start.sh                   # Launch script (kills previous instance, starts server)
+├── launch_chrome.sh           # Launches Chrome with remote debugging on port 9222
+├── run_objective_tests.sh     # Comprehensive test runner with coverage & quality score
+├── harvest.py                 # Multi-source harvesting orchestrator
+├── auto_enrich.py             # Vacancy enrichment pipeline
+├── jobs.db                    # SQLite database (auto-migrated)
+├── config.json                # API keys, LLM provider, policies
+├── pytest.ini                 # Pytest configuration
 │
-├── scrapers/                 # 11 job source scrapers
-│   ├── base.py               # BaseScraper interface
-│   ├── telegram_scraper.py   # Telegram channel parser
-│   ├── hh_scraper.py         # HeadHunter API
-│   ├── habr_scraper.py       # Habr Career
-│   ├── remoteok_scraper.py   # RemoteOK API
-│   ├── remotive_scraper.py   # Remotive API
-│   ├── wwr_scraper.py        # WeWorkRemotely RSS
-│   ├── crypto_scraper.py     # CryptoJobsList
-│   ├── superjob_scraper.py   # SuperJob
-│   ├── rabotaru_scraper.py   # Rabota.ru
-│   ├── hackernews_scraper.py # HN Who's Hiring
-│   ├── jobicy_scraper.py     # Jobicy
-│   └── ats_scraper.py        # Greenhouse/Lever/Ashby/Workable
+├── scrapers/                  # 14 job source scrapers
+│   ├── base.py                # BaseScraper interface
+│   ├── hh_scraper.py          # HeadHunter API scraper
+│   ├── habr_scraper.py        # Habr Career scraper
+│   ├── superjob_scraper.py    # SuperJob scraper
+│   ├── rabotaru_scraper.py    # Rabota.ru scraper
+│   ├── setka_scraper.py       # Setka.ru scraper
+│   ├── getmatch_scraper.py    # GetMatch scraper
+│   ├── telegram_scraper.py    # Telegram channels & Telethon userbot
+│   ├── remoteok_scraper.py    # RemoteOK API scraper
+│   ├── remotive_scraper.py    # Remotive API scraper
+│   ├── wwr_scraper.py         # WeWorkRemotely RSS scraper
+│   ├── crypto_scraper.py      # CryptoJobsList scraper
+│   ├── hackernews_scraper.py  # Hacker News "Who's Hiring" scraper
+│   ├── jobicy_scraper.py      # Jobicy scraper
+│   └── ats_scraper.py         # Greenhouse/Lever/Ashby/Workable scraper
 │
-├── enricher/                 # Data enrichment
-│   ├── lead_finder.py        # Contact extraction (TG, email, phone)
-│   └── ai_parser.py          # AI vacancy parser + CRM ingester
+├── enricher/                  # Data enrichment
+│   ├── lead_finder.py         # Contact extraction (Telegram, email, phone)
+│   └── ai_parser.py           # AI vacancy parser + CRM ingester
 │
-├── filter/                   # Vacancy filtering
-│   └── profile_filter.py     # Anti-BS filter, grade detection
+├── filter/                    # Vacancy filtering
+│   └── profile_filter.py      # Anti-BS filter, grade detection, blacklist checks
 │
-├── generator/                # AI content generation (13 modules)
-│   ├── pitch_builder.py      # Orchestrator — assembles final pitch
-│   ├── cover_letter_engine.py # Multi-stage cover letter (Draft→Critic→Final)
+├── generator/                 # AI content generation & cognitive pipeline
+│   ├── pitch_builder.py       # Pitch orchestrator & keyword matcher
+│   ├── cover_letter_engine.py # Multi-stage cover letter generation & fact-checking
 │   ├── tailored_resume_engine.py # ATS-compliant resume builder
-│   ├── ats_analyzer.py       # ATS keyword scoring
-│   ├── llm_generator.py      # Gemini API wrapper + model fallback
-│   ├── candidate_profile.py  # Canonical profile schema + validator
-│   ├── job_understanding.py  # Facts vs hypotheses extraction
-│   ├── company_researcher.py # Bounded company intelligence
-│   ├── thesis_generator.py   # Application thesis formulation
-│   ├── thesis_critic.py      # Adversarial thesis validator
-│   ├── evidence_retriever.py # Pain-to-capability evidence mapping
-│   ├── application_strategy.py # Positioning + narrative strategy
-│   └── resume_parser.py      # PDF/DOCX resume parser
+│   ├── ats_analyzer.py        # ATS keyword scoring & match analysis
+│   ├── llm_generator.py       # Gemini API & LM Studio wrapper + model fallback
+│   ├── candidate_profile.py   # Canonical profile schema + validator
+│   ├── job_understanding.py   # Facts vs hypotheses extraction
+│   ├── company_researcher.py  # Bounded company intelligence
+│   ├── thesis_generator.py    # Application thesis formulation
+│   ├── thesis_critic.py       # Adversarial thesis validator & anti-cliché critic
+│   ├── evidence_retriever.py  # Pain-to-capability evidence mapping (STAR)
+│   ├── application_strategy.py # Positioning & narrative strategy
+│   └── resume_parser.py       # PDF/DOCX resume parser
 │
-├── agents/                   # Multi-agent orchestration
-│   ├── runtime.py            # FSM runtime (9 states, retries, timeouts)
-│   ├── multi_agent_roles.py  # 6 specialized agent roles
-│   └── tool_system.py        # Declarative tool registry (6 tools)
+├── agents/                    # Multi-agent orchestration & browser automation
+│   ├── runtime.py             # FSM runtime (9 states, retries, timeouts)
+│   ├── multi_agent_roles.py   # 6 specialized agent roles
+│   ├── agent_brain.py         # Autonomous agent brain & bridge coordinator
+│   ├── tool_system.py         # Declarative tool registry
+│   ├── universal_form_filler.py # Universal form filling coordinator
+│   └── adapters/              # Platform-specific adapters
+│       ├── hh_cdp_adapter.py  # Deterministic HeadHunter CDP adapter
+│       ├── greenhouse_adapter.py # Greenhouse ATS adapter
+│       └── base_adapter.py    # Base adapter interface
 │
-├── tracker/                  # Persistence layer
-│   ├── db.py                 # SQLite schema, migrations, CRUD functions
-│   ├── shame_list.py         # Blacklist/shame list generator
-│   └── cleanup_closed.py     # Closed vacancy cleanup
+├── tracker/                   # Persistence layer
+│   ├── db.py                  # SQLite schema, migrations, CRUD, FSM states
+│   ├── shame_list.py          # Blacklist / Shame List exporter
+│   └── cleanup_closed.py      # Closed vacancy cleanup
 │
-├── auto_sender.py            # Telegram DM auto-send (Telethon)
+├── extension/                 # Chrome Extension (Manifest V3)
+│   ├── manifest.json          # Extension manifest
+│   ├── core.js                # Anti-detection, CAPTCHA detection, click simulation
+│   ├── platform-adapters.js   # Platform-specific form detection (HH, LinkedIn, ATS)
+│   ├── autofill.js            # Form filling engine
+│   ├── automation.js          # Auto-submit & multi-step traversal
+│   ├── content_script.js      # Message router
+│   ├── background.js          # Background worker (task polling, cooldown)
+│   ├── sidepanel.js           # Side panel UI controller
+│   └── sidepanel.html         # Side panel markup
 │
-├── extension/                # Chrome Extension (Manifest V3)
-│   ├── manifest.json         # Permissions, content scripts, icons
-│   ├── core.js               # Shared utilities (anti-detection, CAPTCHA, click simulation)
-│   ├── platform-adapters.js  # Platform-specific form detection (HH, LinkedIn, ATS, Generic)
-│   ├── autofill.js           # Form filling engine (backward compatible)
-│   ├── automation.js         # Auto-submit, multi-step traversal, CAPTCHA handling
-│   ├── content_script.js     # Message orchestrator (27 lines)
-│   ├── background.js         # Autonomous agent worker (polling, cooldown, retries)
-│   ├── sidepanel.js          # Side panel UI controller
-│   └── sidepanel.html        # Side panel markup
+├── static/                    # Frontend assets
+│   ├── favicon.svg            # CRM favicon
+│   └── js/                    # Modular Vanilla JS
+│       ├── api.js             # API client & SSE streaming reader
+│       ├── app.js             # Entry point & state management
+│       ├── bookmarklet.js     # Auto-apply bookmarklet script
+│       └── views/
+│           ├── vacancies.js   # Vacancy list, viewed state, ratings, rewrite stream
+│           └── modals.js      # Settings, harvest, AI parser modals
 │
-├── static/js/                # CRM frontend modules
-│   ├── app.js                # Entry point, state management
-│   └── views/
-│       ├── vacancies.js      # Vacancy list, details, agent trigger
-│       └── modals.js         # Settings, harvest, AI parser modals
+├── docs/                      # Documentation
+│   ├── ARCHITECTURE.md        # System architecture (this document)
+│   ├── AI_AGENT_ARCHITECTURE.md # 6-agent pipeline blueprint
+│   ├── SCRAPERS_GUIDE.md      # Scrapers and harvesting guide
+│   ├── CONFIGURATION.md       # Configuration and customization guide
+│   └── ru/                    # Russian engineering documentation
+│       ├── ARCHITECTURE.md
+│       ├── SCRAPERS_GUIDE.md
+│       └── CONFIGURATION.md
 │
-├── docs/                     # Documentation
-│   ├── ARCHITECTURE.md       # This file
-│   ├── AI_AGENT_ARCHITECTURE.md # Full 20-phase transformation roadmap
-│   ├── SCRAPERS_GUIDE.md     # How to add new scrapers
-│   └── CONFIGURATION.md      # Setup guide
-│
-└── tests/                    # 122 unit tests
-    ├── test_*.py             # Tests for scrapers, filters, CRM, agents, etc.
-    └── snapshot_*.json       # Test fixtures
+└── tests/                     # 100+ tests
+    ├── conftest.py            # Test fixtures and factory functions
+    ├── test_objective_core.py # Core unit tests (anti-BS, evidence, pitch, ATS)
+    ├── test_objective_db.py   # Database CRUD, migrations, FSM states
+    ├── test_objective_properties.py # Property-based tests (Hypothesis)
+    ├── test_objective_integration.py # HTTP & SSE API integration tests
+    ├── test_*.py              # Functional and regression test suites
+    └── snapshot_*.json        # Regression fixtures
 ```
 
 ---
@@ -158,47 +182,51 @@ job_hunter/
 
 ### Core Tables
 
-#### `vacancies` — All scraped/parsed job records
+#### `vacancies` — Job listings & processing state
 | Column | Type | Description |
 |---|---|---|
 | `id` | TEXT PK | Unique ID (`tg:...`, `hh:...`, `ai:...`) |
-| `source` | TEXT | Source identifier (`tg_job_react`, `hh`, `ai_import`) |
+| `source` | TEXT | Source identifier (`hh`, `habr`, `tg_job_react`, etc.) |
 | `title` | TEXT | Job title |
 | `company` | TEXT | Company name |
 | `url` | TEXT | Direct vacancy URL |
 | `salary` | TEXT | Salary string or "Не указана" |
-| `location` | TEXT | Location |
-| `is_remote` | INTEGER | 1 if remote |
+| `location` | TEXT | Location string |
+| `is_remote` | INTEGER | 1 if remote, 0 otherwise |
 | `description` | TEXT | Full job description |
 | `skills` | TEXT | Comma-separated tech stack |
 | `contact_name` | TEXT | Contact person name |
-| `contact_handle` | TEXT | Direct contact (TG handle, email) |
+| `contact_handle` | TEXT | Direct contact (Telegram handle, email) |
 | `contact_type` | TEXT | `telegram` / `email` / `portal` / `ats` |
 | `score` | INTEGER | Match score 0–100 |
 | `status` | TEXT | `new` / `inbox` / `sent` / `replied` / `archive` / `blacklist` |
 | `language` | TEXT | `ru` or `en` |
 | `grade` | TEXT | `Junior` / `Middle` / `Senior` / `Lead` |
-| `fsm_state` | TEXT | Agent FSM state |
-| `understanding_json` | TEXT | Job understanding analysis (Phase 2) |
-| `application_thesis_json` | TEXT | Application thesis (Phase 4) |
-| `application_strategy_json` | TEXT | Application strategy (Phase 7) |
-| `ats_report_json` | TEXT | ATS analysis report |
+| `fsm_state` | TEXT | Agent FSM state (`DISCOVERED`, `ANALYZING`, etc.) |
+| `pitch_rating` | INTEGER | Overall pitch rating (0–5) |
+| `viewed_at` | TIMESTAMP | Timestamp when vacancy was viewed by user |
+| `ats_report_json` | TEXT | ATS analysis report JSON |
+| `created_at` | TIMESTAMP | Creation timestamp |
 
-#### `pitches` — Generated content per vacancy
+#### `pitches` — Tailored pitches per vacancy
 | Column | Type | Description |
 |---|---|---|
+| `id` | INTEGER PK | Auto-incrementing pitch ID |
 | `vacancy_id` | TEXT | FK → vacancies.id |
-| `pitch_type` | TEXT | `short_dm` / `cover_letter` / `tailored_cv` |
+| `pitch_type` | TEXT | `short_dm`, `cover_letter`, or `tailored_cv` |
 | `language` | TEXT | `ru` or `en` |
-| `content` | TEXT | Generated text |
-| `status` | TEXT | `DRAFT` / `APPROVED` / `SENT` |
+| `content` | TEXT | Generated pitch content |
+| `rating` | INTEGER | Pitch rating (0–5), resets on rewrite |
+| `status` | TEXT | `DRAFT`, `APPROVED`, or `SENT` |
+| `created_at` | TIMESTAMP | Creation timestamp |
+| `updated_at` | TIMESTAMP | Last update timestamp |
 
 #### `candidate_profiles` — Multi-persona profiles
 | Column | Type | Description |
 |---|---|---|
-| `id` | TEXT PK | Profile UUID |
+| `id` | TEXT PK | Profile ID (`fe_ru`, `fe_en`, etc.) |
 | `lang` | TEXT | `ru` or `en` |
-| `target_role` | TEXT | e.g. "Frontend", "Fullstack" |
+| `target_role` | TEXT | Role title (e.g. "Frontend", "Fullstack") |
 | `data_json` | TEXT | Full profile JSON (contacts, experience, evidence) |
 
 #### `application_history` — Audit trail
@@ -206,26 +234,26 @@ job_hunter/
 |---|---|---|
 | `vacancy_id` | TEXT | FK → vacancies.id |
 | `company` | TEXT | Company name |
-| `portal` | TEXT | Platform used |
-| `mode` | TEXT | `ASSIST` / `SEMI_AUTO` / `AUTO` |
-| `fsm_state` | TEXT | Final state |
-| `metadata_json` | TEXT | Additional details |
+| `portal` | TEXT | Platform used (`hh`, `habr`, `linkedin`, etc.) |
+| `mode` | TEXT | `ASSIST`, `SEMI_AUTO`, or `AUTO` |
+| `fsm_state` | TEXT | Final FSM state |
+| `metadata_json` | TEXT | Execution metadata |
 
 #### `agent_tasks` — Browser automation queue
 | Column | Type | Description |
 |---|---|---|
 | `vacancy_id` | TEXT | FK → vacancies.id |
 | `url` | TEXT | Target URL |
-| `status` | TEXT | `PENDING` / `IN_PROGRESS` / `COMPLETED` / `FAILED` |
+| `status` | TEXT | `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED` |
 | `result_message` | TEXT | Execution result |
 
 #### `agent_run_logs` — Agent execution trace
 | Column | Type | Description |
 |---|---|---|
 | `vacancy_id` | TEXT | FK → vacancies.id |
-| `step_name` | TEXT | Agent role name |
-| `status` | TEXT | `SUCCESS` / `FAILED` |
-| `duration_ms` | INTEGER | Step execution time |
+| `step_name` | TEXT | Agent role or step name |
+| `status` | TEXT | `SUCCESS` or `FAILED` |
+| `duration_ms` | INTEGER | Step execution duration in milliseconds |
 
 ---
 
@@ -234,22 +262,22 @@ job_hunter/
 The multi-agent system runs 6 specialized agents in sequence:
 
 ```
-Input: Raw vacancy text/URL
+Input: Raw vacancy description / URL
     │
     ▼
 ┌─────────────────────────┐
 │ 1. JobAnalystAgent       │  understand_job_posting()
-│    Facts vs Hypotheses   │  → explicit/implicit requirements
+│    Facts vs Hypotheses   │  → explicit/implicit requirements, risks
 └───────────┬─────────────┘
             ▼
 ┌─────────────────────────┐
 │ 2. CompanyResearcher     │  research_company_context()
-│    Bounded web fetch     │  → stack signals, engineering blog
+│    Bounded web search    │  → stack signals, engineering realities
 └───────────┬─────────────┘
             ▼
 ┌─────────────────────────┐
 │ 3. CandidateStrategist   │  reframe_evidence() → thesis → strategy
-│    Evidence mapping      │  → positioning, narrative tone
+│    Evidence mapping      │  → STAR alignment, positioning, tone
 └───────────┬─────────────┘
             ▼
 ┌─────────────────────────┐
@@ -258,13 +286,13 @@ Input: Raw vacancy text/URL
 └───────────┬─────────────┘
             ▼
 ┌─────────────────────────┐
-│ 5. CriticAgent           │  audit_ats() + fluff detection
-│    Quality control       │  → refinement pass
+│ 5. CriticAgent           │  audit_ats() + anti-cliché detection
+│    Quality control       │  → eliminates generic fluff & buzzwords
 └───────────┬─────────────┘
             ▼
 ┌─────────────────────────┐
 │ 6. FactCheckerAgent      │  verify_facts() against canonical profile
-│    Anti-hallucination    │  → confidence score
+│    Anti-hallucination    │  → zero unverified claims
 └───────────┬─────────────┘
             ▼
 Output: score + short_dm + cover_letter + tailored_cv
@@ -278,184 +306,40 @@ DISCOVERED → ANALYZING → RESEARCHING → MATCHED → STRATEGY_READY
 
 ---
 
-## Browser Extension Architecture
+## Real-Time SSE Streaming Architecture
 
-### Module System (Manifest V3)
-
-Content scripts load in order:
-```
-core.js → platform-adapters.js → autofill.js → automation.js → content_script.js
-```
-
-Each module attaches to the global `JH` namespace:
-
-| Module | Responsibility | Key Functions |
-|---|---|---|
-| `core.js` | Shared utilities | `setFieldValue()`, `humanType()`, `simulateClick()`, `detectCaptcha()`, `findSubmitButton()`, `findNextButton()`, `detectStepProgress()`, `checkDomainRate()` |
-| `platform-adapters.js` | Platform detection + extraction | `HeadHunterAdapter`, `LinkedInAdapter`, `ModernATSAdapter`, `GenericWebAdapter` |
-| `autofill.js` | Form filling (backward compatible) | `autofillFormOnPage()` — identical to original |
-| `automation.js` | Auto-submit + anti-detection | `autoSubmitWithDetection()`, `traverseMultiStep()` |
-| `content_script.js` | Message router (27 lines) | Routes `AUTOFILL_PAGE`, `AUTO_SUBMIT_PAGE`, `EXTRACT_PAGE_DATA`, `SHOW_RESULT_OVERLAY` |
-
-### Message Types
-
-| Message | Source | Handler | Behavior |
-|---|---|---|---|
-| `EXTRACT_PAGE_DATA` | Side Panel | `platform-adapters.js` | Extract job metadata from page DOM |
-| `AUTOFILL_PAGE` | Side Panel / Background | `autofill.js` | Fill form fields only (SEMI_AUTO) |
-| `AUTO_SUBMIT_PAGE` | Background | `automation.js` | Fill + CAPTCHA check + auto-submit (AUTO) |
-| `SHOW_RESULT_OVERLAY` | Background | `core.js` | Show floating result notification |
-
-### Anti-Detection Measures
-
-| Measure | Implementation |
-|---|---|
-| Randomized delays | `randomDelay(1500, 4000)` after page load |
-| Human-like typing | `humanType()` — character-by-character with 25-90ms delay |
-| Click simulation | `simulateClick()` — mouse trajectory + mousedown/mouseup |
-| Inter-task cooldown | 5-15s random delay between tasks |
-| Domain rate limiting | Max 3 applications per domain per hour |
-| CAPTCHA detection | Cloudflare Turnstile, reCAPTCHA, hCaptcha, DataDome |
-| Framework-aware input | React/Vue/Angular prototype setter bypass |
-
-### Task Lifecycle (background.js)
-
-```
-1. Poll CRM /api/agent/pending-tasks (every 3.5s)
-2. Fetch candidate profile
-3. Create tab (active: true)
-4. Wait for tab load (25s timeout)
-5. Randomized delay (1.5-4s)
-6. Send AUTO_SUBMIT_PAGE or AUTOFILL_PAGE based on mode
-7. Content script:
-   a. CAPTCHA pre-check → block if detected
-   b. Domain rate check → block if exceeded
-   c. Fill form fields
-   d. CAPTCHA re-check before submit
-   e. Find and click submit button
-   f. Return result
-8. Report status to CRM
-9. Show overlay + notification
-10. Inter-task cooldown (5-15s)
-```
+The CRM supports real-time streaming of AI pitch generation via Server-Sent Events:
+- **Endpoint:** `GET /api/vacancies/{id}/rewrite-stream`
+- **Events Emitted:**
+  - `event: progress` — Current stage (e.g. `understanding`, `retrieval`, `drafting`, `critic`, `complete`) and percentage (0–100%).
+  - `event: update` — Live text chunk updates for Cover Letter and Short DM.
+  - `event: done` — Generation completed with final payload.
+  - `event: error` — Error details if generation failed.
+- **Frontend Consumer:** `static/js/api.js` (`streamRewrite`) connects using `EventSource` and dynamically renders progress bars and live preview in `static/js/views/vacancies.js`.
 
 ---
 
-## API Endpoints (crm.py)
+## Chrome Live Bridge & Browser Automation
 
-### Vacancies
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/pitches` | All vacancies with joined pitches |
-| POST | `/api/vacancies/ai-parse` | Universal AI vacancy parser |
-| POST | `/api/vacancies/{id}/rewrite` | Regenerate pitches via AI |
-| POST | `/api/vacancies/{id}/status` | Update vacancy status |
-| GET | `/api/vacancies/{id}/runtime_state` | Get FSM state |
-| GET | `/api/vacancies/{id}/thesis` | Application thesis |
-| GET | `/api/vacancies/{id}/strategy` | Application strategy |
-| GET | `/api/vacancies/{id}/tailored_cv` | On-demand tailored resume |
-| GET | `/api/vacancies/{id}/ats_report` | ATS analysis |
+### 1. Chrome Live Bridge (CDP)
+- Launched via `./launch_chrome.sh` with `--remote-debugging-port=9222`.
+- Stores user credentials in `~/.jobhunter-chrome` so authenticated sessions (HH.ru, Habr, LinkedIn) persist.
+- `agents/adapters/hh_cdp_adapter.py` communicates directly over Chrome DevTools Protocol for deterministic DOM interaction without headless detection.
 
-### Agent
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/agent/queue-task` | Queue auto-apply task |
-| GET | `/api/agent/pending-tasks` | Get pending tasks (for extension) |
-| POST | `/api/agent/task-status` | Report task completion |
-| GET | `/api/agent/tools` | Registered agent tools |
-
-### Profiles & Config
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/profiles` | All candidate profiles |
-| POST | `/api/profiles` | Save profile |
-| GET | `/api/config` | Get configuration |
-| POST | `/api/config` | Save configuration |
-| POST | `/api/upload_resume` | Parse PDF/DOCX resume |
-
-### Other
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/applications/record` | Record application event |
-| GET | `/api/applications/history` | Application audit trail |
-| GET | `/api/harvest/status` | Harvest run status |
-| POST | `/api/harvest` | Start harvest |
-| GET | `/api/shame_list` | Blacklist export |
-| POST | `/api/vacancies/{id}/apply_tg` | Telegram auto-send |
+### 2. Chrome Extension (Manifest V3)
+- Runs content scripts in order: `core.js → platform-adapters.js → autofill.js → automation.js → content_script.js`.
+- Features:
+  - Framework-aware input injection (bypasses React/Vue/Angular synthetic event wrappers).
+  - Human-like typing simulation (`humanType`) with randomized 25–90ms delays.
+  - CAPTCHA detection (Cloudflare Turnstile, reCAPTCHA, hCaptcha, DataDome).
+  - Multi-step form traversal with safety rate limits (max 3 submissions per domain/hour).
 
 ---
 
-## What's Implemented vs What's Missing
+## Objective Testing Framework
 
-### Fully Implemented (Production Ready)
-- [x] 11 source scrapers with anti-BS filtering
-- [x] Multi-persona profile system with PDF/DOCX parsing
-- [x] AI vacancy parsing (Gemini + heuristic fallback)
-- [x] 6-agent cognitive pipeline (understand → research → strategy → write → critique → verify)
-- [x] FSM runtime with states, retries, timeouts
-- [x] CRM web UI with filtering, sorting, analytics
-- [x] Chrome extension with 4 platform adapters
-- [x] Auto-fill engine (React/Vue/Angular compatible)
-- [x] Auto-submit with CAPTCHA detection
-- [x] Multi-step form traversal
-- [x] Anti-detection (random delays, click simulation, rate limiting)
-- [x] Application audit trail
-- [x] Telegram auto-send via Telethon
-- [x] Blacklist/shame list system
-
-### Partially Implemented
-- [ ] Multi-step form traversal (basic, needs platform-specific adapters)
-- [ ] LinkedIn Easy Apply (detects button, fills fields, but LinkedIn blocks automation frequently)
-- [ ] File upload automation (highlights input, can't programmatically attach files)
-
-### Not Implemented (Future Work)
-- [ ] CAPTCHA solving (detection works, no solver integrated)
-- [ ] Email applications via SMTP
-- [ ] Webhook/API-based ATS applications
-- [ ] Rate-limited retry with exponential backoff for failed tasks
-- [ ] Task priority/scheduling in agent_tasks table
-- [ ] Application confirmation tracking (verify receipt by employer)
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Docker containerization
-- [ ] Code quality tooling (ruff, mypy, pre-commit)
-
----
-
-## Configuration
-
-### config.json
-```json
-{
-  "gemini_api_key": "AIzaSy...",
-  "active_profile_id": null,
-  "seniority_alignment": true,
-  "highload_guardrail": true
-}
-```
-
-### Environment Variables (for Telegram auto-send)
-```bash
-export TG_API_ID=12345
-export TG_API_HASH=abc123def456
-```
-
----
-
-## Testing
-
-```bash
-python3 -m unittest discover tests
-```
-
-122 unit tests covering:
-- All 11 scrapers
-- Anti-BS filter logic
-- AI parser heuristic fallback
-- CRM API endpoints
-- Agent FSM runtime
-- Database migrations
-- Contact extraction
-- Profile validation
-- End-to-end drill
-
-Some tests require Gemini API access and may fail with 429/503 errors.
+The testing framework guarantees quality through quantifiable metrics:
+1. **Measurable:** Line and branch coverage quantified per module; Objective Quality Score (0–100) calculated on every run.
+2. **Isolated:** Temp SQLite databases and mocked external APIs eliminate side effects.
+3. **Property-Based:** Hypothesis generates hundreds of random inputs to fuzz boundary conditions, unicode, and extreme payloads.
+4. **Reproducible:** Run `./run_objective_tests.sh` locally or in CI with zero setup.

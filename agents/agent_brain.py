@@ -147,8 +147,8 @@ class CareerAgentBrain:
             data_bytes = json.dumps(payload).encode("utf-8")
 
             for model in GEMINI_MODELS:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json", "x-goog-api-key": api_key}, method="POST")
                 try:
                     with urllib.request.urlopen(req, timeout=25) as resp:
                         res_json = json.loads(resp.read().decode("utf-8"))

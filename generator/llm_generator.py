@@ -7,6 +7,10 @@ from typing import Dict, Any, Optional
 
 GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"]
 
+def _sanitize_short_dm(dm: str) -> str:
+    """No-op sanitizer — keep the AI's natural output."""
+    return dm
+
 def get_llm_config() -> Dict[str, Any]:
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
     cfg = {
@@ -136,6 +140,31 @@ def get_gold_standard_examples(lang: str = "ru", limit: int = 2) -> list:
         return []
 
 
+def get_rejected_examples(lang: str = "ru", limit: int = 3) -> list:
+    """Retrieve user-rejected pitches to serve as anti-patterns (what NOT to do)."""
+    try:
+        from tracker.db import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT p.pitch_type, p.content, v.title, v.company
+            FROM pitches p
+            JOIN vacancies v ON v.id = p.vacancy_id
+            WHERE p.rating = -1
+              AND p.pitch_type IN ('cover_letter', 'short_dm')
+              AND p.language = ?
+              AND length(p.content) > 50
+            ORDER BY p.id DESC
+            LIMIT ?
+        ''', (lang, limit))
+        rows = cur.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[ANTI_PATTERN] Could not load rejected examples: {e}")
+        return []
+
+
 def generate_ai_pitch(
     vacancy: Dict[str, Any],
     profile: Any,
@@ -152,6 +181,29 @@ def generate_ai_pitch(
     title = vacancy.get("title", "Frontend Engineer")
     company = vacancy.get("company", "Company")
     desc = (vacancy.get("description") or "")[:2500]
+
+    # Enrich description with AI understanding if available
+    understanding = vacancy.get("understanding_json") or ""
+    if understanding:
+        try:
+            u = json.loads(understanding) if isinstance(understanding, str) else understanding
+            u_parts = []
+            facts = u.get("facts", {})
+            if facts.get("explicit_requirements"):
+                u_parts.append(f"Requirements: {', '.join(facts['explicit_requirements'])}")
+            if facts.get("responsibilities"):
+                u_parts.append(f"Responsibilities: {'; '.join(facts['responsibilities'])}")
+            reasoning = u.get("reasoning", {})
+            if reasoning.get("engineering_signals"):
+                u_parts.append(f"Engineering context: {'; '.join(reasoning['engineering_signals'][:3])}")
+            if reasoning.get("likely_team_problems"):
+                u_parts.append(f"Team challenges: {'; '.join(reasoning['likely_team_problems'][:3])}")
+            if reasoning.get("hiring_priorities"):
+                u_parts.append(f"Hiring priorities: {'; '.join(reasoning['hiring_priorities'][:3])}")
+            if u_parts:
+                desc += "\n\nCOMPANY ANALYSIS (from AI understanding):\n" + "\n".join(u_parts)
+        except Exception:
+            pass
 
     # Format profile data cleanly
     if isinstance(profile, dict):
@@ -185,94 +237,67 @@ def generate_ai_pitch(
         for ex in gold_list:
             gold_examples_text += f"\n--- GOLD EXAMPLE FOR {ex.get('title')} AT {ex.get('company')} ({ex.get('pitch_type', '').upper()}):\n{ex.get('content')}\n"
 
-    prompt = f"""You are {name}, a Senior Frontend/Fullstack Engineer writing a job application.
-You are writing DIRECTLY to an engineering lead or hiring manager — peer to peer, not HR to applicant.
+    rejected_text = ""
+    rejected_list = get_rejected_examples(lang=lang, limit=3)
+    if rejected_list:
+        rejected_text = "\nUSER-REJECTED ANTI-PATTERNS (The candidate explicitly disliked these — DO NOT repeat these styles, structures, or phrases):\n"
+        for ex in rejected_list:
+            rejected_text += f"\n--- REJECTED EXAMPLE ({ex.get('pitch_type', '').upper()}) — DO NOT MIMIC:\n{ex.get('content')}\n"
 
-JOB DETAILS:
-- Role: {title}
-- Company: {company}
-- Requirements & Description:
+    prompt = f"""Write as {name}, a Senior Frontend/Fullstack Engineer.
+You are writing to an engineering lead — peer to peer.
+
+JOB: {title} at {company}
 {desc}
 
-MY REAL PROFILE:
-- Name: {name}
-- Role: {role}
-- Summary: {summary}
-- Real Projects & Results:
-{exp}
-- Tech Stack: {keywords}
-- Contacts: Telegram: {tg} | Email: {email} | GitHub: {github} | LinkedIn: {linkedin}
+PROFILE: {name}, {role}
+Experience: {exp}
+Stack: {keywords}
+Contacts: TG: {tg} | {email} | {github} | {linkedin}
 
 WARNINGS: {warnings if warnings else "None"}
 
-CRITICAL LANGUAGE RULE — NO EXCEPTIONS:
-Write EVERYTHING in {language_name}.
-If the job description is in Russian, write in Russian. If in English, write in English.
-Mixing languages = automatic failure.
+LANGUAGE: {language_name} only. No mixing.
 
-COVER LETTER & SHORT DM RULES (follow exactly):
+---
 
-RULE 1 — OPENING HOOK & BAN ON "CAPTAIN OBVIOUS":
-ABSOLUTELY BANNED OPENERS (immediate failure):
-- "Вижу, что вы ищете...", "Вижу, что в [Company] ищут...", "Заметил, что вы в поиске...", "Увидел вашу вакансию...", "Увидел, что открыта позиция..."
-- "I see that you are looking for...", "I noticed you're hiring...", "Saw your opening at [Company]..."
-- "Hello [Company] Team", "I am writing to apply", "I am excited/thrilled/passionate", "Dear Hiring Manager", "Здравствуйте команда", "Меня зовут", "Я хочу откликнуться на вакансию".
-NEVER state to the recruiter/company what they are searching for ("Вижу, что ищете X"). They wrote the posting, they know who they are hiring.
-REQUIRED: Start with ONE concrete observation about THIS specific company's technical challenge,
-product scale, or engineering problem visible in the job description, or directly state your technical angle.
-Examples:
-- "Running SSR on 100M+ monthly active users means bundle size is not a metric — it's a cost."
-- "Когда сервис принимает 50k запросов в секунду, гидратация React — это не деталь, это архитектура."
-- "A/B testing infrastructure at scale breaks when component state does not match server snapshots."
+WHAT MAKES A GOOD APPLICATION:
 
-RULE 2 — MATCH THEIR PROBLEM TO YOUR PROOF:
-Look at the TOP 2-3 requirements in the job description. For each one, connect it to a SPECIFIC result
-from MY projects with a real number or outcome:
-- UI/UX, Design Systems: Cloveri component library for Mintsifry govt project, GSAP/Lottie/Embla animations
-- Performance: SSR/RSC optimization, 100/100 PageSpeed scores, zero-bloat bundle strategies
-- Dashboards, CMS, RBAC: Radiotochka — httpOnly session cookies, hydration mismatch elimination
-- Startup speed, MVPs: Droog hackathon — 3 role-based interfaces shipped in 48h, 1st place
-- Fullstack ownership: FastAPI/Node APIs, payment webhooks (YuKassa/HMAC), Docker+Traefik CI/CD
-DO NOT use vague language. "I improved performance" is banned. Attach a concrete fact.
+1. GREETING: "Добрый день!" / "Привет!" — OK, keep it short. One word max.
+   After the greeting, immediately jump into something specific about THIS company.
 
-RULE 3 — NO AI SLOP:
-Never use: "deeply passionate", "fast-paced environment", "team player", "results-driven",
-"leverage synergies", "идеально подхожу", "горю желанием", "нацелен на результат".
-Every sentence must be falsifiable. If it could be copy-pasted to any resume, delete it.
+2. SECOND SENTENCE = THEIR PROBLEM, NOT YOUR RESUME.
+   BAD: "Мой опыт напрямую переносится на ваш стек."
+   GOOD: "80+ человек в frontend-команде — это не про код, это про процессы и архитектуру, которая не ломается при масштабировании."
+   GOOD: "B2B-продукты для digital-маркетинга требуют быстрых UI-итераций без потери производительности — именно этим я занимался в NoLogs."
 
-RULE 4 — NO FOUNDER FRAMING:
-Never say "my startup", "my project", "я фаундер". 
-Frame as: "Lead Frontend Engineer at NoLogs SaaS" or "продуктовый инженер в SaaS NoLogs".
+3. CONNECT THEIR NEED → YOUR PROOF (with numbers).
+   BAD: "Мой опыт напрямую переносится на ваш стек."
+   GOOD: "В NoLogs я довёл Next.js-приложение до 100/100 PageSpeed через code splitting и SSR — паттерны, которые точно пригодятся для вашего Nuxt-приложения."
 
-RULE 5 — STRICTLY NO HALLUCINATING FOREIGN STACKS:
-Candidate's real stack is: React, Next.js, TypeScript, Tailwind CSS, Node.js, FastAPI, PostgreSQL, Docker.
-If the vacancy requires technologies NOT in the candidate's profile (e.g. .NET, C#, Angular, Java, PHP, 1C, Flutter, Go):
-DO NOT claim to be a Senior developer in those technologies! Never pretend to have years of experience with .NET or Angular if not in profile.
-Instead, bridge through candidate's real expertise: complex frontend architecture, enterprise web platforms, robust API integration, or high-performance UI. Be honest and grounded.
+4. BE SPECIFIC ABOUT THE COMPANY.
+   Read their description. Reference something concrete: their product, their scale, their tech choice.
+   "Ваш стек Nuxt/Vue + Node.js говорит о fullstack-ориентированной команде — мой опыт с BFF-паттернами на Next.js и FastAPI здесь применим."
 
-RULE 6 — LENGTH & FORMAT:
-Cover letter: 3 paragraphs maximum. No padding. End with contacts on the last line.
-Short DM: 2-3 sentences. Punchy. Direct. Peer-to-peer.
-SHORT DM format:
-- Sentence 1: Direct hook and technical overlap (e.g., "Привет! Откликаюсь на позицию {title}. По стеку и задачам: [моя ключевая компетенция/пересечение]." or "Hi! Applying for the {title} role. My core focus is [key technical match]."). STRICTLY NO "Вижу, что вы ищете" or repeating their vacancy description!
-- Sentence 2: One hard proof point or metric matching their primary engineering challenge.
-- Sentence 3: Concise CTA (portfolio/GitHub link, offer to connect).
+5. SOUND HUMAN.
+   Write like you're talking to a colleague over coffee, not submitting a form.
+   It's OK to have an opinion. It's OK to be slightly informal.
+   BANNED: "results-driven", "passionate", "fast-paced", "team player", "leverage", "ideally suited", "горю желанием", "нацелен на результат".
+
+6. COVER LETTER FORMAT:
+   "Добрый день!"
+   Paragraph 1: Their specific problem or challenge (from the description).
+   Paragraph 2: Your concrete experience that solves it (with numbers).
+   Paragraph 3: Why you care about this particular role + contacts.
+
+7. SHORT DM FORMAT:
+   "Привет!" or "Добрый день!"
+   1-2 sentences: technical overlap + one proof point + CTA.
+
 {gold_examples_text}
-MATCH SCORE (0-100):
-- 80-98: Frontend/Fullstack/Product Web role matching React, Next.js, TypeScript core stack
-- 60-79: Partial match — some relevant tech but not the primary focus
-- 30-59: Weak match — different domain but transferable skills
-- 10-29: PENALTY — QA, DevOps, Data Science, PM, Designer, HR, non-engineering roles.
-  Even if they mention Git or JS, if the core role is not engineering, score 10-29.
-BS DETECTION: If job posting has 3+ red flags (no salary for remote, 10+ required tech, vague
-"competitive salary", requirements far above implied seniority, mandatory self-employment), reduce score by 10-15.
-
-Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
-{{
-  "short_dm": "...",
-  "cover_letter": "...",
-  "score": 75
-}}
+{rejected_text}
+JSON only:
+{{"short_dm": "...", "cover_letter": "...", "score": 75}}
 """
 
     # 1. If LM Studio is selected as the primary provider, call it directly
@@ -283,7 +308,7 @@ Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
             if parsed:
                 return {
                     "success": True,
-                    "short_dm": (parsed.get("short_dm") or "").strip(),
+                    "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip()),
                     "cover_letter": (parsed.get("cover_letter") or "").strip(),
                     "score": int(parsed.get("score", 80))
                 }
@@ -301,7 +326,7 @@ Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
             if parsed:
                 return {
                     "success": True,
-                    "short_dm": (parsed.get("short_dm") or "").strip(),
+                    "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip()),
                     "cover_letter": (parsed.get("cover_letter") or "").strip(),
                     "score": int(parsed.get("score", 80))
                 }
@@ -340,7 +365,7 @@ Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
                 parsed = json.loads(text)
                 return {
                     "success": True,
-                    "short_dm": parsed.get("short_dm", "").strip(),
+                    "short_dm": _sanitize_short_dm(parsed.get("short_dm", "").strip()),
                     "cover_letter": parsed.get("cover_letter", "").strip(),
                     "score": int(parsed.get("score", 75))
                 }
@@ -381,7 +406,7 @@ Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
         if parsed:
             return {
                 "success": True,
-                "short_dm": (parsed.get("short_dm") or "").strip(),
+                "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip()),
                 "cover_letter": (parsed.get("cover_letter") or "").strip(),
                 "score": int(parsed.get("score", 80))
             }

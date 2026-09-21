@@ -61,6 +61,33 @@ class HabrScraper(BaseScraper):
                     full_url = f"https://career.habr.com{url_path}"
                     contacts = extract_contacts(card)
 
+                    # Fetch full description from vacancy page
+                    full_desc = ""
+                    try:
+                        req2 = urllib.request.Request(full_url, headers=headers)
+                        with urllib.request.urlopen(req2, timeout=10) as resp2:
+                            page_html = resp2.read().decode('utf-8', errors='ignore')
+                        desc_match = re.search(
+                            r'<div class="vacancy-description[^"]*"[^>]*>(.*?)</div>\s*(?=<div class="|(?:</section|</article))',
+                            page_html, re.DOTALL
+                        )
+                        if not desc_match:
+                            desc_match = re.search(
+                                r'<div class="job-description[^"]*"[^>]*>(.*?)</div>',
+                                page_html, re.DOTALL
+                            )
+                        if desc_match:
+                            raw = desc_match.group(1)
+                            raw = re.sub(r'<[^>]+>', ' ', raw)
+                            raw = html.unescape(raw)
+                            raw = re.sub(r'\s+', ' ', raw).strip()
+                            full_desc = raw[:4000]
+                    except Exception:
+                        pass
+
+                    if not full_desc:
+                        full_desc = f"Вакансия с Habr Career: {title} в {company}.\nСтек: {skills_str}.\nЛокация: {location}.\nЗарплата: {salary}."
+
                     vacancies.append({
                         "id": vac_id,
                         "source": "habr",
@@ -70,7 +97,7 @@ class HabrScraper(BaseScraper):
                         "salary": salary,
                         "location": location,
                         "is_remote": 1 if is_remote else 0,
-                        "description": f"Вакансия с Habr Career: {title} в {company}.\nСтек: {skills_str}.\nЛокация: {location}.\nЗарплата: {salary}.",
+                        "description": full_desc,
                         "skills": skills_str,
                         "language": "ru",
                         "contact_name": contacts.get("contact_name") or "",

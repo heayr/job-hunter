@@ -84,6 +84,10 @@ def critic_refine_letter(
         (r'(?i)буду бесконечно рад любой возможности пообщаться', 'Буду рад обсудить задачи с командой'),
         (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*вижу,\s*что\s+(?:в\s+[^,.]+?\s+)?(?:ищут|вы\s+в\s+поиске|вы\s+ищете)[^,.]*?[,.]?\s*', 'Привет! '),
         (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*увидел\s+(?:вашу\s+)?(?:позицию|вакансию)\s+«?[^»\n]+?»?\s*(?:в\s+[^,\n]+?)?[!,.]?\s*', 'Привет! Откликаюсь на позицию. '),
+        (r'(?i)(?:наткнулся|наткнулась|наткнулся|встретил(?:а)?)\s+(?:на\s+)?(?:вашу\s+)?(?:вакансию|позицию)\s*«?[^»\n]+?»?', 'Откликаюсь на позицию'),
+        (r'(?i)(?:заметил(?:а)?|обратил(?:а)?\s+внимание)\s+(?:что\s+)?(?:ваша\s+компания|вы|в\s+[^,.]+)\s+(?:ищете|в\s+поиске)[^,.]*', 'Откликаюсь на позицию'),
+        (r'(?i)(?:ваша\s+компания|компания\s+\w+)\s+ищет\s+\w+', 'Откликаюсь на позицию'),
+        (r'(?i)(?:вы|команда)\s+(?:в\s+поиске|ищете|look(?:ing)?\s+for)\s+\w+', 'Откликаюсь на позицию'),
         (r'(?i)i\s+see\s+(?:that\s+)?(?:you\s+are|they\s+are)\s+looking\s+for\s+.*?[,.]?\s*', 'Applying for the role. '),
         (r'(?i)saw\s+your\s+.*?opening\s+at\s+.*?[,.]?\s*', 'Applying for the role. '),
         (r'(?i)i am thrilled to apply for the position of', 'Applying for the'),
@@ -124,6 +128,7 @@ def heuristic_cover_letter(
 ) -> Dict[str, Any]:
     """
     Deterministic offline multi-stage Cover Letter & Short DM generator.
+    Now with ATS keyword injection for each specific job.
     """
     identity = profile.get("identity", {})
     name = identity.get("name") or profile.get("name", "Егор Мышинский" if lang == "ru" else "Egor Myshinsky")
@@ -151,6 +156,26 @@ def heuristic_cover_letter(
     ])
     thesis = thesis_data.get("thesis", f"Сквозная поставка веб-интерфейсов и Core Web Vitals 100/100 для {company}")
 
+    # Extract ATS keywords from job requirements
+    facts = job_understanding.get("facts", {})
+    reqs = facts.get("explicit_requirements", [])
+    reqs_text = " ".join(reqs).lower()
+
+    # Match profile skills against job requirements for ATS optimization
+    profile_skills = profile.get("skills", [])
+    matched_tech = []
+    for skill in profile_skills:
+        skill_lower = skill.lower()
+        # Check if any part of the skill appears in job requirements
+        if any(part in reqs_text for part in skill_lower.split() if len(part) > 3):
+            matched_tech.append(skill)
+
+    # Build ATS-optimized tech line
+    if matched_tech:
+        ats_tech_line = ", ".join(matched_tech[:6])
+    else:
+        ats_tech_line = "React, Next.js, TypeScript"
+
     # Build bullets from highlights
     bullet_lines = "\n".join(f"• {h}" for h in highlights[:3])
 
@@ -168,7 +193,7 @@ def heuristic_cover_letter(
 Ключевой стек и проверенные результаты под задачи команды:
 {bullet_lines}
 
-Инженерный фокус — чистый поддерживаемый код, предсказуемая поставка фич в спринтах и внимание к деталям интерфейса. На бэкенде свободно проектирую REST API контракты на FastAPI и поднимаю инфраструктуру в Docker, поэтому не создаю блокеров для смежных команд.
+Технологический стек: {ats_tech_line}. Инженерный фокус — чистый поддерживаемый код, предсказуемая поставка фич в спринтах и внимание к деталям интерфейса. На бэкенде свободно проектирую REST API контракты и поднимаю инфраструктуру в Docker, поэтому не создаю блокеров для смежных команд.
 
 Буду рад обсудить задачи с командой!
 
@@ -176,9 +201,11 @@ def heuristic_cover_letter(
 Telegram: {tg} | Email: {email}
 GitHub: {github} | LinkedIn: {linkedin}"""
 
+        # ATS-optimized short DM with matched keywords
+        ats_keywords_short = ", ".join(matched_tech[:3]) if matched_tech else "React, Next.js, TypeScript"
         draft_dm = f"""Привет! Откликаюсь на позицию «{title}» в {company}.
 
-Мой стек (React 19, Next.js 16, TypeScript) напрямую закрывает ключевые требования: {highlights[0]}
+Мой стек ({ats_keywords_short}) напрямую закрывает ключевые требования: {highlights[0]}
 
 GitHub: {github} | LinkedIn: {linkedin}
 
@@ -196,7 +223,7 @@ Applying for the {title} position.
 Relevant engineering outcomes aligning with your roadmap:
 {bullet_lines}
 
-My priority is high shipping velocity, clean architectural boundaries, and relentless performance optimization (100/100 PageSpeed). I design backend contracts with FastAPI/Node.js and containerize via Docker, preventing cross-team blockers.
+Tech stack: {ats_tech_line}. My priority is high shipping velocity, clean architectural boundaries, and relentless performance optimization. I design backend contracts and containerize via Docker, preventing cross-team blockers.
 
 Looking forward to connecting with your team!
 
@@ -205,9 +232,10 @@ Best regards,
 Telegram: {tg} | Email: {email}
 GitHub: {github} | LinkedIn: {linkedin}"""
 
+        ats_keywords_en = ", ".join(matched_tech[:3]) if matched_tech else "React, Next.js, TypeScript"
         draft_dm = f"""Hi! Applying for the {title} position at {company}.
 
-My background with React 19, Next.js 16, and TypeScript directly matches your requirements: {highlights[0]}
+My background with {ats_keywords_en} directly matches your requirements: {highlights[0]}
 
 GitHub: {github} | LinkedIn: {linkedin}
 
@@ -282,7 +310,7 @@ OUTPUT JSON ONLY matching this schema:
 }}
 """
     model = GEMINI_MODELS[0]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -295,7 +323,7 @@ OUTPUT JSON ONLY matching this schema:
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=14.0) as resp:

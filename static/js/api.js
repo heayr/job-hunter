@@ -33,6 +33,41 @@ window.api = {
         return await res.json();
     },
 
+    rewriteAIStream(vacId, callbacks) {
+        const { onProgress, onChunk, onDone, onError } = callbacks;
+        const eventSource = new EventSource(`/api/vacancies/${encodeURIComponent(vacId)}/rewrite-stream`);
+
+        eventSource.addEventListener('progress', (e) => {
+            const data = JSON.parse(e.data);
+            if (onProgress) onProgress(data);
+        });
+
+        eventSource.addEventListener('chunk', (e) => {
+            const data = JSON.parse(e.data);
+            if (onChunk) onChunk(data);
+        });
+
+        eventSource.addEventListener('done', (e) => {
+            const data = JSON.parse(e.data);
+            eventSource.close();
+            if (onDone) onDone(data);
+        });
+
+        eventSource.addEventListener('error', (e) => {
+            let data;
+            try { data = JSON.parse(e.data); } catch { data = { message: 'SSE connection error' }; }
+            eventSource.close();
+            if (onError) onError(data);
+        });
+
+        eventSource.onerror = () => {
+            eventSource.close();
+            if (onError) onError({ message: 'Network error — check VPN and server' });
+        };
+
+        return eventSource;
+    },
+
     async ratePitch(vacId, rating, pitchType = null, shortDm = null, coverLetter = null) {
         const res = await fetch('/api/pitches/rate', {
             method: 'POST',
@@ -147,6 +182,16 @@ window.api = {
 
     async launchCdp() {
         const res = await fetch('/api/agent/cdp/launch', { method: 'POST' });
+        return await res.json();
+    },
+
+    async post(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
         return await res.json();
     }
 };

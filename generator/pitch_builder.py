@@ -269,7 +269,7 @@ def calculate_match_score(vacancy: Dict[str, Any], profile: Optional[Dict[str, A
 
 def select_dynamic_achievements(full_text: str, lang: str = "ru", profile: Optional[Dict] = None, use_ai: bool = True) -> List[str]:
     """Select the 2-3 most relevant real achievements from candidate's profile matching the job requirements."""
-    # If a profile is provided, run Evidence Reframing Engine
+    # If a profile is provided, use the dynamic achievement matcher
     if profile:
         try:
             job_dummy = {
@@ -289,39 +289,64 @@ def select_dynamic_achievements(full_text: str, lang: str = "ru", profile: Optio
         except Exception:
             pass
 
+    # Fallback: extract from profile's key_achievements directly
+    if profile:
+        achievements = profile.get("key_achievements", [])
+        if achievements:
+            text_lower = full_text.lower()
+            scored = []
+            for ach in achievements:
+                score = 0
+                for tag in ach.get("tags", []):
+                    if tag in text_lower:
+                        score += 10
+                for tech in ach.get("technologies", []):
+                    if tech.lower() in text_lower:
+                        score += 8
+                if ach.get("defensibility") == "HIGH":
+                    score += 3
+                scored.append((score, ach))
+            scored.sort(key=lambda x: x[0], reverse=True)
+
+            bullets = []
+            for _, ach in scored[:3]:
+                metric = ach.get("metric", "")
+                metric_unit = ach.get("metric_unit", "")
+                action = ach.get("action", "")
+                result = ach.get("result", "")
+                techs = ach.get("technologies", [])
+                tech_str = ", ".join(techs[:3]) if techs else ""
+
+                if lang == "ru":
+                    if metric and metric_unit:
+                        bullet = f"{metric} {metric_unit}: {action.lower().rstrip('.')}"
+                    elif result:
+                        bullet = result
+                    else:
+                        bullet = action
+                else:
+                    if metric and metric_unit:
+                        bullet = f"{metric} {metric_unit}: {action.lower().rstrip('.')}"
+                    elif result:
+                        bullet = result
+                    else:
+                        bullet = action
+
+                if tech_str:
+                    bullet += f" ({tech_str})"
+                bullets.append(bullet)
+
+            if bullets:
+                return bullets
+
+    # Last resort fallback — generic profile-based bullets
     bullets = []
-    text_lower = full_text.lower()
-
     if lang == "en":
-        if any(w in text_lower for w in ["performance", "pagespeed", "core web vitals", "speed", "оптимиз"]):
-            bullets.append("Core Web Vitals & performance optimization: achieved 100/100 PageSpeed on Next.js 16 (App Router) via bundle optimization and SSR streaming.")
-        if any(w in text_lower for w in ["component", "design system", "ui kit", "ui-kit", "figma", "animat", "gsap", "motion"]):
-            bullets.append("Design systems & interactive UI: built modular component libraries (Cloveri for Mintsifry) and rich interactive animations via GSAP (@gsap/react), Lottie, and Embla Carousel.")
-        if any(w in text_lower for w in ["auth", "security", "rbac", "cms", "dashboard", "admin"]):
-            bullets.append("Shipped end-to-end admin dashboards & CMS platforms (Radiotochka), implementing RBAC, secure session cookies (httpOnly/SameSite), and robust SSR hydration.")
-        if any(w in text_lower for w in ["fullstack", "backend", "fastapi", "python", "node", "postgres", "sql", "docker", "api"]):
-            bullets.append("Fullstack architecture & ownership: built REST APIs with FastAPI & Node.js, PostgreSQL, multi-stage Docker builds, Traefik v3 reverse proxy with TLS, automated billing & webhooks.")
-        if any(w in text_lower for w in ["hackathon", "speed", "startup", "scale", "mvp", "lead", "senior"]):
-            bullets.append("1st place at Droog hackathon: architected and shipped 3 role-based interfaces with React/Redux in 48 hours under tight deadline.")
-
-        if not bullets:
-            bullets.append("Lead Frontend Engineer at NoLogs SaaS: client architecture on Next.js 16 (App Router), React 19, and TypeScript 5.")
-            bullets.append("Full-cycle production delivery: from Figma design systems to Docker containerization and live deployment.")
+        bullets.append("Senior product engineer with end-to-end ownership: from UI architecture to backend APIs and Docker deployments.")
+        bullets.append("Proven performance benchmark: achieved 100/100 Core Web Vitals on Next.js 16 App Router.")
     else:
-        if any(w in text_lower for w in ["performance", "pagespeed", "скорость", "оптимиз"]):
-            bullets.append("Оптимизация производительности и Core Web Vitals: результат 100/100 в PageSpeed на Next.js 16 (App Router) за счет оптимизации бандла и SSR-стриминга.")
-        if any(w in text_lower for w in ["компонент", "дизайн-систем", "ui-kit", "ui kit", "figma", "анимац", "animat", "gsap", "motion", "дизайн"]):
-            bullets.append("Дизайн-системы и сложный UI: опыт создания компонентных библиотек (Cloveri для Минцифры) и интерактивных сценариев на GSAP (@gsap/react), Lottie и Embla Carousel.")
-        if any(w in text_lower for w in ["auth", "авториз", "rbac", "cms", "админ", "панел"]):
-            bullets.append("Разработка админ-панелей и CMS (Radiotochka): реализация RBAC, безопасных session-cookies и устранение рассинхронизации SSR-гидратации с NextAuth.")
-        if any(w in text_lower for w in ["fullstack", "backend", "бэкенд", "фуллстек", "fastapi", "python", "node", "postgres", "sql", "docker", "api"]):
-            bullets.append("Полный стек и инфраструктура: разработка REST API на FastAPI и Node.js, PostgreSQL, multi-stage сборки в Docker, Traefik v3 c авто-TLS, интеграция эквайринга и вебхуков.")
-        if any(w in text_lower for w in ["стартап", "хакатон", "mvp", "лид", "senior", "сеньор"]):
-            bullets.append("1 место на хакатоне Droog: с нуля разработал 3 ролевых интерфейса за 48 часов в условиях жестких дедлайнов.")
-
-        if not bullets:
-            bullets.append("Lead Frontend-разработчик NoLogs SaaS: архитектура клиентской части на Next.js 16 (App Router), React 19, TypeScript 5.")
-            bullets.append("Сквозная разработка фич от архитектуры и дизайн-системы до деплоя в Docker и поддержки пользователей.")
+        bullets.append("Senior product engineer со сквозным владением: от архитектуры UI до backend API и Docker.")
+        bullets.append("Реальный опыт оптимизации Core Web Vitals до 100/100 на Next.js 16 App Router.")
 
     return bullets[:3]
 

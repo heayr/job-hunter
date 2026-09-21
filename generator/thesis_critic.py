@@ -15,7 +15,11 @@ BANNED_FLUFF_PATTERNS = [
     r'(?:в сегодняшнем быстро меняющемся мире|настоящий энтузиаст)',
     r'(?:experienced professional|fast learner|hard worker|motivated team player)',
     r'(?:thrilled to apply|passionate about coding|excited for this opportunity)',
-    r'(?:in today\'s fast-paced world|perfect fit for this role)'
+    r'(?:in today\'s fast-paced world|perfect fit for this role)',
+    r'(?:меня зовут \w+,\s*(?:и\s+)?(?:хочу|желаю|готов|хотел))',
+    r'(?:увидел(?:а)? вашу вакансию|видел(?:а)? вашу вакансию|наткнулся на вашу)',
+    r'(?:ваша компания ищет|вы ищете|your company is looking|you are looking for|you\'re looking for)',
+    r'(?:рассматриваю вашу вакансию|considering your (?:opening|position|vacancy))',
 ]
 
 def detect_generic_fluff(text: str) -> List[str]:

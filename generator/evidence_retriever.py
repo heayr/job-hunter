@@ -6,93 +6,77 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from generator.llm_generator import get_api_key, GEMINI_MODELS
 
-# ── STRATEGIC FRAMING PRESETS ────────────────────────────────────────────────
 
-STRATEGIC_PRESETS_RU = {
-    "performance": {
-        "pattern": r'(?:performance|скорост|pagespeed|оптимиз|core web vitals|lcp|cls|бандл)',
-        "pain": "Падение Core Web Vitals, тяжелый JS-бандл или долгий LCP, ухудшающий конверсию",
-        "claim": "Оптимизация производительности и Core Web Vitals до 100/100",
-        "framing": "Архитектурная оптимизация клиентской части: достижение 100/100 в Google PageSpeed на Next.js 16 (App Router) за счет изоляции серверных компонентов (RSC), SSR-стриминга и устранения раздувания клиентского бандла.",
-        "seniority": "Lead / Senior Architect",
-        "defensibility": "HIGH (аргументация на базе RSC, App Router, bundle analyzer и code splitting)"
-    },
-    "design_system": {
-        "pattern": r'(?:компонент|дизайн-систем|ui kit|ui-kit|figma|анимац|gsap|motion|верстк|интерфейс)',
-        "pain": "Фрагментация UI, отсутствие консистентной дизайн-системы и медленная разработка новых экранов",
-        "claim": "Разработка модульных дизайн-систем и сложного интерактивного UI",
-        "framing": "Сквозное проектирование дизайн-систем и UI-библиотек из Figma: опыт построения компонентных библиотек (Cloveri для Минцифры) и кастомных интерактивных сценариев на GSAP (@gsap/react), Lottie и Tailwind CSS v4 без сторонних перегруженных зависимостей.",
-        "seniority": "Senior / Lead UI Engineer",
-        "defensibility": "HIGH (опыт создания библиотек компонентов и работы с токенами)"
-    },
-    "admin_rbac": {
-        "pattern": r'(?:auth|авториз|rbac|cms|админ|панел|безопасн|session|cookie)',
-        "pain": "Сложности с разграничением прав доступа (RBAC), безопасностью сессий и рассинхроном SSR-гидратации",
-        "claim": "Разработка защищенных CMS и аналитических платформ с RBAC",
-        "framing": "Разработка enterprise админ-панелей и CMS (Radiotochka): проектирование гранулярного ролевого доступа (RBAC), безопасных session-cookies (httpOnly, SameSite) и полное устранение проблем гидратации с NextAuth.",
-        "seniority": "Senior Fullstack / Product Engineer",
-        "defensibility": "HIGH (демонстрация реальной архитектуры сессий и прав доступа)"
-    },
-    "fullstack_ownership": {
-        "pattern": r'(?:fullstack|бэкенд|backend|fastapi|python|node|postgres|sql|docker|api|инфраструктур)',
-        "pain": "Блокировки фронтенда из-за медленной поставки серверных API, нехватка рук на бэкенде",
-        "claim": "Сквозная разработка под ключ: от интерфейса до API и Docker",
-        "framing": "Полное владение фичами (End-to-End Ownership): автономное проектирование REST API на FastAPI и Node.js, модели данных PostgreSQL, упаковка в multi-stage Docker контейнеры с Traefik v3 и авто-TLS без ожидания выделенного бэкенда.",
-        "seniority": "Lead Product Engineer / Autonomous Senior",
-        "defensibility": "HIGH (знание FastAPI, Docker, SQL, API contracts)"
-    },
-    "velocity_startups": {
-        "pattern": r'(?:скорость|дедлайн|стартап|mvp|хакатон|сжатые сроки|гибкост)',
-        "pain": "Потребность в сверхбыстром выводе фич на рынок и тестировании продуктовых гипотез без бюрократии",
-        "claim": "Экстремальная скорость поставки и победы на хакатонах",
-        "framing": "1 место на хакатоне Droog: с нуля спроектировал и запустил 3 ролевых интерфейса за 48 часов в условиях жесткого дедлайна. Прагматичный фокус на business-impact без оверинжиниринга.",
-        "seniority": "Fast-Paced Senior / Founding Engineer",
-        "defensibility": "HIGH (подтвержденный диплом и работающий проект)"
-    }
-}
+# ── DYNAMIC ACHIEVEMENT MATCHING ENGINE ───────────────────────────────────────
 
-STRATEGIC_PRESETS_EN = {
-    "performance": {
-        "pattern": r'(?:performance|speed|pagespeed|optimiz|core web vitals|lcp|cls|bundle)',
-        "pain": "Core Web Vitals degradation, bloated JavaScript payloads, and slow LCP harming conversion",
-        "claim": "Core Web Vitals & performance optimization to 100/100 PageSpeed",
-        "framing": "Client-side architectural modernization: achieved 100/100 in Google PageSpeed on Next.js 16 (App Router) via React Server Components streaming, aggressive bundle splitting, and zero-bloat state architectures.",
-        "seniority": "Lead / Senior Architect",
-        "defensibility": "HIGH (proven Next.js App Router & streaming benchmarks)"
-    },
-    "design_system": {
-        "pattern": r'(?:component|design system|ui kit|ui-kit|figma|animat|gsap|motion|frontend|ui)',
-        "pain": "UI fragmentation, inconsistent components across teams, and slow front-end delivery",
-        "claim": "Modular design system engineering & rich interactive UI",
-        "framing": "Design system & component library engineering: built reusable UI kits directly from Figma (Cloveri project) and high-performance interactive interfaces using GSAP (@gsap/react), Lottie, and modern Tailwind CSS without bloated dependencies.",
-        "seniority": "Senior UI / Product Engineer",
-        "defensibility": "HIGH (hands-on experience with modular UI libraries & tokens)"
-    },
-    "admin_rbac": {
-        "pattern": r'(?:auth|rbac|cms|dashboard|admin|security|session|cookie)',
-        "pain": "Complex role-based access control (RBAC), session vulnerabilities, and SSR hydration mismatches",
-        "claim": "Enterprise dashboard & CMS platform engineering with RBAC",
-        "framing": "Shipped end-to-end admin dashboards & CMS platforms (Radiotochka): implemented granular RBAC, secure session-cookies (httpOnly, SameSite), and eliminated SSR hydration errors with NextAuth.",
-        "seniority": "Senior Fullstack / Product Engineer",
-        "defensibility": "HIGH (concrete session management and authorization architecture)"
-    },
-    "fullstack_ownership": {
-        "pattern": r'(?:fullstack|full-stack|backend|fastapi|python|node|postgres|sql|docker|api|infra)',
-        "pain": "Frontend blockers caused by slow backend API cycles and lack of full-cycle ownership",
-        "claim": "End-to-End Ownership: from UI architecture to backend APIs & Docker",
-        "framing": "End-to-End Feature Ownership: autonomous delivery from Figma to production. Designed REST APIs with FastAPI & Node.js, PostgreSQL relational models, multi-stage Docker builds, and Traefik v3 TLS routing without waiting for dedicated backend teams.",
-        "seniority": "Lead Product Engineer / Autonomous Senior",
-        "defensibility": "HIGH (solid API contracts, SQL models, and containerization)"
-    },
-    "velocity_startups": {
-        "pattern": r'(?:velocity|speed|deadline|startup|mvp|hackathon|fast-paced|early stage)',
-        "pain": "Urgent requirement for rapid time-to-market and autonomous shipping under tight deadlines",
-        "claim": "Extreme shipping velocity & proven hackathon victory",
-        "framing": "1st place at Droog Hackathon: architected and shipped 3 role-based interfaces in 48 hours under strict deadline. Relentless focus on delivery velocity and business value without over-engineering.",
-        "seniority": "Founding / Fast-Paced Senior Engineer",
-        "defensibility": "HIGH (verifiable 1st place track record and live deliverables)"
+def _score_achievement(achievement: Dict, job_text: str, lang: str = "ru") -> int:
+    """Score an achievement against job requirements based on tag overlap and keyword density."""
+    score = 0
+    tags = achievement.get("tags", [])
+    techs = [t.lower() for t in achievement.get("technologies", [])]
+    job_lower = job_text.lower()
+
+    # Tag matching — core signal
+    tag_keywords = {
+        "performance": ["performance", "pagespeed", "core web vitals", "lcp", "cls", "speed", "скорост", "оптимиз", "быстр", "производительн"],
+        "fullstack": ["fullstack", "full-stack", "backend", "бэкенд", "api", "fastapi", "node", "postgres", "sql", "фуллстек"],
+        "delivery": ["hackathon", "хакатон", "deadline", "дедлайн", "velocity", "скорость", "mvp", "стартап", "быстр", "sprint", "спринт"],
+        "infrastructure": ["docker", "infrastructure", "инфраструктур", "devops", "deploy", "деплой", "traefik", "ci/cd", "kubernetes"],
+        "design_system": ["component", "компонент", "design system", "дизайн-систем", "figma", "ui kit", "ui-kit", "animation", "анимац", "gsap", "motion"],
+        "security": ["auth", "авториз", "rbac", "security", "безопасн", "session", "cookie", "cms", "админ"],
+        "automation": ["automation", "автоматиз", "bot", "бот", "telegram", "integration", "интеграц"],
     }
-}
+
+    for tag in tags:
+        if tag in tag_keywords:
+            for kw in tag_keywords[tag]:
+                if kw in job_lower:
+                    score += 15
+                    break
+
+    # Technology matching — secondary signal
+    for tech in techs:
+        if tech in job_lower:
+            score += 10
+
+    # Defensibility bonus — HIGH defensibility = stronger claim
+    if achievement.get("defensibility") == "HIGH":
+        score += 5
+
+    # Metric specificity bonus — concrete numbers > vague claims
+    metric = achievement.get("metric", "")
+    if re.search(r'\d+', metric):
+        score += 8
+
+    return score
+
+
+def _reframe_achievement(achievement: Dict, job_text: str, lang: str = "ru") -> str:
+    """Reframe an achievement into a high-impact bullet point tailored to the job."""
+    problem = achievement.get("problem", "")
+    action = achievement.get("action", "")
+    result = achievement.get("result", "")
+    metric = achievement.get("metric", "")
+    metric_unit = achievement.get("metric_unit", "")
+    techs = achievement.get("technologies", [])
+
+    tech_str = ", ".join(techs[:3]) if techs else ""
+
+    if lang == "ru":
+        # Pick the strongest framing based on what the job needs
+        if metric and metric_unit:
+            return f"{metric} {metric_unit}: {action.lower().rstrip('.')}. Технологии: {tech_str}." if tech_str else f"{metric} {metric_unit}: {action.lower().rstrip('.')}."
+        elif result:
+            return f"{result}. Технологии: {tech_str}." if tech_str else f"{result}."
+        else:
+            return f"{action}. Технологии: {tech_str}." if tech_str else f"{action}."
+    else:
+        if metric and metric_unit:
+            return f"{metric} {metric_unit}: {action.lower().rstrip('.')}. Stack: {tech_str}." if tech_str else f"{metric} {metric_unit}: {action.lower().rstrip('.')}."
+        elif result:
+            return f"{result}. Stack: {tech_str}." if tech_str else f"{result}."
+        else:
+            return f"{action}. Stack: {tech_str}." if tech_str else f"{action}."
 
 
 def heuristic_evidence_retrieval(
@@ -101,85 +85,111 @@ def heuristic_evidence_retrieval(
     lang: str = "ru"
 ) -> Dict[str, Any]:
     """
-    Offline heuristic reframing engine that maps company pain points to
-    high-impact candidate evidence statements.
+    Dynamic achievement matcher: pulls from profile's key_achievements,
+    scores them against job requirements, returns top 3 reframed bullets.
     """
-    presets = STRATEGIC_PRESETS_RU if lang == "ru" else STRATEGIC_PRESETS_EN
-
-    # Collect job context signals
+    # Build job context text
     facts = job_understanding.get("facts", {})
     reasoning = job_understanding.get("reasoning", {})
     overview = job_understanding.get("role_overview", {})
 
-    combined_text = " ".join([
+    job_text = " ".join([
         overview.get("title", ""),
         " ".join(facts.get("explicit_requirements", [])),
         " ".join(facts.get("responsibilities", [])),
         " ".join(reasoning.get("likely_team_problems", [])),
         " ".join(reasoning.get("engineering_signals", []))
-    ]).lower()
+    ])
 
-    matched_evidence = []
-    selected_keys = []
+    # Get achievements from profile
+    achievements = profile.get("key_achievements", [])
 
-    # Match in priority order
-    for key, preset in presets.items():
-        if re.search(preset["pattern"], combined_text, re.I):
-            selected_keys.append(key)
+    if achievements:
+        # Score and sort achievements by relevance to this specific job
+        scored = []
+        for ach in achievements:
+            s = _score_achievement(ach, job_text, lang=lang)
+            scored.append((s, ach))
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        # Take top 3 and reframe them
+        matched_evidence = []
+        for _, ach in scored[:3]:
+            reframed = _reframe_achievement(ach, job_text, lang=lang)
             matched_evidence.append({
-                "job_pain_point": preset["pain"],
-                "candidate_claim": preset["claim"],
-                "aggressive_framing": preset["framing"],
-                "seniority_signal": preset["seniority"],
-                "interview_defensibility": preset["defensibility"]
+                "job_pain_point": ach.get("problem", ""),
+                "candidate_claim": ach.get("result", ""),
+                "aggressive_framing": reframed,
+                "seniority_signal": "Senior / Lead Engineer",
+                "interview_defensibility": ach.get("defensibility", "HIGH"),
+                "source_achievement_id": ach.get("id", "")
             })
+    else:
+        # Fallback to legacy presets if no key_achievements defined
+        matched_evidence = _fallback_preset_matching(job_text, lang=lang)
 
-    # Ensure at least 2 strong strategic anchors are always present
-    fallback_order = ["fullstack_ownership", "design_system", "performance"]
-    for fb_key in fallback_order:
-        if len(matched_evidence) >= 3:
-            break
-        if fb_key not in selected_keys:
-            preset = presets[fb_key]
-            selected_keys.append(fb_key)
-            matched_evidence.append({
-                "job_pain_point": preset["pain"],
-                "candidate_claim": preset["claim"],
-                "aggressive_framing": preset["framing"],
-                "seniority_signal": preset["seniority"],
-                "interview_defensibility": preset["defensibility"]
-            })
-
-    # Strategic narrative & positioning
+    # Strategic narrative
     if lang == "ru":
         positioning = "Senior / Lead Product Engineer со сквозным владением (End-to-End Ownership): от архитектуры интерфейса и дизайн-системы до серверных API и деплоя в Docker"
         leverage_points = [
-            "Автономность: способность в одиночку закрывать модули и фичи под ключ без нянченья со стороны тимлида",
-            "Реальный опыт оптимизации Core Web Vitals до 100/100 на Next.js 16 App Router",
-            "Высокая скорость поставки, доказанная 1-м местом на хакатоне (3 интерфейса за 48 часов)"
-        ]
-        defensive_pivots = [
-            "Если в вакансии упоминаются редкие или легаси библиотеки: делать упор на глубокий фундамент в React 19 / TypeScript, позволяющий освоить смежный инструмент за пару дней без рисков для продакшна."
+            "Автономность: способность в одиночку закрывать модули и фичи под ключ",
+            "Реальный опыт оптимизации производительности до 100/100 PageSpeed",
+            "Высокая скорость поставки, доказанная на хакатонах и в коммерческих проектах"
         ]
     else:
-        positioning = "Senior / Lead Product Engineer with End-to-End Ownership: from UI architecture and design systems to backend APIs and Docker deployments"
+        positioning = "Senior / Lead Product Engineer with End-to-End Ownership: from UI architecture to backend APIs and Docker deployments"
         leverage_points = [
-            "Complete autonomy: takes features from Figma to production without requiring micro-management",
-            "Proven performance benchmark: achieved 100/100 Core Web Vitals on Next.js 16 App Router",
-            "Exceptional delivery velocity: 1st place in Droog hackathon (shipped 3 role-based apps in 48 hours)"
-        ]
-        defensive_pivots = [
-            "If asked about obscure or unmentioned niche libraries: pivot to deep TypeScript/React architecture fundamentals ensuring zero onboarding drag."
+            "Complete autonomy: takes features from Figma to production without micro-management",
+            "Proven performance benchmark: achieved 100/100 Core Web Vitals on Next.js 16",
+            "High shipping velocity: proven hackathon winner and commercial SaaS delivery"
         ]
 
     return {
-        "matched_evidence": matched_evidence[:3],
+        "matched_evidence": matched_evidence,
         "strategic_narrative": {
             "positioning_angle": positioning,
             "leverage_points": leverage_points,
-            "defensive_pivots": defensive_pivots
+            "defensive_pivots": [
+                "Focus on deep React/TypeScript fundamentals that transfer to any stack"
+            ]
         }
     }
+
+
+def _fallback_preset_matching(job_text: str, lang: str = "ru") -> List[Dict]:
+    """Legacy fallback when no key_achievements are defined."""
+    # Minimal hardcoded presets as safety net
+    presets = {
+        "performance": {
+            "pattern": r'(?:performance|pagespeed|core web vitals|lcp|cls|speed|скорост|оптимиз)',
+            "framing_ru": "Оптимизация Core Web Vitals до 100/100 на Next.js 16 (App Router) за счет RSC, SSR-стриминга и code splitting.",
+            "framing_en": "Achieved 100/100 PageSpeed on Next.js 16 via RSC streaming, bundle splitting, and zero-bloat state architecture."
+        },
+        "fullstack": {
+            "pattern": r'(?:fullstack|backend|fastapi|python|node|postgres|sql|docker|api)',
+            "framing_ru": "Сквозная разработка: REST API на FastAPI/Node.js, PostgreSQL, multi-stage Docker с Traefik v3 и авто-TLS.",
+            "framing_en": "End-to-End ownership: REST APIs with FastAPI/Node.js, PostgreSQL, multi-stage Docker with Traefik v3 auto-TLS."
+        },
+        "delivery": {
+            "pattern": r'(?:hackathon|velocity|deadline|мvp|стартап|хакатон|дедлайн)',
+            "framing_ru": "1 место на хакатоне Droog: 3 ролевых интерфейса за 48 часов в условиях жесткого дедлайна.",
+            "framing_en": "1st place at Droog Hackathon: shipped 3 role-based interfaces in 48 hours under strict deadline."
+        },
+    }
+
+    matched = []
+    for key, preset in presets.items():
+        if re.search(preset["pattern"], job_text, re.I):
+            framing = preset[f"framing_{lang}"]
+            matched.append({
+                "job_pain_point": f"Requires {key} expertise",
+                "candidate_claim": framing,
+                "aggressive_framing": framing,
+                "seniority_signal": "Senior Engineer",
+                "interview_defensibility": "HIGH"
+            })
+
+    return matched[:3]
 
 
 def retrieve_and_reframe_evidence(
@@ -199,8 +209,8 @@ def retrieve_and_reframe_evidence(
     # Extract core facts
     candidate_name = profile.get("name") or profile.get("identity", {}).get("name", "Candidate")
     target_role = profile.get("role") or profile.get("identity", {}).get("target_role", "Senior Engineer")
-    candidate_evidence = profile.get("evidence", [])
     raw_exp = profile.get("experience", "")[:2000]
+    key_achievements = profile.get("key_achievements", [])
 
     job_title = job_understanding.get("role_overview", {}).get("title", "Engineer")
     company = job_understanding.get("role_overview", {}).get("company", "Company")
@@ -210,26 +220,38 @@ def retrieve_and_reframe_evidence(
 
     language_name = "Russian" if lang == "ru" else "English"
 
+    achievements_text = ""
+    if key_achievements:
+        achievements_list = []
+        for ach in key_achievements:
+            achievements_list.append(
+                f"- [{ach.get('category', 'general')}] {ach.get('metric', '')} {ach.get('metric_unit', '')}: "
+                f"{ach.get('action', '')} | Result: {ach.get('result', '')} | "
+                f"Tech: {', '.join(ach.get('technologies', []))} | "
+                f"Tags: {', '.join(ach.get('tags', []))}"
+            )
+        achievements_text = "\n".join(achievements_list)
+
     prompt = f"""You are a Strategic Career Agent representing {candidate_name} ({target_role}).
 Your job is to build an AGGRESSIVE, HIGH-STATUS engineering positioning package connecting this company's hidden pain points to the candidate's real capabilities.
 
 CRITICAL INSTRUCTIONS:
 1. NO ACADEMIC TIMIDITY: Frame the candidate as a decisive Senior / Lead Product Engineer who owns features end-to-end (Figma -> Client Architecture -> API Contracts -> Docker/Production).
-2. REAL CAPABILITY ANCHORING: Every claim must be defensible in an interview. Anchor all claims in the candidate's verified stack:
-   - React 19, TypeScript 5, Next.js 16 (App Router, RSC, Streaming, PageSpeed 100/100).
-   - Fast delivery (1st place at Droog Hackathon: 3 role-based interfaces in 48h).
-   - Design systems & modular UI (Cloveri for Mintsifry, GSAP, Tailwind CSS v4).
-   - Fullstack versatility (FastAPI, Node.js, PostgreSQL, Docker, Traefik, session cookies).
-   - Admin platforms & RBAC (Radiotochka CMS).
+2. REAL CAPABILITY ANCHORING: Every claim must be defensible in an interview.
 3. STRICT NO FOUNDER / NO PET-PROJECT MARKERS: Never mention being a 'founder', 'owner', or 'pet project'. Frame all SaaS work as Lead Engineer roles.
+4. DYNAMIC ACHIEVEMENT MATCHING: Select the 2-3 most relevant achievements from the candidate's key_achievements below that directly address this specific job's requirements. Do NOT use achievements that are irrelevant to the role.
+5. ATS KEYWORD OPTIMIZATION: Ensure the reframed bullets contain the exact technologies and keywords mentioned in the job requirements.
+
+CANDIDATE KEY ACHIEVEMENTS (select the most relevant 2-3 for this specific job):
+{achievements_text}
+
+CANDIDATE EXPERIENCE:
+{raw_exp}
 
 JOB CONTEXT ({company} — {job_title}):
 - Team Pains: {json.dumps(problems, ensure_ascii=False)}
 - Engineering Signals: {json.dumps(signals, ensure_ascii=False)}
 - Hard Requirements: {json.dumps(explicit_reqs, ensure_ascii=False)}
-
-CANDIDATE EVIDENCE & EXPERIENCE:
-{raw_exp}
 
 LANGUAGE: {language_name}
 
@@ -237,17 +259,17 @@ Respond ONLY with valid JSON in this exact structure:
 {{
   "matched_evidence": [
     {{
-      "job_pain_point": "The specific bottleneck or need this company has",
-      "candidate_claim": "The capability from candidate profile addressing it",
-      "aggressive_framing": "High-impact, senior-level bullet point showing business & technical value",
+      "job_pain_point": "The specific bottleneck this company has",
+      "candidate_claim": "The specific achievement addressing it",
+      "aggressive_framing": "High-impact bullet point with concrete metrics, tailored to this job's keywords",
       "seniority_signal": "Lead / Senior Architect",
       "interview_defensibility": "HIGH (can discuss X, Y, Z in depth)"
     }}
   ],
   "strategic_narrative": {{
-    "positioning_angle": "Core positioning angle",
-    "leverage_points": ["Point 1", "Point 2", "Point 3"],
-    "defensive_pivots": ["Pivot statement for interview"]
+    "positioning_angle": "Core positioning angle for THIS specific role",
+    "leverage_points": ["Point 1 matching job requirements", "Point 2", "Point 3"],
+    "defensive_pivots": ["Pivot for interview"]
   }}
 }}
 """

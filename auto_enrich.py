@@ -36,7 +36,7 @@ def get_vacancies_to_enrich(enrich_all: bool = False) -> list:
             cur.execute("""
                 SELECT * FROM vacancies 
                 WHERE understanding_json IS NULL 
-                AND status != 'blacklisted'
+                AND status NOT IN ('blacklist', 'sent', 'archived')
                 ORDER BY created_at DESC
             """)
         return [dict(row) for row in cur.fetchall()]
@@ -122,12 +122,16 @@ def save_enrichment_results(conn, vac_id: str, result: dict):
             (vac_id, p_type, lang, content)
         )
 
-    # Update score and mark as enriched
+    # Update score and mark as enriched (don't overwrite user-set statuses)
     score = pitch_data.get("score", 0)
-    cur.execute(
-        "UPDATE vacancies SET score = ?, status = 'analyzed', language = ? WHERE id = ?",
-        (score, lang, vac_id)
-    )
+    cur.execute("""
+        UPDATE vacancies SET score = ?, language = ?
+        WHERE id = ? AND status NOT IN ('blacklist', 'sent', 'archived', 'queued')
+    """, (score, lang, vac_id))
+    cur.execute("""
+        UPDATE vacancies SET status = 'analyzed'
+        WHERE id = ? AND status IN ('new', 'analyzed')
+    """, (vac_id,))
 
 
 def auto_enqueue_enriched(score_threshold: int = 70):

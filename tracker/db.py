@@ -131,6 +131,8 @@ def init_db(custom_path: Optional[str] = None):
         cursor.execute("ALTER TABLE vacancies ADD COLUMN fsm_state TEXT DEFAULT 'DISCOVERED'")
     if 'pitch_rating' not in columns:
         cursor.execute("ALTER TABLE vacancies ADD COLUMN pitch_rating INTEGER DEFAULT 0")
+    if 'viewed_at' not in columns:
+        cursor.execute("ALTER TABLE vacancies ADD COLUMN viewed_at TIMESTAMP")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pitches (

@@ -258,7 +258,7 @@ OUTPUT JSON ONLY matching this schema:
 }}
 """
     model = GEMINI_MODELS[0]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -271,7 +271,7 @@ OUTPUT JSON ONLY matching this schema:
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=12.0) as resp:

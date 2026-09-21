@@ -34,7 +34,8 @@ elif [ "$OS" = "Linux" ]; then
             --remote-debugging-port="${CDP_PORT}" \
             --user-data-dir="${USER_DATA_DIR}" \
             --no-first-run \
-            --no-default-browser-check > /dev/null 2>&1 &
+            --no-default-browser-check \
+            "http://localhost:8115" > /dev/null 2>&1 &
     else
         echo "⚠️ Google Chrome / Chromium не найден в PATH на Linux. Установите google-chrome или chromium."
     fi

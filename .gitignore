@@ -49,6 +49,10 @@ ENV/
 *.egg-info/
 dist/
 build/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
 
 # ─────────────────────────────────────────────
 #  Operating System & IDE
