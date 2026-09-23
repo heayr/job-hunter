@@ -7,9 +7,34 @@ from typing import Dict, Any, Optional
 
 GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"]
 
-def _sanitize_short_dm(dm: str) -> str:
-    """No-op sanitizer — keep the AI's natural output."""
-    return dm
+def _sanitize_text(text: str, custom_stop_phrases: list = None) -> str:
+    """Anti-BS & Anti-Bullet sanitizer."""
+    # Remove bullets
+    text = re.sub(r'(?m)^[\s]*[-*•]\s*', '', text)
+    text = re.sub(r'(?m)^[\s]*\d+\.\s*', '', text)
+    # Remove cliches
+    cliches = [
+        r"(?i)буду рад(а)? внести (свой )?вклад",
+        r"(?i)динамично развивающ\w+ компани",
+        r"(?i)ознакомился с (вашей )?вакансией",
+        r"(?i)с большим интересом прочитал",
+        r"(?i)могу принести пользу",
+        r"(?i)нацелен(а)? на результат"
+    ]
+    if custom_stop_phrases:
+        for p in custom_stop_phrases:
+            if len(p) > 2:
+                cliches.append(r"(?i)" + re.escape(p))
+                
+    for c in cliches:
+        text = re.sub(c, "", text)
+    # Clean double spaces or broken lines caused by removals
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    return text
+
+def _sanitize_short_dm(dm: str, custom_stop_phrases: list = None) -> str:
+    return _sanitize_text(dm, custom_stop_phrases)
 
 def get_llm_config() -> Dict[str, Any]:
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
@@ -22,12 +47,16 @@ def get_llm_config() -> Dict[str, Any]:
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if data.get("llm_provider"):
-                    cfg["provider"] = data["llm_provider"]
-                if data.get("gemini_api_key"):
-                    cfg["gemini_api_key"] = data["gemini_api_key"].strip()
-                if data.get("lm_studio_url"):
-                    cfg["lm_studio_url"] = data["lm_studio_url"].strip()
+                # Apply all loaded keys to cfg
+                for k, v in data.items():
+                    if k == "gemini_api_key" and v:
+                        cfg[k] = v.strip()
+                    elif k == "lm_studio_url" and v:
+                        cfg[k] = v.strip()
+                    elif k == "llm_provider" and v:
+                        cfg["provider"] = v
+                    else:
+                        cfg[k] = v
         except Exception:
             pass
     return cfg
@@ -88,7 +117,7 @@ def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True,
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.2,
+        "temperature": float(cfg.get("temperature", 0.2)),
         "max_tokens": 3500
     }
 
@@ -172,6 +201,9 @@ def generate_ai_pitch(
     lang: str = "ru"
 ) -> Dict[str, Any]:
     cfg = get_llm_config()
+    stop_phrases = cfg.get("stop_phrases", [])
+    stop_phrases_text = ", ".join(stop_phrases) if stop_phrases else ""
+    
     provider = cfg.get("provider", "gemini")
     api_key = cfg.get("gemini_api_key", "")
     if provider == "gemini" and not api_key:
@@ -244,61 +276,85 @@ def generate_ai_pitch(
         for ex in rejected_list:
             rejected_text += f"\n--- REJECTED EXAMPLE ({ex.get('pitch_type', '').upper()}) — DO NOT MIMIC:\n{ex.get('content')}\n"
 
-    prompt = f"""Write as {name}, a Senior Frontend/Fullstack Engineer.
-You are writing to an engineering lead — peer to peer.
+    stop_phrases_block = f'''
+CRITICAL RULE - BLACKLIST (АБСОЛЮТНЫЙ ЗАПРЕТ):
+Ты ни при каких обстоятельствах не должен использовать следующие слова и фразы (даже синонимы или в измененном виде). Представь, что их не существует в языке:
+[{stop_phrases_text}]
+''' if stop_phrases_text else ""
 
-JOB: {title} at {company}
+    default_template = """ТЫ — опытный IT-специалист и карьерный стратег. Твоя задача — писать короткие, пробивные и 100% конвертящие сопроводительные письма под конкретную вакансию.
+
+КОНТЕКСТ РЫНКА (ПРАВИЛА ИГРЫ):
+1. Все приукрашивают. Кандидат должен выглядеть максимально уверенным практиком с твердым релевантным бэкграундом (минимум 2+ года, уверенно адаптируй опыт под требования).
+2. Эйчар тратит 5 секунд. Письмо должно цеплять с первого абзаца техническим сленгом ("изнанка", "под капотом", "логи", "контракты" — в зависимости от стека).
+
+ПОЛНЫЙ ЗАПРЕТ НА "ИИ-СТИЛЬ":
+- Никаких маркированных списков (bullet points)! Пиши сплошными абзацами.
+- Никаких штампов ("динамично развивающаяся", "буду рад внести вклад", "ознакомился с вакансией").
+- Тон: уверенный, сухой, профессионально-разговорный (инженер пишет инженеру).
+
+{stop_phrases_block}
+
+СТРУКТУРА:
+1. Приветствие. Просто напиши "Привет!" или "Добрый день!" и СРАЗУ переходи к своему опыту. Никаких вступлений про саму вакансию.
+Пример ИДЕАЛЬНОГО старта: "Привет! У меня за плечами полный цикл разработки SaaS на React..."
+СТРОГИЙ ЗАПРЕТ: Никогда не пиши "Откликаюсь на...", "Пишу по поводу...", "Рассматриваю позицию...", "Забираю вакансию в работу" и любой другой мусор, указывающий на факт отклика. HR и так знает, зачем ты пишешь.
+2. Крючок (1 абзац): Заявление релевантного опыта. Главный угол атаки: не просто "исполнитель по ТЗ", а человек, понимающий архитектуру и бизнес-задачу.
+3. Мясо стека: Собрать главные требования из описания и вписать их в живую речь. Использовать сленг.
+4. Короткий CTA + Контакты: {tg} | {email} | {github}
+
+VACANCY: {title} at {company}
 {desc}
 
 PROFILE: {name}, {role}
-Experience: {exp}
-Stack: {keywords}
-Contacts: TG: {tg} | {email} | {github} | {linkedin}
-
-WARNINGS: {warnings if warnings else "None"}
-
-LANGUAGE: {language_name} only. No mixing.
-
----
-
-WHAT MAKES A GOOD APPLICATION:
-
-1. GREETING: "Добрый день!" / "Привет!" — OK, keep it short. One word max.
-   After the greeting, immediately jump into something specific about THIS company.
-
-2. SECOND SENTENCE = THEIR PROBLEM, NOT YOUR RESUME.
-   BAD: "Мой опыт напрямую переносится на ваш стек."
-   GOOD: "80+ человек в frontend-команде — это не про код, это про процессы и архитектуру, которая не ломается при масштабировании."
-   GOOD: "B2B-продукты для digital-маркетинга требуют быстрых UI-итераций без потери производительности — именно этим я занимался в NoLogs."
-
-3. CONNECT THEIR NEED → YOUR PROOF (with numbers).
-   BAD: "Мой опыт напрямую переносится на ваш стек."
-   GOOD: "В NoLogs я довёл Next.js-приложение до 100/100 PageSpeed через code splitting и SSR — паттерны, которые точно пригодятся для вашего Nuxt-приложения."
-
-4. BE SPECIFIC ABOUT THE COMPANY.
-   Read their description. Reference something concrete: their product, their scale, their tech choice.
-   "Ваш стек Nuxt/Vue + Node.js говорит о fullstack-ориентированной команде — мой опыт с BFF-паттернами на Next.js и FastAPI здесь применим."
-
-5. SOUND HUMAN.
-   Write like you're talking to a colleague over coffee, not submitting a form.
-   It's OK to have an opinion. It's OK to be slightly informal.
-   BANNED: "results-driven", "passionate", "fast-paced", "team player", "leverage", "ideally suited", "горю желанием", "нацелен на результат".
-
-6. COVER LETTER FORMAT:
-   "Добрый день!"
-   Paragraph 1: Their specific problem or challenge (from the description).
-   Paragraph 2: Your concrete experience that solves it (with numbers).
-   Paragraph 3: Why you care about this particular role + contacts.
-
-7. SHORT DM FORMAT:
-   "Привет!" or "Добрый день!"
-   1-2 sentences: technical overlap + one proof point + CTA.
+{summary}
+Keywords: {keywords}
+Exp: {exp}
 
 {gold_examples_text}
 {rejected_text}
+
+WARNINGS: {warnings}
+
+LANGUAGE: {language_name} only.
+
 JSON only:
-{{"short_dm": "...", "cover_letter": "...", "score": 75}}
+{{"short_dm": "...", "cover_letter": "...", "score": 85}}
 """
+    raw_template = cfg.get("system_prompt_template")
+    if not raw_template or not raw_template.strip():
+        raw_template = default_template
+
+    # Ensure JSON constraint is always present even if user deleted it
+    if "JSON only" not in raw_template:
+        raw_template += '\nJSON only:\n{"short_dm": "...", "cover_letter": "...", "score": 85}\n'
+        
+    def safe_replace(tmpl, replacements):
+        res = tmpl
+        for k, v in replacements.items():
+            res = res.replace("{" + k + "}", str(v))
+        return res
+
+    prompt = safe_replace(raw_template, {
+        "title": title,
+        "company": company,
+        "desc": desc[:1500],
+        "name": name,
+        "role": role,
+        "summary": summary,
+        "keywords": keywords,
+        "exp": exp,
+        "tg": tg,
+        "email": email,
+        "github": github,
+        "linkedin": linkedin,
+        "stop_phrases_block": stop_phrases_block,
+        "gold_examples_text": gold_examples_text,
+        "rejected_text": rejected_text,
+        "warnings": warnings if warnings else "None",
+        "language_name": language_name
+    })
+
 
     # 1. If LM Studio is selected as the primary provider, call it directly
     if provider == "lm_studio":
@@ -308,8 +364,8 @@ JSON only:
             if parsed:
                 return {
                     "success": True,
-                    "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip()),
-                    "cover_letter": (parsed.get("cover_letter") or "").strip(),
+                    "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip(), stop_phrases),
+                    "cover_letter": _sanitize_text((parsed.get("cover_letter") or "").strip(), stop_phrases),
                     "score": int(parsed.get("score", 80))
                 }
         return {
@@ -326,8 +382,8 @@ JSON only:
             if parsed:
                 return {
                     "success": True,
-                    "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip()),
-                    "cover_letter": (parsed.get("cover_letter") or "").strip(),
+                    "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip(), stop_phrases),
+                    "cover_letter": _sanitize_text((parsed.get("cover_letter") or "").strip(), stop_phrases),
                     "score": int(parsed.get("score", 80))
                 }
         return {"success": False, "error": "Gemini API ключ не указан в Настройках ИИ"}
@@ -337,7 +393,7 @@ JSON only:
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.35,
+            "temperature": float(cfg.get("temperature", 0.7)),
             "responseMimeType": "application/json"
         }
     }
@@ -365,8 +421,8 @@ JSON only:
                 parsed = json.loads(text)
                 return {
                     "success": True,
-                    "short_dm": _sanitize_short_dm(parsed.get("short_dm", "").strip()),
-                    "cover_letter": parsed.get("cover_letter", "").strip(),
+                    "short_dm": _sanitize_short_dm(parsed.get("short_dm", "").strip(), stop_phrases),
+                    "cover_letter": _sanitize_text(parsed.get("cover_letter", "").strip(), stop_phrases),
                     "score": int(parsed.get("score", 75))
                 }
         except urllib.error.HTTPError as he:
@@ -406,8 +462,8 @@ JSON only:
         if parsed:
             return {
                 "success": True,
-                "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip()),
-                "cover_letter": (parsed.get("cover_letter") or "").strip(),
+                "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip(), stop_phrases),
+                "cover_letter": _sanitize_text((parsed.get("cover_letter") or "").strip(), stop_phrases),
                 "score": int(parsed.get("score", 80))
             }
 

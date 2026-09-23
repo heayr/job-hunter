@@ -44,7 +44,7 @@ class TestAgentApprovalPrivileged(unittest.TestCase):
         cur.execute("DELETE FROM pitches WHERE vacancy_id = ?", (self.vacancy_id,))
         cur.execute("DELETE FROM agent_sessions WHERE vacancy_id = ?", (self.vacancy_id,))
         cur.execute("DELETE FROM application_history WHERE vacancy_id = ?", (self.vacancy_id,))
-        cur.execute("DELETE FROM vacancies WHERE id = ?", (self.vacancy_id,))
+        cur.execute("DELETE FROM vacancies WHERE id = ? OR company = 'Apex Fintech'", (self.vacancy_id,))
         conn.commit()
         conn.close()
 

@@ -49,6 +49,14 @@
             <p class="text-[10px] text-slate-500 mt-1">Запустите сервер в LM Studio на порту 1234 (например, Qwen 2.5 7B или Llama 3.1 8B).</p>
         </div>
 
+        <!-- Stop Phrases Block -->
+        <div class="mb-3.5 pt-2.5 border-t border-slate-800">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Стоп-фразы генерации (через запятую)</label>
+            <textarea id="setting-stop-phrases" placeholder="динамично, внести вклад, ознакомился с вакансией..." rows="2"
+                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-red-500 font-mono"></textarea>
+            <p class="text-[10px] text-slate-500 mt-1">ИИ получит жесткий запрет на эти слова, а регулярки вычистят их перед отправкой.</p>
+        </div>
+
         <div class="mb-3.5 pt-2.5 border-t border-slate-800 space-y-2.5 text-xs">
             <div class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Калибровка стратегии и резюме</div>
             <label class="flex items-start gap-2.5 cursor-pointer select-none">

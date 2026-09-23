@@ -176,70 +176,47 @@ def heuristic_cover_letter(
     else:
         ats_tech_line = "React, Next.js, TypeScript"
 
-    # Build bullets from highlights
-    bullet_lines = "\n".join(f"• {h}" for h in highlights[:3])
+    # Build continuous text from highlights instead of bullets
+    achievements_text = " ".join([f"{h}." for h in highlights[:3]])
 
     is_middle = "middle" in archetype.lower() or "мидл" in archetype.lower() or "junior" in archetype.lower()
 
     if lang == "ru":
-        core_hook = f"Специализируюсь на продуктовом фронтенде с фокусом на самостоятельное закрытие задач и чистую архитектуру." if is_middle else f"Специализируюсь на масштабируемой фронтенд-архитектуре и сквозной поставке бизнес-функционала."
+        core_hook = f"Специализируюсь на продуктовом фронтенде с фокусом на самостоятельное закрытие задач." if is_middle else f"Специализируюсь на масштабируемой архитектуре и сквозной поставке бизнес-функционала."
         
-        draft_cl = f"""Здравствуйте!
+        draft_cl = f"""Откликаюсь на позицию «{title}» в {company}.
 
-Откликаюсь на позицию «{title}» в {company}.
+{core_hook} {achievements_text}
 
-{core_hook}
+Рабочий стек: {ats_tech_line}. В фокусе — архитектура без блокеров и предсказуемая поставка фич. На бэкенде спокойно проектирую REST API контракты и поднимаю инфраструктуру в Docker, поэтому смежным командам не приходится ждать. Готов созвониться и ответить на технические вопросы.
 
-Ключевой стек и проверенные результаты под задачи команды:
-{bullet_lines}
-
-Технологический стек: {ats_tech_line}. Инженерный фокус — чистый поддерживаемый код, предсказуемая поставка фич в спринтах и внимание к деталям интерфейса. На бэкенде свободно проектирую REST API контракты и поднимаю инфраструктуру в Docker, поэтому не создаю блокеров для смежных команд.
-
-Буду рад обсудить задачи с командой!
-
-Контакты:
-Telegram: {tg} | Email: {email}
-GitHub: {github} | LinkedIn: {linkedin}"""
+{tg} | {email} | {github} | {linkedin}"""
 
         # ATS-optimized short DM with matched keywords
         ats_keywords_short = ", ".join(matched_tech[:3]) if matched_tech else "React, Next.js, TypeScript"
         draft_dm = f"""Привет! Откликаюсь на позицию «{title}» в {company}.
 
-Мой стек ({ats_keywords_short}) напрямую закрывает ключевые требования: {highlights[0]}
+Мой стек ({ats_keywords_short}) напрямую закрывает ваши задачи. {highlights[0]}. Готов созвониться!
 
-GitHub: {github} | LinkedIn: {linkedin}
-
-Буду рад обсудить задачи с командой!"""
+{github} | {linkedin}"""
 
     else:
-        core_hook = f"Autonomous product-focused engineer with full ownership of client architecture and high delivery speed." if is_middle else f"Senior product engineer with end-to-end technical ownership and proven delivery track record."
+        core_hook = f"Autonomous product-focused engineer with full ownership of client architecture." if is_middle else f"Senior product engineer with end-to-end technical ownership."
 
-        draft_cl = f"""Hello {company} Team,
+        draft_cl = f"""Applying for the {title} position at {company}.
 
-Applying for the {title} position.
+{core_hook} {achievements_text}
 
-{core_hook}
+Tech stack: {ats_tech_line}. My priority is high shipping velocity and clean architectural boundaries. I design backend contracts and containerize via Docker, preventing cross-team blockers. Looking forward to discussing the role!
 
-Relevant engineering outcomes aligning with your roadmap:
-{bullet_lines}
-
-Tech stack: {ats_tech_line}. My priority is high shipping velocity, clean architectural boundaries, and relentless performance optimization. I design backend contracts and containerize via Docker, preventing cross-team blockers.
-
-Looking forward to connecting with your team!
-
-Best regards,
-{name}
-Telegram: {tg} | Email: {email}
-GitHub: {github} | LinkedIn: {linkedin}"""
+{tg} | {email} | {github} | {linkedin}"""
 
         ats_keywords_en = ", ".join(matched_tech[:3]) if matched_tech else "React, Next.js, TypeScript"
         draft_dm = f"""Hi! Applying for the {title} position at {company}.
 
-My background with {ats_keywords_en} directly matches your requirements: {highlights[0]}
+My background with {ats_keywords_en} directly matches your stack. {highlights[0]}. Looking forward to connecting!
 
-GitHub: {github} | LinkedIn: {linkedin}
-
-Looking forward to connecting!"""
+{github} | {linkedin}"""
 
     # Run Critic stage
     final_cl, cl_notes = critic_refine_letter(draft_cl, strategy, lang=lang)

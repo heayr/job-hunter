@@ -116,7 +116,7 @@ class CRMHandler(BaseHTTPRequestHandler):
                 v.ats_report_json,
                 COALESCE(v.fsm_state, 'DISCOVERED') AS fsm_state,
                 COALESCE(v.pitch_rating, 0) AS pitch_rating,
-                v.viewed_at,
+
                 COALESCE(MAX(CASE WHEN p.pitch_type = 'cover_letter' THEN p.rating END), 0) AS cl_rating,
                 COALESCE(MAX(CASE WHEN p.pitch_type = 'short_dm' THEN p.rating END), 0) AS dm_rating,
                 MAX(CASE WHEN p.pitch_type = 'short_dm'     THEN p.content END) AS short_dm,

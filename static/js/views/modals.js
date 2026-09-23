@@ -87,6 +87,13 @@ async function loadConfig() {
         const remOnly = document.getElementById('setting-remote-only');
         if (remOnly) remOnly.checked = data.policy_remote_only === true;
 
+        const stopPhrases = document.getElementById('setting-stop-phrases');
+        if (stopPhrases) {
+            let phrases = data.stop_phrases || [];
+            if (Array.isArray(phrases)) phrases = phrases.join(", ");
+            stopPhrases.value = phrases;
+        }
+
         activeProfileId = data.active_profile_id || null;
         renderActiveProfileDropdown();
     } catch (e) {
@@ -105,6 +112,9 @@ async function saveConfig() {
     const dailyLim = parseInt(document.getElementById('setting-daily-limit')?.value || '25', 10);
     const remOnly = document.getElementById('setting-remote-only')?.checked ?? false;
 
+    let stopPhrases = document.getElementById('setting-stop-phrases')?.value || '';
+    stopPhrases = stopPhrases.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
     const payload = {
         llm_provider: currentLlmProvider,
         lm_studio_url: lmUrl,
@@ -114,7 +124,8 @@ async function saveConfig() {
         policy_min_salary_rub: salRub,
         policy_min_salary_usd: salUsd,
         policy_daily_limit: dailyLim,
-        policy_remote_only: remOnly
+        policy_remote_only: remOnly,
+        stop_phrases: stopPhrases
     };
     if (key && !key.includes('●')) {
         payload.gemini_api_key = key;

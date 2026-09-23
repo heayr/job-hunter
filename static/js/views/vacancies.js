@@ -72,10 +72,17 @@ function setTab(tab) {
     if (tab === 'profiles') {
         document.getElementById('main-view').classList.add('hidden');
         document.getElementById('profiles-view').classList.remove('hidden');
+        if (document.getElementById('prompt-view')) document.getElementById('prompt-view').classList.add('hidden');
         loadProfilesList();
+    } else if (tab === 'prompt') {
+        document.getElementById('main-view').classList.add('hidden');
+        document.getElementById('profiles-view').classList.add('hidden');
+        if (document.getElementById('prompt-view')) document.getElementById('prompt-view').classList.remove('hidden');
+        if (typeof loadPromptEditor === 'function') loadPromptEditor();
     } else {
         document.getElementById('main-view').classList.remove('hidden');
         document.getElementById('profiles-view').classList.add('hidden');
+        if (document.getElementById('prompt-view')) document.getElementById('prompt-view').classList.add('hidden');
         currentVac = null;
         updateCounts();
         renderList();

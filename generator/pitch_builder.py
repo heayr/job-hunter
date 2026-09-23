@@ -396,7 +396,7 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Op
 
     # Select real matching achievements with Phase 3 reframing
     achievements = select_dynamic_achievements(f"{title} {skills} {desc}", lang=lang, profile=profile, use_ai=use_ai)
-    bullet_text = "\n".join(f"• {b}" for b in achievements)
+    achievements_text = " ".join([f"{a}." for a in achievements])
 
     # Phase 10: Use Cover Letter Engine with cognitive loop
     try:
@@ -432,48 +432,37 @@ def generate_pitch(vacancy: Dict[str, Any], use_ai: bool = False, profile_id: Op
     except Exception:
         if lang == "en":
             greeting_dm = f"Hi {recipient}!" if recipient else "Hi!"
-            greeting_cl = f"Dear {company} Team," if company else "Hello Hiring Team,"
-
             top_fact = achievements[0] if achievements else f"I build production web apps with {highlight_kw}."
 
             short_dm = (
                 warning_header +
                 f"{greeting_dm} Applying for the {title} position at {company}.\n\n"
-                f"My focus aligns directly with your stack ({highlight_kw}). {top_fact}\n\n"
-                f"{github} | {linkedin}\n\n"
-                f"Looking forward to discussing the role with your team!"
+                f"My focus aligns directly with your stack ({highlight_kw}). {top_fact} Ready to connect.\n\n"
+                f"{github} | {linkedin}"
             )
             cover_letter = (
                 warning_header +
-                f"{greeting_cl}\n\n"
-                f"I'm applying for the {title} role at {company}.\n\n"
-                f"I build high-performance, maintainable web applications with React, Next.js, and TypeScript, with full technical ownership across the stack ({highlight_kw}).\n\n"
-                f"Relevant experience & outcomes:\n"
-                f"{bullet_text}\n\n"
+                f"Applying for the {title} role at {company}.\n\n"
+                f"I build high-performance, maintainable web applications with React, Next.js, and TypeScript, with full technical ownership across the stack ({highlight_kw}). {achievements_text}\n\n"
                 f"Would be glad to discuss how my background can help your team ship fast and scale.\n\n"
-                f"Best regards,\n{name}\n{tg} | {email}\n{github} | {linkedin}"
+                f"{name}\n{tg} | {email}\n{github} | {linkedin}"
             )
         else:
             greeting_dm = f"Привет, {recipient}!" if recipient else "Привет!"
-
             top_fact = achievements[0] if achievements else f"Специализируюсь на продуктовой веб-разработке с фокусом на {highlight_kw}."
 
             short_dm = (
                 warning_header +
                 f"{greeting_dm} Откликаюсь на позицию «{title}» в {company}.\n\n"
                 f"Мой стек и опыт напрямую пересекаются с вашими задачами ({highlight_kw}). {top_fact}\n\n"
-                f"{github} | {linkedin}\n\n"
-                f"Буду рад обсудить задачи с командой!"
+                f"{github} | {linkedin}"
             )
             cover_letter = (
                 warning_header +
-                f"Здравствуйте!\n\n"
-                f"Меня зовут {name}, откликаюсь на вакансию «{title}» в {company}.\n\n"
-                f"Специализируюсь на фронтенде и фуллстек-разработке (React, Next.js, TypeScript). Фокусируюсь на чистой архитектуре, высокой производительности и надежности в production ({highlight_kw}).\n\n"
-                f"Ключевой опыт под задачи позиции:\n"
-                f"{bullet_text}\n\n"
-                f"Буду рад обсудить задачи с командой!\n\n"
-                f"Контакты:\n{tg} | {email}\n{github} | {linkedin}"
+                f"Откликаюсь на вакансию «{title}» в {company}.\n\n"
+                f"Специализируюсь на фронтенде и фуллстек-разработке. Фокусируюсь на чистой архитектуре, высокой производительности и надежности в production ({highlight_kw}). {achievements_text}\n\n"
+                f"Готов созвониться и обсудить детали.\n\n"
+                f"{tg} | {email}\n{github} | {linkedin}"
             )
 
     # Calculate baseline heuristic score
