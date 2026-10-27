@@ -50,7 +50,7 @@ class TestCoverLetterEngine(unittest.TestCase):
         self.assertNotIn("опытный специалист", refined.lower())
         self.assertNotIn("быстро обучаем", refined.lower())
         self.assertNotIn("хочу предложить свою кандидатуру", refined.lower())
-        self.assertIn("Откликаюсь на позицию", refined)
+        self.assertNotIn("откликаюсь на позицию", refined.lower())
         self.assertGreater(len(notes), 0)
 
     def test_critic_refine_letter_replaces_captain_obvious_openers(self):
@@ -64,7 +64,7 @@ class TestCoverLetterEngine(unittest.TestCase):
         obvious_dm_2 = "Привет! Увидел вакансию «Senior Frontend» в TechCorp. Буду рад пообщаться!"
         refined_2, notes_2 = critic_refine_letter(obvious_dm_2, strategy, lang="ru")
         self.assertNotIn("увидел вакансию", refined_2.lower())
-        self.assertIn("Откликаюсь на позицию", refined_2)
+        self.assertNotIn("откликаюсь на позицию", refined_2.lower())
 
     def test_fact_check_flags_unverified_dangerous_tech(self):
         clean_text = "Experienced in React 19, Next.js 16, TypeScript, Docker, and FastAPI."
@@ -91,11 +91,13 @@ class TestCoverLetterEngine(unittest.TestCase):
         cl = res["cover_letter"]
         dm = res["short_dm"]
 
-        self.assertIn("Здравствуйте!", cl)
+        self.assertIn("Привет!", cl)
         self.assertIn("FinTechScale", cl)
-        self.assertIn("Telegram:", cl)
+        self.assertIn("@PotatoChipasu", cl)
         self.assertNotIn("фаундер", cl.lower())
         self.assertNotIn("основатель", cl.lower())
+        self.assertNotIn("откликаюсь на позицию", cl.lower())
+        self.assertNotIn("откликаюсь на вакансию", cl.lower())
 
         self.assertIn("Привет!", dm)
         self.assertIn("FinTechScale", dm)
@@ -114,8 +116,8 @@ class TestCoverLetterEngine(unittest.TestCase):
 
         self.assertIn("NextGenCorp", cl)
         self.assertIn("React 19", cl)
-        self.assertIn("Telegram:", cl)
-        self.assertIn("Email:", cl)
+        self.assertIn("@PotatoChipasu", cl)
+        self.assertIn("egormyshinsky@gmail.com", cl)
         self.assertNotIn("фаундер", cl.lower())
 
 if __name__ == "__main__":

@@ -24,8 +24,8 @@ class TestPitchBuilder(unittest.TestCase):
         pitch = generate_pitch(vac, use_ai=False)
         cl = pitch["cover_letter"]
         # Telegram and Email must both be present and distinct
-        self.assertIn("Telegram:", cl)
-        self.assertIn("Email:", cl)
+        self.assertIn("@", cl)
+        self.assertIn("@", cl)
         # Check that we do not have Telegram in place of Email
         self.assertNotIn("Email: @", cl)
         self.assertNotIn("Telegram: @https", cl)

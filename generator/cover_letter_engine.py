@@ -79,20 +79,23 @@ def critic_refine_letter(
 
     # Remove generic subservient or Captain Obvious openings
     subservient_patterns = [
-        (r'(?i)меня зовут .*?,\s*и я хочу предложить свою кандидатуру на вакансию', 'Откликаюсь на позицию'),
-        (r'(?i)с большим интересом прочитал описание вакансии', 'Изучил требования к позиции'),
+        (r'(?i)меня зовут .*?,\s*(?:и\s+)?(?:я\s+)?(?:хочу|желаю|готов|хотел)(?:\s+)?(?: предложить свою кандидатуру на вакансию)?', ''),
+        (r'(?i)с большим интересом прочитал описание вакансии', ''),
         (r'(?i)буду бесконечно рад любой возможности пообщаться', 'Буду рад обсудить задачи с командой'),
         (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*вижу,\s*что\s+(?:в\s+[^,.]+?\s+)?(?:ищут|вы\s+в\s+поиске|вы\s+ищете)[^,.]*?[,.]?\s*', 'Привет! '),
-        (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*увидел\s+(?:вашу\s+)?(?:позицию|вакансию)\s+«?[^»\n]+?»?\s*(?:в\s+[^,\n]+?)?[!,.]?\s*', 'Привет! Откликаюсь на позицию. '),
-        (r'(?i)(?:наткнулся|наткнулась|наткнулся|встретил(?:а)?)\s+(?:на\s+)?(?:вашу\s+)?(?:вакансию|позицию)\s*«?[^»\n]+?»?', 'Откликаюсь на позицию'),
-        (r'(?i)(?:заметил(?:а)?|обратил(?:а)?\s+внимание)\s+(?:что\s+)?(?:ваша\s+компания|вы|в\s+[^,.]+)\s+(?:ищете|в\s+поиске)[^,.]*', 'Откликаюсь на позицию'),
-        (r'(?i)(?:ваша\s+компания|компания\s+\w+)\s+ищет\s+\w+', 'Откликаюсь на позицию'),
-        (r'(?i)(?:вы|команда)\s+(?:в\s+поиске|ищете|look(?:ing)?\s+for)\s+\w+', 'Откликаюсь на позицию'),
-        (r'(?i)i\s+see\s+(?:that\s+)?(?:you\s+are|they\s+are)\s+looking\s+for\s+.*?[,.]?\s*', 'Applying for the role. '),
-        (r'(?i)saw\s+your\s+.*?opening\s+at\s+.*?[,.]?\s*', 'Applying for the role. '),
-        (r'(?i)i am thrilled to apply for the position of', 'Applying for the'),
+        (r'(?i)(?:привет(?:ствую)?|здравствуйте)[!,.]?\s*увидел\s+(?:вашу\s+)?(?:позицию|вакансию)\s+«?[^»\n]+?»?\s*(?:в\s+[^,\n]+?)?[!,.]?\s*', 'Привет! '),
+        (r'(?i)(?:наткнулся|наткнулась|встретил(?:а)?)\s+(?:на\s+)?(?:вашу\s+)?(?:вакансию|позицию)\s*«?[^»\n]+?»?', ''),
+        (r'(?i)(?:заметил(?:а)?|обратил(?:а)?\s+внимание)\s+(?:что\s+)?(?:ваша\s+компания|вы|в\s+[^,.]+)\s+(?:ищете|в\s+поиске)[^,.]*', ''),
+        (r'(?i)(?:ваша\s+компания|компания\s+\w+)\s+ищет\s+\w+', ''),
+        (r'(?i)(?:вы|команда)\s+(?:в\s+поиске|ищете|look(?:ing)?\s+for)\s+\w+', ''),
+        (r'(?i)(?:откликаюсь на (?:позицию|вакансию)|пишу по поводу (?:позиции|вакансии)|рассматриваю (?:позицию|вакансию)|забираю (?:вакансию|позицию) в работу)', ''),
+        (r'(?i)i\s+see\s+(?:that\s+)?(?:you\s+are|they\s+are)\s+looking\s+for\s+.*?[,.]?\s*', ''),
+        (r'(?i)saw\s+your\s+.*?opening\s+at\s+.*?[,.]?\s*', ''),
+        (r'(?i)i am thrilled to apply for the position of', ''),
         (r'(?i)i believe i am the ideal candidate for', 'My background directly addresses'),
-        (r'(?i)thank you for your time and consideration', 'Looking forward to connecting')
+        (r'(?i)thank you for your time and consideration', 'Looking forward to connecting'),
+        (r'(?i)applying for the (?:position|role) of\s+', ''),
+        (r'(?i)applying for the (?:position|role) at\s+', '')
     ]
     for pattern, repl in subservient_patterns:
         if re.search(pattern, refined):
@@ -184,9 +187,9 @@ def heuristic_cover_letter(
     if lang == "ru":
         core_hook = f"Специализируюсь на продуктовом фронтенде с фокусом на самостоятельное закрытие задач." if is_middle else f"Специализируюсь на масштабируемой архитектуре и сквозной поставке бизнес-функционала."
         
-        draft_cl = f"""Откликаюсь на позицию «{title}» в {company}.
+        draft_cl = f"""Привет!
 
-{core_hook} {achievements_text}
+{core_hook} В контексте {company} это значит: {achievements_text}
 
 Рабочий стек: {ats_tech_line}. В фокусе — архитектура без блокеров и предсказуемая поставка фич. На бэкенде спокойно проектирую REST API контракты и поднимаю инфраструктуру в Docker, поэтому смежным командам не приходится ждать. Готов созвониться и ответить на технические вопросы.
 
@@ -194,27 +197,27 @@ def heuristic_cover_letter(
 
         # ATS-optimized short DM with matched keywords
         ats_keywords_short = ", ".join(matched_tech[:3]) if matched_tech else "React, Next.js, TypeScript"
-        draft_dm = f"""Привет! Откликаюсь на позицию «{title}» в {company}.
+        draft_dm = f"""Привет!
 
-Мой стек ({ats_keywords_short}) напрямую закрывает ваши задачи. {highlights[0]}. Готов созвониться!
+Мой стек ({ats_keywords_short}) напрямую закрывает задачи {company}. {highlights[0]}. Готов созвониться!
 
 {github} | {linkedin}"""
 
     else:
         core_hook = f"Autonomous product-focused engineer with full ownership of client architecture." if is_middle else f"Senior product engineer with end-to-end technical ownership."
 
-        draft_cl = f"""Applying for the {title} position at {company}.
+        draft_cl = f"""Hi!
 
-{core_hook} {achievements_text}
+{core_hook} In the context of {company}, this means: {achievements_text}
 
 Tech stack: {ats_tech_line}. My priority is high shipping velocity and clean architectural boundaries. I design backend contracts and containerize via Docker, preventing cross-team blockers. Looking forward to discussing the role!
 
 {tg} | {email} | {github} | {linkedin}"""
 
         ats_keywords_en = ", ".join(matched_tech[:3]) if matched_tech else "React, Next.js, TypeScript"
-        draft_dm = f"""Hi! Applying for the {title} position at {company}.
+        draft_dm = f"""Hi!
 
-My background with {ats_keywords_en} directly matches your stack. {highlights[0]}. Looking forward to connecting!
+My background with {ats_keywords_en} directly matches {company}'s stack. {highlights[0]}. Looking forward to connecting!
 
 {github} | {linkedin}"""
 

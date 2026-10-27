@@ -12,14 +12,36 @@ def _sanitize_text(text: str, custom_stop_phrases: list = None) -> str:
     # Remove bullets
     text = re.sub(r'(?m)^[\s]*[-*•]\s*', '', text)
     text = re.sub(r'(?m)^[\s]*\d+\.\s*', '', text)
-    # Remove cliches
+    # Remove cliches - hardcoded list
     cliches = [
         r"(?i)буду рад(а)? внести (свой )?вклад",
         r"(?i)динамично развивающ\w+ компани",
         r"(?i)ознакомился с (вашей )?вакансией",
         r"(?i)с большим интересом прочитал",
         r"(?i)могу принести пользу",
-        r"(?i)нацелен(а)? на результат"
+        r"(?i)нацелен(а)? на результат",
+        r"(?i)откликаюсь на (?:позицию|вакансию)",
+        r"(?i)пишу по поводу (?:позиции|вакансию)",
+        r"(?i)рассматриваю (?:вашу )?(?:позицию|вакансию)",
+        r"(?i)забираю (?:вакансию|позицию) в работу",
+        r"(?i)наткнулся на (?:вашу )?(?:вакансию|позицию)",
+        r"(?i)увидел(?:а)? (?:вашу )?(?:вакансию|позицию)",
+        r"(?i)меня заинтересовала (?:ваша )?(?:вакансию|позиция)",
+        r"(?i)ознакомился с описанием",
+        r"(?i)с интересом изучил",
+        r"(?i)буду рад(а)? присоединиться",
+        r"(?i)готов включиться в работу",
+        r"(?i)меня зовут \w+,\s*(?:и\s+)?(?:хочу|желаю|готов|хотел)",
+        r"(?i)ваша компания ищет",
+        r"(?i)вы ищете",
+        r"(?i)your company is looking",
+        r"(?i)you are looking for",
+        r"(?i)you're looking for",
+        r"(?i)applying for the (?:position|role)",
+        r"(?i)i am thrilled to apply",
+        r"(?i)i believe i am the ideal candidate",
+        r"(?i)saw your .*?opening",
+        r"(?i)i see .*?looking for",
     ]
     if custom_stop_phrases:
         for p in custom_stop_phrases:

@@ -1334,7 +1334,30 @@ class CRMHandler(BaseHTTPRequestHandler):
                 elif "superjob.ru" in url:
                     from agents.adapters.superjob_adapter import SuperJobCDPAdapter
                     adapter = SuperJobCDPAdapter()
-                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit)
+                    candidate_data = None
+                    resume_pdf_path = None
+                    try:
+                        conn = get_db_connection()
+                        cur = conn.cursor()
+                        cur.execute("SELECT data_json, lang FROM candidate_profiles WHERE is_active = 1 LIMIT 1")
+                        p_row = cur.fetchone()
+                        if p_row and p_row['data_json']:
+                            candidate_data = json.loads(p_row['data_json'])
+                            candidate_data['lang'] = p_row['lang']
+                        conn.close()
+                    except Exception:
+                        pass
+                    try:
+                        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+                        if os.path.exists(config_path):
+                            with open(config_path, 'r', encoding='utf-8') as cf:
+                                cfg = json.load(cf)
+                                lang = (candidate_data or {}).get('lang', 'ru')
+                                key = 'resume_pdf_path_en' if lang == 'en' else 'resume_pdf_path_ru'
+                                resume_pdf_path = cfg.get(key) or cfg.get('resume_pdf_path')
+                    except Exception:
+                        pass
+                    return adapter.apply(url, cover_letter or "", auto_submit=auto_submit, candidate_data=candidate_data, resume_pdf_path=resume_pdf_path)
                 elif "rabota.ru" in url:
                     from agents.adapters.rabota_adapter import RabotaRuCDPAdapter
                     adapter = RabotaRuCDPAdapter()

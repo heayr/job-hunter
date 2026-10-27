@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from agents.adapters.superjob_adapter import SuperJobCDPAdapter
 from agents.adapters.rabota_adapter import RabotaRuCDPAdapter
 
@@ -26,6 +26,7 @@ class TestCISPortalsAdapters(unittest.TestCase):
         adapter._is_already_applied = MagicMock(return_value=False)
         adapter._is_auth_required = MagicMock(return_value=False)
         adapter._open_response_modal = MagicMock(return_value=True)
+        adapter._detect_redirect = MagicMock(return_value=None)
         adapter._fill_cover_letter = MagicMock(return_value=True)
 
         res = adapter.apply("https://superjob.ru/vakansii/123.html", "Dear team")
@@ -33,6 +34,39 @@ class TestCISPortalsAdapters(unittest.TestCase):
         self.assertEqual(res["stage"], "READY_FOR_APPROVAL")
         self.assertEqual(res["platform"], "superjob")
         self.assertTrue(bool(res["approval_token"]))
+
+    def test_superjob_adapter_detects_redirect_to_external_ats(self):
+        adapter = SuperJobCDPAdapter(driver=self.mock_driver)
+        adapter._is_already_applied = MagicMock(return_value=False)
+        adapter._is_auth_required = MagicMock(return_value=False)
+        adapter._open_response_modal = MagicMock(return_value=True)
+        adapter._detect_redirect = MagicMock(return_value="https://job.pik.ru/about")
+        adapter._handle_external_ats = MagicMock(return_value={
+            "success": True,
+            "platform": "superjob_external_ats",
+            "stage": "READY_FOR_APPROVAL",
+            "external_ats_url": "https://job.pik.ru/about",
+            "filled_count": 4,
+            "approval_token": "mock_token"
+        })
+
+        res = adapter.apply("https://superjob.ru/vakansii/123.html", "Dear team")
+        self.assertTrue(res["success"])
+        self.assertEqual(res["platform"], "superjob_external_ats")
+        self.assertEqual(res["external_ats_url"], "https://job.pik.ru/about")
+        adapter._handle_external_ats.assert_called_once()
+
+    def test_detect_redirect_returns_url_on_domain_change(self):
+        adapter = SuperJobCDPAdapter(driver=self.mock_driver)
+        self.mock_page.url = "https://job.pik.ru/about"
+        result = adapter._detect_redirect(self.mock_page, "https://superjob.ru/vakansii/123.html", "superjob.ru", wait_ms=500)
+        self.assertEqual(result, "https://job.pik.ru/about")
+
+    def test_detect_redirect_returns_none_when_staying_on_superjob(self):
+        adapter = SuperJobCDPAdapter(driver=self.mock_driver)
+        self.mock_page.url = "https://superjob.ru/response/123"
+        result = adapter._detect_redirect(self.mock_page, "https://superjob.ru/vakansii/123.html", "superjob.ru", wait_ms=500)
+        self.assertIsNone(result)
 
     def test_rabota_adapter_ready_for_approval(self):
         self.mock_page.url = "https://rabota.ru/vacancy/123"
