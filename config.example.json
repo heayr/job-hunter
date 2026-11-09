@@ -1,7 +1,42 @@
 {
-  "llm_provider": "deepseek",
-  "deepseek_api_key": "YOUR_DEEPSEEK_API_KEY_HERE",
-  "deepseek_model": "deepseek-chat",
-  "deepseek_base_url": "https://api.deepseek.com/v1",
-  "lm_studio_url": "http://127.0.0.1:1234/v1"
+  "hh": {
+    "client_id": "YOUR_HH_CLIENT_ID",
+    "client_secret": "YOUR_HH_CLIENT_SECRET",
+    "redirect_uri": "https://httpbin.org/get",
+    "user_agent_email": "applicant@example.com",
+    "resume_title": "Python Developer"
+  },
+  "superjob": {
+    "client_id": "YOUR_SJ_CLIENT_ID",
+    "client_secret": "YOUR_SJ_CLIENT_SECRET",
+    "redirect_uri": "https://httpbin.org/get",
+    "resume_title": "Python Developer"
+  },
+  "search": {
+    "query": "Python OR FastAPI OR Backend",
+    "experience": "between1And3",
+    "schedule": "remote",
+    "only_with_salary": false,
+    "salary": null,
+    "period_days": 7,
+    "stop_words": ["стажер", "intern", "1C", "1С", "преподаватель", "junior", "lead", "руководитель"],
+    "company_blacklist": []
+  },
+  "safety": {
+    "max_daily_applies": 50,
+    "delay_min_seconds": 15,
+    "delay_max_seconds": 35,
+    "skip_tests": true
+  },
+  "cover_letter": {
+    "default_text": "Добрый день! Заинтересовала ваша позиция. Мой практический стек и опыт разработки полностью соответствуют задачам проекта. Буду рад обсудить детали на интервью."
+  },
+  "llm": {
+    "enabled": true,
+    "provider": "lm_studio",
+    "lm_studio_url": "http://127.0.0.1:1234/v1",
+    "model": "local-model",
+    "api_key": "",
+    "base_url": "https://api.deepseek.com/v1"
+  }
 }

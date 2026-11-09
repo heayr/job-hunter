@@ -1,35 +1,16 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
-# 0. Автоматическая подготовка виртуального окружения при первом запуске
-if [ ! -d ".venv" ]; then
-    echo "📦 Виртуальное окружение .venv не найдено. Создание и установка зависимостей..."
-    PYTHON_CMD=""
-    for cmd in python3 python; do
-        if command -v "$cmd" > /dev/null 2>&1; then
-            PYTHON_CMD="$cmd"
-            break
-        fi
-    done
-    if [ -z "$PYTHON_CMD" ]; then
-        echo "❌ Ошибка: Python 3 не найден в системе. Установите python3."
-        exit 1
-    fi
-    "$PYTHON_CMD" -m venv .venv
-    .venv/bin/pip install --upgrade pip
-    if [ -f "requirements.txt" ]; then
-        .venv/bin/pip install -r requirements.txt
-    fi
-fi
-
-# 1. Автоматический запуск Chrome с CDP портом 9222 (если еще не запущен)
+# 1. Запуск Chrome с открытым портом CDP 9222 (если не запущен)
 if [ -f "./launch_chrome.sh" ]; then
     ./launch_chrome.sh
 fi
 
-echo "⚡ Stopping previous CRM instances..."
-pkill -f "crm.py" 2>/dev/null || true
-sleep 0.5
+# 2. Запуск браузерного авто-отклика
+PYTHON_BIN="python3"
+if [ -d ".venv/bin" ] && [ -f ".venv/bin/python" ]; then
+    PYTHON_BIN=".venv/bin/python"
+fi
 
-echo "⚡ Starting Job Hunter CRM..."
-exec .venv/bin/python crm.py
+echo "🚀 Запуск Browser Auto-Applier (CDP)..."
+exec "$PYTHON_BIN" browser_applier.py "$@"
