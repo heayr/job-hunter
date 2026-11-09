@@ -4,7 +4,7 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, List, Optional, Tuple
 
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, call_llm_json
 from generator.thesis_generator import generate_application_thesis
 
 # ── FORBIDDEN GENERIC CLICHES / FLUFF PATTERNS ───────────────────────────────
@@ -184,38 +184,10 @@ Respond ONLY with valid JSON in this exact structure:
 }}
 """
 
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json"
-        }
-    }
-
-    models_to_try = GEMINI_MODELS[:]
-    for model in models_to_try:
-        model_path = model if model.startswith("models/") else f"models/{model}"
-        url = f"https://generativelanguage.googleapis.com/v1beta/{model_path}:generateContent"
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': api_key
-                }
-            )
-            with urllib.request.urlopen(req, timeout=18) as response:
-                resp_text = response.read().decode('utf-8')
-                resp_data = json.loads(resp_text)
-                text = resp_data['candidates'][0]['content']['parts'][0]['text'].strip()
-                text = re.sub(r'^```(?:json)?\s*', '', text)
-                text = re.sub(r'\s*```$', '', text).strip()
-                parsed = json.loads(text)
-                if "verdict" in parsed and "score" in parsed:
-                    return parsed
-        except Exception as e:
-            print(f"  [thesis_critic] Model {model} critique failed: {e}")
+    parsed = call_llm_json(prompt)
+    if parsed and isinstance(parsed, dict):
+        if "verdict" in parsed and "score" in parsed:
+            return parsed
 
     return heuristic_critique(thesis_data, profile, job_understanding, lang)
 

@@ -11,7 +11,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from generator.llm_generator import get_api_key, get_llm_config, call_lm_studio, extract_json_payload, GEMINI_MODELS
+from generator.llm_generator import get_api_key, get_llm_config, call_lm_studio, extract_json_payload, call_llm_json
 from generator.pitch_builder import generate_pitch
 from filter.profile_filter import detect_vacancy_grade
 from tracker.db import get_db_connection, save_vacancy
@@ -132,12 +132,8 @@ def _normalize_parsed_vacancy(parsed: Dict[str, Any], raw_text: str, source_url:
     }
 
 
-def parse_with_gemini(raw_text: str, source_url: str = "") -> Dict[str, Any]:
-    """Uses configured LLM (LM Studio or Gemini) to parse unstructured job text into strict CRM schema."""
-    cfg = get_llm_config()
-    provider = cfg.get("provider", "gemini")
-    api_key = cfg.get("gemini_api_key", "")
-
+def parse_with_ai(raw_text: str, source_url: str = "") -> Dict[str, Any]:
+    """Uses configured LLM (DeepSeek or LM Studio) to parse unstructured job text into strict CRM schema."""
     prompt = f"""You are an expert Technical Recruiter and Headhunter.
 Analyze the following unstructured job posting text (which could be from a website, Telegram message, email, or LinkedIn).
 Extract key job information and output STRICT JSON matching this schema:
@@ -165,56 +161,14 @@ Rules:
 Job Posting Text:
 \"\"\"{raw_text[:6500]}\"\"\"
 """
+    parsed = call_llm_json(prompt)
+    if parsed:
+        return _normalize_parsed_vacancy(parsed, raw_text, source_url)
 
-    # 1. Hot-swapped local LLM (LM Studio)
-    if provider == "lm_studio":
-        raw_json = call_lm_studio(prompt, json_mode=True)
-        if raw_json:
-            parsed = extract_json_payload(raw_json)
-            if parsed:
-                return _normalize_parsed_vacancy(parsed, raw_text, source_url)
-            print(f"  [ai_parser] LM Studio JSON parse failed on output: {raw_json[:120]}")
-
-    # 2. Google Gemini API
-    if not api_key:
-        return heuristic_fallback_parse(raw_text, source_url)
-
-    models_to_try = GEMINI_MODELS[:]
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json"
-        }
-    }
-
-    for model in models_to_try:
-        model_path = model if model.startswith("models/") else f"models/{model}"
-        url = f"https://generativelanguage.googleapis.com/v1beta/{model_path}:generateContent"
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': api_key
-                }
-            )
-            with urllib.request.urlopen(req, timeout=18) as response:
-                resp_text = response.read().decode('utf-8')
-                resp_data = json.loads(resp_text)
-                text = resp_data['candidates'][0]['content']['parts'][0]['text'].strip()
-                text = re.sub(r'^```(?:json)?\s*', '', text)
-                text = re.sub(r'\s*```$', '', text).strip()
-                parsed = json.loads(text)
-
-                return _normalize_parsed_vacancy(parsed, raw_text, source_url)
-        except Exception as e:
-            print(f"  [ai_parser] Model {model} attempt failed: {e}")
-
-    # Fallback if all Gemini models fail or network fails
     return heuristic_fallback_parse(raw_text, source_url)
+
+
+parse_with_gemini = parse_with_ai
 
 
 def ingest_vacancy_with_ai(

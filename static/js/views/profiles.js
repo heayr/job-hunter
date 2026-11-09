@@ -564,7 +564,7 @@ async function uploadResume(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
     const status = document.getElementById('resume-status');
-    if (status) status.innerHTML = `<span class="text-sky-400 animate-pulse">Парсинг через Gemini...</span>`;
+    if (status) status.innerHTML = `<span class="text-sky-400 animate-pulse">Парсинг через ИИ...</span>`;
 
     const reader = new FileReader();
     reader.onload = async (e) => {

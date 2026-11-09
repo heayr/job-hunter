@@ -27,46 +27,59 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-let currentLlmProvider = 'gemini';
+let currentLlmProvider = 'deepseek';
 
 function setLlmProvider(provider) {
+    if (provider === 'gemini') provider = 'deepseek';
     currentLlmProvider = provider;
-    const btnGemini = document.getElementById('provider-btn-gemini');
+    const btnDs = document.getElementById('provider-btn-deepseek') || document.getElementById('provider-btn-gemini');
     const btnLm = document.getElementById('provider-btn-lm_studio');
-    const blockGemini = document.getElementById('llm-block-gemini');
+    const blockDs = document.getElementById('llm-block-deepseek') || document.getElementById('llm-block-gemini');
     const blockLm = document.getElementById('llm-block-lm_studio');
 
     if (provider === 'lm_studio') {
-        btnLm.className = 'p-2 rounded-lg border border-purple-500 bg-purple-950/40 text-left transition-colors';
-        btnGemini.className = 'p-2 rounded-lg border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors';
-        blockLm.classList.remove('hidden');
-        blockGemini.classList.add('hidden');
+        if (btnLm) btnLm.className = 'p-2.5 rounded-xl border border-purple-500 bg-purple-950/40 text-left transition-colors';
+        if (btnDs) btnDs.className = 'p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors';
+        if (blockLm) blockLm.classList.remove('hidden');
+        if (blockDs) blockDs.classList.add('hidden');
     } else {
-        btnGemini.className = 'p-2 rounded-lg border border-sky-500 bg-sky-950/40 text-left transition-colors';
-        btnLm.className = 'p-2 rounded-lg border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors';
-        blockGemini.classList.remove('hidden');
-        blockLm.classList.add('hidden');
+        if (btnDs) btnDs.className = 'p-2.5 rounded-xl border border-sky-500 bg-sky-950/40 text-left transition-colors';
+        if (btnLm) btnLm.className = 'p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-left hover:border-slate-600 transition-colors';
+        if (blockDs) blockDs.classList.remove('hidden');
+        if (blockLm) blockLm.classList.add('hidden');
     }
 }
 
 async function loadConfig() {
     try {
         const data = await api.getConfig();
-        const keyInput = document.getElementById('gemini-key');
+        const keyInput = document.getElementById('deepseek-key') || document.getElementById('gemini-key');
         if (keyInput) {
-            if (data.has_gemini_key) {
+            const hasKey = data.has_deepseek_key || data.has_gemini_key;
+            if (hasKey) {
                 keyInput.placeholder = '●●●●●●●● (Ключ сохранен на сервере)';
-                keyInput.value = data.gemini_api_key || '';
+                keyInput.value = data.deepseek_api_key || data.gemini_api_key || '';
             } else {
-                keyInput.placeholder = 'AIzaSy...';
+                keyInput.placeholder = 'sk-...';
                 keyInput.value = '';
             }
+        }
+
+        const modelInput = document.getElementById('deepseek-model');
+        if (modelInput && data.deepseek_model) {
+            modelInput.value = data.deepseek_model;
+        }
+
+        const baseUrlInput = document.getElementById('deepseek-base-url');
+        if (baseUrlInput && data.deepseek_base_url) {
+            baseUrlInput.value = data.deepseek_base_url;
         }
 
         const lmUrlInput = document.getElementById('lm-studio-url');
         if (lmUrlInput) lmUrlInput.value = data.lm_studio_url || 'http://127.0.0.1:1234/v1';
 
-        setLlmProvider(data.llm_provider || 'gemini');
+        const prov = (data.llm_provider === 'gemini') ? 'deepseek' : (data.llm_provider || 'deepseek');
+        setLlmProvider(prov);
         
         const senCheck = document.getElementById('setting-seniority-alignment');
         if (senCheck) senCheck.checked = data.seniority_alignment !== false;
@@ -102,7 +115,9 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
-    const key = document.getElementById('gemini-key')?.value.trim() || '';
+    const key = (document.getElementById('deepseek-key') || document.getElementById('gemini-key'))?.value.trim() || '';
+    const dsModel = document.getElementById('deepseek-model')?.value.trim() || 'deepseek-chat';
+    const dsBaseUrl = document.getElementById('deepseek-base-url')?.value.trim() || 'https://api.deepseek.com/v1';
     const lmUrl = document.getElementById('lm-studio-url')?.value.trim() || 'http://127.0.0.1:1234/v1';
     const seniorityAlignment = document.getElementById('setting-seniority-alignment')?.checked ?? true;
     const highloadGuardrail = document.getElementById('setting-highload-guardrail')?.checked ?? true;
@@ -117,6 +132,8 @@ async function saveConfig() {
 
     const payload = {
         llm_provider: currentLlmProvider,
+        deepseek_model: dsModel,
+        deepseek_base_url: dsBaseUrl,
         lm_studio_url: lmUrl,
         active_profile_id: activeProfileId,
         seniority_alignment: seniorityAlignment,
@@ -128,7 +145,7 @@ async function saveConfig() {
         stop_phrases: stopPhrases
     };
     if (key && !key.includes('●')) {
-        payload.gemini_api_key = key;
+        payload.deepseek_api_key = key;
     }
 
     await api.saveConfig(payload);

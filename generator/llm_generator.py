@@ -5,7 +5,8 @@ import os
 import re
 from typing import Dict, Any, Optional
 
-GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"]
+DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"]
+GEMINI_MODELS = DEEPSEEK_MODELS  # Alias for backward compatibility
 
 def _sanitize_text(text: str, custom_stop_phrases: list = None) -> str:
     """Anti-BS & Anti-Bullet sanitizer."""
@@ -61,22 +62,27 @@ def _sanitize_short_dm(dm: str, custom_stop_phrases: list = None) -> str:
 def get_llm_config() -> Dict[str, Any]:
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
     cfg = {
-        "provider": "gemini", # "gemini" | "lm_studio"
-        "gemini_api_key": os.environ.get("GEMINI_API_KEY", "").strip(),
+        "provider": "deepseek",  # "deepseek" | "lm_studio"
+        "deepseek_api_key": os.environ.get("DEEPSEEK_API_KEY", "").strip(),
+        "deepseek_base_url": os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"),
+        "deepseek_model": os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
         "lm_studio_url": "http://127.0.0.1:1234/v1"
     }
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Apply all loaded keys to cfg
                 for k, v in data.items():
-                    if k == "gemini_api_key" and v:
-                        cfg[k] = v.strip()
+                    if k in ("deepseek_api_key", "api_key") and v:
+                        cfg["deepseek_api_key"] = str(v).strip()
+                    elif k == "deepseek_base_url" and v:
+                        cfg["deepseek_base_url"] = str(v).strip().rstrip("/")
+                    elif k == "deepseek_model" and v:
+                        cfg["deepseek_model"] = str(v).strip()
                     elif k == "lm_studio_url" and v:
-                        cfg[k] = v.strip()
+                        cfg[k] = str(v).strip()
                     elif k == "llm_provider" and v:
-                        cfg["provider"] = v
+                        cfg["provider"] = "deepseek" if v == "gemini" else str(v)
                     else:
                         cfg[k] = v
         except Exception:
@@ -84,7 +90,7 @@ def get_llm_config() -> Dict[str, Any]:
     return cfg
 
 def get_api_key() -> str:
-    return get_llm_config().get("gemini_api_key", "")
+    return get_llm_config().get("deepseek_api_key", "")
 
 def get_lm_studio_active_model(base_url: str) -> str:
     try:
@@ -166,6 +172,87 @@ def call_lm_studio(prompt: str, system_prompt: str = "", json_mode: bool = True,
     return None
 
 
+def call_deepseek(prompt: str, system_prompt: str = "", json_mode: bool = True, timeout: float = 60.0, model: str = None) -> Optional[str]:
+    """Calls DeepSeek API via standard OpenAI-compatible endpoint."""
+    cfg = get_llm_config()
+    api_key = cfg.get("deepseek_api_key", "")
+    if not api_key:
+        return None
+    base_url = cfg.get("deepseek_base_url", "https://api.deepseek.com/v1").rstrip("/")
+    url = f"{base_url}/chat/completions"
+
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    chosen_model = model or cfg.get("deepseek_model") or "deepseek-chat"
+
+    payload = {
+        "model": chosen_model,
+        "messages": messages,
+        "temperature": float(cfg.get("temperature", 0.2)),
+        "max_tokens": 4000
+    }
+    if json_mode and "reasoner" not in chosen_model:
+        payload["response_format"] = {"type": "json_object"}
+
+    data_bytes = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data_bytes,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            choices = data.get("choices", [])
+            if choices:
+                msg = choices[0].get("message", {})
+                content = (msg.get("content") or "").strip()
+                if not content and msg.get("reasoning_content"):
+                    content = msg.get("reasoning_content", "").strip()
+                return content
+    except Exception as e:
+        print(f"DEBUG: DeepSeek request failed: {type(e).__name__}: {e}")
+        return None
+    return None
+
+
+def call_llm(prompt: str, system_prompt: str = "", json_mode: bool = True, timeout: float = 60.0) -> Optional[str]:
+    """Calls configured LLM provider (DeepSeek cloud or LM Studio local) with seamless fallback."""
+    cfg = get_llm_config()
+    provider = cfg.get("provider", "deepseek")
+
+    if provider == "lm_studio":
+        resp = call_lm_studio(prompt, system_prompt=system_prompt, json_mode=json_mode, timeout=timeout)
+        if resp:
+            return resp
+        if cfg.get("deepseek_api_key"):
+            return call_deepseek(prompt, system_prompt=system_prompt, json_mode=json_mode, timeout=timeout)
+        return None
+    else:
+        # Default: DeepSeek
+        resp = call_deepseek(prompt, system_prompt=system_prompt, json_mode=json_mode, timeout=timeout)
+        if resp:
+            return resp
+        # Fallback to LM Studio
+        return call_lm_studio(prompt, system_prompt=system_prompt, json_mode=json_mode, timeout=timeout)
+
+
+def call_llm_json(prompt: str, system_prompt: str = "", timeout: float = 60.0) -> Optional[Dict[str, Any]]:
+    """Helper that queries LLM and extracts parsed JSON dictionary."""
+    raw = call_llm(prompt, system_prompt=system_prompt, json_mode=True, timeout=timeout)
+    if raw:
+        return extract_json_payload(raw)
+    return None
+
+
+
 def get_gold_standard_examples(lang: str = "ru", limit: int = 2) -> list:
     """Retrieve user-approved gold standard pitches to serve as few-shot exemplars."""
     try:
@@ -226,11 +313,9 @@ def generate_ai_pitch(
     stop_phrases = cfg.get("stop_phrases", [])
     stop_phrases_text = ", ".join(stop_phrases) if stop_phrases else ""
     
-    provider = cfg.get("provider", "gemini")
-    api_key = cfg.get("gemini_api_key", "")
-    if provider == "gemini" and not api_key:
-        # Check if LM Studio is reachable as alternative
-        pass
+    provider = cfg.get("provider", "deepseek")
+    api_key = cfg.get("deepseek_api_key", "")
+
 
     title = vacancy.get("title", "Frontend Engineer")
     company = vacancy.get("company", "Company")
@@ -395,89 +480,20 @@ JSON only:
             "error": "Не удалось получить ответ от локального LM Studio. Убедитесь, что LM Studio запущен на " + cfg.get("lm_studio_url", "http://127.0.0.1:1234/v1")
         }
 
-    # 2. Otherwise try Gemini API
-    if not api_key:
-        # Check if LM Studio fallback is running
-        lm_resp = call_lm_studio(prompt, json_mode=True)
-        if lm_resp:
-            parsed = extract_json_payload(lm_resp)
+    # 2. DeepSeek API (Cloud)
+    if api_key:
+        ds_resp = call_deepseek(prompt, json_mode=True)
+        if ds_resp:
+            parsed = extract_json_payload(ds_resp)
             if parsed:
                 return {
                     "success": True,
                     "short_dm": _sanitize_short_dm((parsed.get("short_dm") or "").strip(), stop_phrases),
                     "cover_letter": _sanitize_text((parsed.get("cover_letter") or "").strip(), stop_phrases),
-                    "score": int(parsed.get("score", 80))
+                    "score": int(parsed.get("score", 85))
                 }
-        return {"success": False, "error": "Gemini API ключ не указан в Настройках ИИ"}
 
-    models_to_try = GEMINI_MODELS[:]
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": float(cfg.get("temperature", 0.7)),
-            "responseMimeType": "application/json"
-        }
-    }
-
-    last_error = ""
-
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': api_key
-                }
-            )
-            with urllib.request.urlopen(req, timeout=20) as response:
-                resp_text = response.read().decode('utf-8')
-                resp_data = json.loads(resp_text)
-                text = resp_data['candidates'][0]['content']['parts'][0]['text'].strip()
-                # Clean possible markdown wrapping if any
-                text = re.sub(r'^```(?:json)?\s*', '', text)
-                text = re.sub(r'\s*```$', '', text).strip()
-                parsed = json.loads(text)
-                return {
-                    "success": True,
-                    "short_dm": _sanitize_short_dm(parsed.get("short_dm", "").strip(), stop_phrases),
-                    "cover_letter": _sanitize_text(parsed.get("cover_letter", "").strip(), stop_phrases),
-                    "score": int(parsed.get("score", 75))
-                }
-        except urllib.error.HTTPError as he:
-            err_body = he.read().decode('utf-8', errors='ignore')
-            last_error = f"HTTP {he.code}: {he.reason}"
-            if he.code in (404, 429, 500, 502, 503, 504):
-                # Temporary Google capacity spike (503), rate limit (429) or missing model -> try next model
-                continue
-            if he.code == 403:
-                return {
-                    "success": False,
-                    "error": "Gemini API 403 Forbidden (Требуется активный VPN для доступа к Google AI из РФ)"
-                }
-            if he.code == 400:
-                return {
-                    "success": False,
-                    "error": "Неверный Gemini API ключ или невалидный запрос (400)"
-                }
-        except (TimeoutError, urllib.error.URLError) as ue:
-            reason_str = str(getattr(ue, 'reason', ue))
-            if "timed out" in reason_str.lower() or isinstance(ue, TimeoutError):
-                last_error = "Таймаут соединения с Gemini API (проверьте стабильность VPN или повторите попытку)"
-            else:
-                last_error = f"Сетевая ошибка: {reason_str} (Проверьте подключение к интернету / VPN)"
-            continue
-        except Exception as e:
-            if "timed out" in str(e).lower():
-                last_error = "Таймаут соединения с Gemini API (проверьте стабильность VPN или повторите попытку)"
-            else:
-                last_error = f"Ошибка генерации: {str(e)}"
-            continue
-
-    # 3. If Gemini models failed (e.g. rate limit 429 or 503), try LM Studio fallback
+    # 3. Fallback to LM Studio
     lm_resp = call_lm_studio(prompt, json_mode=True)
     if lm_resp:
         parsed = extract_json_payload(lm_resp)
@@ -489,7 +505,10 @@ JSON only:
                 "score": int(parsed.get("score", 80))
             }
 
+    if not api_key:
+        return {"success": False, "error": "DeepSeek API ключ не указан в Настройках ИИ"}
+
     return {
         "success": False,
-        "error": last_error or "Не удалось получить ответ от Gemini API (проверьте VPN) или LM Studio"
+        "error": "Не удалось получить ответ от DeepSeek API или LM Studio"
     }

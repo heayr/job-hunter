@@ -68,8 +68,8 @@ A multi-agent reasoning architecture that processes each vacancy systematically:
 - **Granular Pitch Rating:** Rate Cover Letters and Short DMs (1–5 stars) to build an active feedback loop.
 - **Self-Correcting Generator:** Ratings inform subsequent rewrites to prevent repetitive mistakes; ratings reset automatically on regeneration.
 
-### 6. 🧠 Dual LLM Engine (Gemini & Local LLM / LM Studio)
-- **Google Gemini API:** Native support for `gemini-3.1-flash-lite`, `gemini-flash-latest`, and automatic model fallbacks.
+### 6. 🧠 Dual LLM Engine (DeepSeek & Local LLM / LM Studio)
+- **DeepSeek API:** Native support for `deepseek-chat` (V3) and `deepseek-reasoner` (R1) via standard OpenAI-compatible API.
 - **Local LLM Support:** Compatible with LM Studio, Ollama, or any OpenAI-compatible `/v1` endpoint for 100% offline, private inference with zero data leakage.
 
 ### 7. 🌐 Browser Automation & Stealth Auto-Apply
@@ -100,7 +100,7 @@ Built with a **zero-dependency, local-first** engineering philosophy:
 | **Backend** | Python 3.10+ (`http.server`, `sqlite3`, `urllib`) | Zero heavy frameworks, instant cold start (<100ms), no package rot. |
 | **Frontend** | Modular Vanilla JS + Tailwind CSS (CDN) | Extremely fast, zero build step, instant reload on save. |
 | **Database** | SQLite (`jobs.db`) with auto-migrations | 100% local data ownership, zero server config. |
-| **AI Engine** | Google Gemini API & Local LLM (LM Studio / Ollama) | Fast, structured reasoning with offline privacy option. |
+| **AI Engine** | DeepSeek API & Local LLM (LM Studio / Ollama) | Fast, structured reasoning with offline privacy option. |
 | **Automation** | Chrome CDP Bridge + Manifest V3 Extension + Bookmarklet | Runs in user's authenticated context, immune to Cloudflare & bot blocks. |
 | **Testing** | Pytest, Hypothesis, Coverage | Objective, quantifiable quality score and property-based verification. |
 
@@ -121,12 +121,13 @@ cp generator/profiles.example.json generator/profiles.json
 Configure `config.json` with your preferred AI provider:
 ```json
 {
-  "llm_provider": "gemini",
-  "gemini_api_key": "YOUR_GEMINI_API_KEY",
+  "llm_provider": "deepseek",
+  "deepseek_api_key": "YOUR_DEEPSEEK_API_KEY",
+  "deepseek_model": "deepseek-chat",
   "lm_studio_url": "http://127.0.0.1:1234/v1"
 }
 ```
-*(Get a free Gemini key from [Google AI Studio](https://aistudio.google.com/), or start LM Studio locally for offline inference).*
+*(Get a DeepSeek key from [DeepSeek Platform](https://platform.deepseek.com/), or start LM Studio locally for offline inference).*
 
 ### 2. Launch CRM
 ```bash
@@ -225,8 +226,8 @@ The test suite covers:
 - **Оценка питчей:** Выставление оценок (1–5 звезд) для Cover Letter и Short DM.
 - **Обратная связь:** Оценки учитываются генератором при повторных итерациях, а при перезапуске рейтинг автоматически сбрасывается.
 
-### 6. 🧠 Поддержка двух LLM-движков (Gemini и локальные модели)
-- **Google Gemini API:** Поддержка `gemini-3.1-flash-lite`, `gemini-flash-latest` с умным фолбэком.
+### 6. 🧠 Поддержка двух LLM-движков (DeepSeek и локальные модели)
+- **DeepSeek API:** Поддержка `deepseek-chat` (V3) и `deepseek-reasoner` (R1) через OpenAI-совместимый API.
 - **Локальные нейросети (LM Studio / Ollama):** Работа через OpenAI-совместимый эндпоинт `/v1` для 100% приватности и работы без доступа к внешним сетям.
 
 ### 7. 🌐 Автоматизация браузера и скрытный автоотклик
@@ -257,7 +258,7 @@ The test suite covers:
 | **Backend** | Python 3.10+ (`http.server`, `sqlite3`, `urllib`) | Никаких тяжелых фреймворков. Мгновенный холодный запуск (<100мс). |
 | **Frontend** | Модульный Vanilla JS + Tailwind CSS (CDN) | Максимальная скорость, отсутствие сборщиков и `node_modules`. |
 | **База данных** | SQLite (`jobs.db`) с автомиграциями | 100% суверенитет данных, всё хранится локально. |
-| **AI Engine** | Google Gemini API + Local LLM (LM Studio / Ollama) | Точный структурированный вывод с возможностью полной автономности. |
+| **AI Engine** | DeepSeek API + Local LLM (LM Studio / Ollama) | Точный структурированный вывод с возможностью полной автономности. |
 | **Автоматизация** | Chrome CDP Bridge + Расширение V3 + Букмарклет | Работа в авторизованном браузере в обход Cloudflare и капчей. |
 | **Тестирование** | Pytest, Hypothesis, Coverage | Измеримый Quality Score, расчет покрытия и фаззинг граничных условий. |
 
@@ -278,8 +279,9 @@ cp generator/profiles.example.json generator/profiles.json
 Укажи параметры в `config.json`:
 ```json
 {
-  "llm_provider": "gemini",
-  "gemini_api_key": "ТВОЙ_GEMINI_API_KEY",
+  "llm_provider": "deepseek",
+  "deepseek_api_key": "ТВОЙ_DEEPSEEK_API_KEY",
+  "deepseek_model": "deepseek-chat",
   "lm_studio_url": "http://127.0.0.1:1234/v1"
 }
 ```

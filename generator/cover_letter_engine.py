@@ -4,7 +4,7 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, List, Optional, Tuple
 
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, call_llm_json
 from generator.thesis_critic import detect_generic_fluff
 
 
@@ -289,37 +289,15 @@ OUTPUT JSON ONLY matching this schema:
   "fact_check_status": "VERIFIED"
 }}
 """
-    model = GEMINI_MODELS[0]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            "responseMimeType": "application/json"
-        }
-    }
+    parsed = call_llm_json(prompt)
+    if parsed and isinstance(parsed, dict):
+        # Run critic pass on AI output
+        parsed["cover_letter"], cl_notes = critic_refine_letter(parsed.get("cover_letter", ""), strategy, lang=lang)
+        parsed["short_dm"], dm_notes = critic_refine_letter(parsed.get("short_dm", ""), strategy, lang=lang)
+        parsed["critique_notes"] = parsed.get("critique_notes", []) + cl_notes + dm_notes
 
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=14.0) as resp:
-            raw = json.loads(resp.read().decode('utf-8'))
-            text = raw['candidates'][0]['content']['parts'][0]['text'].strip()
-            parsed = json.loads(text)
-            
-            # Run critic pass on AI output
-            parsed["cover_letter"], cl_notes = critic_refine_letter(parsed.get("cover_letter", ""), strategy, lang=lang)
-            parsed["short_dm"], dm_notes = critic_refine_letter(parsed.get("short_dm", ""), strategy, lang=lang)
-            parsed["critique_notes"] = parsed.get("critique_notes", []) + cl_notes + dm_notes
-
-            valid, errors = validate_cover_letter_output(parsed)
-            if valid:
-                return parsed
-    except Exception:
-        pass
+        valid, errors = validate_cover_letter_output(parsed)
+        if valid:
+            return parsed
 
     return heuristic_pkg

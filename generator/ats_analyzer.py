@@ -4,7 +4,7 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, List, Optional, Tuple
 
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, call_llm_json
 
 
 def validate_ats_report(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -257,31 +257,10 @@ OUTPUT JSON ONLY matching this schema:
   "recommendations": ["..."]
 }}
 """
-    model = GEMINI_MODELS[0]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json"
-        }
-    }
-
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=12.0) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            raw = data['candidates'][0]['content']['parts'][0]['text'].strip()
-            parsed = json.loads(raw)
-            is_valid, errors = validate_ats_report(parsed)
-            if is_valid:
-                return parsed
-    except Exception:
-        pass
+    parsed = call_llm_json(prompt)
+    if parsed and isinstance(parsed, dict):
+        is_valid, errors = validate_ats_report(parsed)
+        if is_valid:
+            return parsed
 
     return heuristic_report

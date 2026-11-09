@@ -12,7 +12,7 @@ try:
 except ImportError:
     Document = None
 
-from generator.llm_generator import get_api_key, get_llm_config, call_lm_studio, extract_json_payload
+from generator.llm_generator import get_api_key, get_llm_config, call_lm_studio, extract_json_payload, call_llm_json
 
 def parse_pdf(file_bytes):
     if PdfReader is None:
@@ -577,8 +577,6 @@ def extract_profile_with_ai(text: str) -> dict:
     """
     local_profile = parse_resume_locally(text)
     cfg = get_llm_config()
-    provider = cfg.get("provider", "gemini")
-
     prompt = f"""
     Extract structured candidate profile from this resume for HH.ru / LinkedIn / ATS integration.
     Return ONLY JSON with fields:
@@ -587,38 +585,9 @@ def extract_profile_with_ai(text: str) -> dict:
     {text[:4000]}
     """
 
-    if provider == "lm_studio":
-        raw_json = call_lm_studio(prompt, json_mode=True)
-        if raw_json:
-            ai_obj = extract_json_payload(raw_json)
-            if ai_obj and isinstance(ai_obj, dict):
-                for k in ["role", "name", "summary", "keywords"]:
-                    if ai_obj.get(k):
-                        local_profile[k] = ai_obj[k]
-                return local_profile
-        return local_profile
-
-    api_key = cfg.get("gemini_api_key", "")
-    if not api_key or not api_key.strip():
-        return local_profile
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1}
-    }
-    try:
-        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={
-            'Content-Type': 'application/json',
-            'x-goog-api-key': api_key
-        })
-        response = urllib.request.urlopen(req, timeout=8).read().decode('utf-8')
-        resp_data = json.loads(response)
-        out = resp_data['candidates'][0]['content']['parts'][0]['text']
-        out = out.replace('```json', '').replace('```', '').strip()
-        ai_obj = json.loads(out)
+    ai_obj = call_llm_json(prompt)
+    if ai_obj and isinstance(ai_obj, dict):
         for k in ["role", "name", "summary", "keywords"]:
             if ai_obj.get(k):
                 local_profile[k] = ai_obj[k]
-        return local_profile
-    except Exception:
-        return local_profile
+    return local_profile

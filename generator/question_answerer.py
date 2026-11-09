@@ -3,7 +3,7 @@ import json
 import urllib.request
 from typing import Dict, Any, List, Optional
 
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, call_llm
 
 
 def answer_application_question(
@@ -163,23 +163,9 @@ INVARIANTS:
 5. Language: {'Russian' if lang == 'ru' or re.search(r'[а-яё]', question.lower()) else 'English'}.
 6. Keep it concise, professional, and engineering-focused (under 120 words). Output ONLY the final answer text.
 """
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 250}
-    }
-    data_bytes = json.dumps(payload).encode("utf-8")
-
-    for model in GEMINI_MODELS:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json", "x-goog-api-key": api_key}, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                res_json = json.loads(resp.read().decode("utf-8"))
-                return res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
-        except urllib.error.URLError:
-            break
-        except Exception:
-            continue
+    res = call_llm(prompt, json_mode=False, timeout=10.0)
+    if res:
+        return res.strip()
     return None
 
 
@@ -275,25 +261,12 @@ ALLOWED OPTIONS:
 {json.dumps(clean_opts, ensure_ascii=False)}
 
 Output ONLY the exact string from ALLOWED OPTIONS. Do not add any explanation or punctuation."""
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 60}
-        }
-        data_bytes = json.dumps(payload).encode("utf-8")
-        for model in GEMINI_MODELS:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-            req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json", "x-goog-api-key": api_key}, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=2) as resp:
-                    res_json = json.loads(resp.read().decode("utf-8"))
-                    cand_ans = res_json["candidates"][0]["content"]["parts"][0]["text"].strip().strip('"\'')
-                    for opt in clean_opts:
-                        if opt.lower() == cand_ans.lower():
-                            return opt
-            except urllib.error.URLError:
-                break
-            except Exception:
-                continue
+        res = call_llm(prompt, json_mode=False, timeout=6.0)
+        if res:
+            cand_ans = res.strip().strip('"\'')
+            for opt in clean_opts:
+                if opt.lower() == cand_ans.lower():
+                    return opt
 
     return clean_opts[0]
 

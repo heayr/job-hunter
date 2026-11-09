@@ -15,7 +15,7 @@ from tracker.db import (
 )
 from agents.tool_system import ToolRegistry, ToolPermission
 from agents.event_bus import get_event_bus
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, call_llm_json
 from generator.candidate_profile import get_canonical_profile
 
 
@@ -113,61 +113,10 @@ class CareerAgentBrain:
         }
 
     def _call_llm_decision(self, prompt: str) -> Dict[str, Any]:
-        """Calls LM Studio (Local LLM) or Gemini API with structured JSON output enforcing ReAct decision."""
-        from generator.llm_generator import get_llm_config, call_lm_studio
-        cfg = get_llm_config()
-        provider = cfg.get("provider", "gemini")
-
-        # 1. If provider is LM Studio, call local model first
-        if provider == "lm_studio":
-            raw_json = call_lm_studio(prompt, json_mode=True)
-            if raw_json:
-                try:
-                    # Clean possible markdown wrapping
-                    cleaned = re.sub(r'^```(?:json)?\s*', '', raw_json.strip())
-                    cleaned = re.sub(r'\s*```$', '', cleaned).strip()
-                    return json.loads(cleaned)
-                except Exception:
-                    pass
-
-        # 2. Otherwise try Gemini models
-        api_key = cfg.get("gemini_api_key", "")
-        if api_key:
-            payload = {
-                "contents": [
-                    {
-                        "parts": [{"text": prompt}]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.1,
-                    "response_mime_type": "application/json"
-                }
-            }
-            data_bytes = json.dumps(payload).encode("utf-8")
-
-            for model in GEMINI_MODELS:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-                req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json", "x-goog-api-key": api_key}, method="POST")
-                try:
-                    with urllib.request.urlopen(req, timeout=25) as resp:
-                        res_json = json.loads(resp.read().decode("utf-8"))
-                        text = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                        return json.loads(text)
-                except Exception as e:
-                    continue
-
-        # 3. If Gemini failed (e.g. 429), try LM Studio as automatic local fallback
-        if provider != "lm_studio":
-            raw_json = call_lm_studio(prompt, json_mode=True)
-            if raw_json:
-                try:
-                    cleaned = re.sub(r'^```(?:json)?\s*', '', raw_json.strip())
-                    cleaned = re.sub(r'\s*```$', '', cleaned).strip()
-                    return json.loads(cleaned)
-                except Exception:
-                    pass
-
+        """Calls configured LLM (DeepSeek or LM Studio) with structured JSON output enforcing ReAct decision."""
+        parsed = call_llm_json(prompt)
+        if parsed and isinstance(parsed, dict):
+            return parsed
         return self._heuristic_fallback_decision()
 
     def _get_cover_letter_for_vacancy(self) -> str:

@@ -406,12 +406,14 @@ class CRMHandler(BaseHTTPRequestHandler):
                     except Exception:
                         pass
             safe_config = dict(config)
-            raw_key = safe_config.get('gemini_api_key', '')
-            safe_config['has_gemini_key'] = bool(raw_key and raw_key.strip())
+            raw_key = safe_config.get('deepseek_api_key', '') or safe_config.get('gemini_api_key', '')
+            safe_config['has_deepseek_key'] = bool(raw_key and raw_key.strip())
+            safe_config['has_gemini_key'] = safe_config['has_deepseek_key']
             if raw_key and len(raw_key) > 8:
-                safe_config['gemini_api_key'] = raw_key[:4] + '●' * 8 + raw_key[-4:]
+                safe_config['deepseek_api_key'] = raw_key[:4] + '●' * 8 + raw_key[-4:]
             else:
-                safe_config['gemini_api_key'] = ''
+                safe_config['deepseek_api_key'] = ''
+            safe_config['gemini_api_key'] = safe_config['deepseek_api_key']
             _send_json(self, safe_config)
 
         elif self.path == '/api/shame_list':
@@ -1075,6 +1077,10 @@ class CRMHandler(BaseHTTPRequestHandler):
                         config = json.load(cf)
                     except Exception:
                         pass
+            if 'deepseek_api_key' in body:
+                val = str(body['deepseek_api_key'] or '').strip()
+                if not val or '●' in val:
+                    body.pop('deepseek_api_key', None)
             if 'gemini_api_key' in body:
                 val = str(body['gemini_api_key'] or '').strip()
                 if not val or '●' in val:

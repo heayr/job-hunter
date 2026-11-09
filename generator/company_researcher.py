@@ -6,7 +6,7 @@ import html
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from generator.llm_generator import get_api_key, GEMINI_MODELS
+from generator.llm_generator import get_api_key, call_llm_json
 
 # ── DOMAIN & URL EXTRACTION ──────────────────────────────────────────────────
 
@@ -220,32 +220,11 @@ Output STRICT JSON:
   "sources": ["{domain or 'job_description'}"]
 }}
 """
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
-        }
-
-        for model in GEMINI_MODELS:
-            model_path = model if model.startswith("models/") else f"models/{model}"
-            url = f"https://generativelanguage.googleapis.com/v1beta/{model_path}:generateContent"
-            try:
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode('utf-8'),
-                    headers={'Content-Type': 'application/json', 'x-goog-api-key': api_key}
-                )
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    resp_data = json.loads(resp.read().decode('utf-8'))
-                    text = resp_data['candidates'][0]['content']['parts'][0]['text'].strip()
-                    text = re.sub(r'^```(?:json)?\s*', '', text)
-                    text = re.sub(r'\s*```$', '', text).strip()
-                    parsed = json.loads(text)
-                    if "public_facts" in parsed and "engineering_signals" in parsed:
-                        parsed["cached_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        dossier = parsed
-                        break
-            except Exception:
-                pass
+        parsed = call_llm_json(prompt)
+        if parsed and isinstance(parsed, dict):
+            if "public_facts" in parsed and "engineering_signals" in parsed:
+                parsed["cached_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                dossier = parsed
 
     # 4. Fallback if AI or network failed
     if not dossier:
